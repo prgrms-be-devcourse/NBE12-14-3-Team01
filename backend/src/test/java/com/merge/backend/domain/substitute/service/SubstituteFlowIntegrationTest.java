@@ -471,7 +471,9 @@ class SubstituteFlowIntegrationTest {
     }
 
     private WorkplaceMember saveMember(String name, WorkplaceRole role) {
-        User user = userRepository.save(new User("flow-" + name + "@test.com", "password-hash", name));
+        User user = userRepository.save(
+            new User("flow-" + name + "@test.com", "password-hash", name)
+        );
 
         return workplaceMemberRepository.save(
             new WorkplaceMember(workplace, user, role, now.minusDays(30))

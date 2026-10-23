@@ -256,7 +256,8 @@ class SubstituteRequestConcurrencyTest {
     class ForcedOrderTest {
 
         @Test
-        @DisplayName("Shift Lock - 먼저 생성 중인 요청이 커밋될 때까지 두 번째 생성은 대기하고, 이후 ACTIVE_REQUEST_EXISTS로 실패한다")
+        @DisplayName("Shift Lock - 먼저 생성 중인 요청이 커밋될 때까지 두 번째 생성은 대기하고, "
+            + "이후 ACTIVE_REQUEST_EXISTS로 실패한다")
         void secondCreateWaitsForFirstCreate() throws Exception {
 
             // given
@@ -278,7 +279,8 @@ class SubstituteRequestConcurrencyTest {
         }
 
         @Test
-        @DisplayName("Request Lock - 첫 번째 후보의 수락이 커밋될 때까지 두 번째 후보는 대기하고, 이후 REQUEST_NOT_OPEN으로 실패한다")
+        @DisplayName("Request Lock - 첫 번째 후보의 수락이 커밋될 때까지 두 번째 후보는 대기하고, "
+            + "이후 REQUEST_NOT_OPEN으로 실패한다")
         void secondAcceptWaitsForFirstAccept() throws Exception {
 
             // given
@@ -336,7 +338,8 @@ class SubstituteRequestConcurrencyTest {
         }
 
         @Test
-        @DisplayName("User Lock - 같은 User가 다른 Request를 수락하는 중이면 대기하고, 이후 CONFLICT_ACTIVE_SUBSTITUTE로 실패한다")
+        @DisplayName("User Lock - 같은 User가 다른 Request를 수락하는 중이면 대기하고, "
+            + "이후 CONFLICT_ACTIVE_SUBSTITUTE로 실패한다")
         void sameUserSecondAcceptWaitsForFirstAccept() throws Exception {
 
             // given - Request가 서로 다르므로 Request Lock으로는 막히지 않는다
