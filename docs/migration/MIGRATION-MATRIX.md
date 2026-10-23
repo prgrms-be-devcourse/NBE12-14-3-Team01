@@ -1,0 +1,100 @@
+# Domain Migration / Regression Matrix
+
+> 작성 기준: 2차 `origin/develop` `243f77c`, 2026-10-22 (D0-B). D0-D (2026-10-23): §2 PR·Kotlin 상태를 3차 `develop` `cdaaa13` 기준으로 갱신. 상태: **초안**.
+> Domain별 상세(API, 정책, Test, DoD)는 `docs/delivery/<Domain>.md`, Test 행 단위는 `docs/evidence/TEST-INVENTORY.md`.
+> 이 문서는 기술 진행 상태의 Source of Truth다. 일정·담당은 Notion Delivery Board가 SoT이고, Board 행은 이 문서의 행 ID로 연결한다.
+> 검증 상태 칸은 **통과한 Run 링크가 있을 때만** 채운다. Test가 존재한다는 것만으로는 채우지 않는다.
+
+## 1. Domain 범위 (실제 Package 기준)
+
+| V | Domain | Package / Class | Owner (초안, 팀 확인 필요 — D-NOW-01) |
+|---|---|---|---|
+| V1 | Auth / Security | `domain/user/**`, `global/security/**`, `global/rq/**` | 김덕우 |
+| V2 | Workplace / Member / Pattern | `domain/workplace/**`, **`domain/shift/**/RegularShiftPattern*`** | 황희리 |
+| V3 | Schedule / Shift / Unavailable | `domain/shift/**/Schedule*`, `Shift*`, `UnavailableTime*`, `domain/shift/event/**` | 박세민 |
+| V4 | Substitute | `domain/substitute/**` | 최세현 |
+| V5 | Notification / Event | `domain/notification/**` | 백혜승 |
+| 공통 | Global | `global/config`, `global/dto`, `global/entity`, `global/exception`, `global/util`, `standard` | 공통 설정 Owner (미지정) |
+
+주의: Pattern(V2)은 V3와 같은 `domain/shift` Package에 있다. `ScheduleService`(V3)가 `RegularShiftPattern`을 읽는다.
+
+## 2. 진행 상태
+
+Kotlin 상태 근거 (2026-10-23 확인): 3차 원격 Branch는 `develop`·`main`뿐. `develop` `cdaaa13`의 `.kt`는 환경 검증 파일 2개(`KotlinEnvironmentCheck.kt`, `KotlinEnvironmentTest.kt`, PR #1)이며 **Domain 코드의 Kotlin 전환은 0**. 담당자 보고는 받지 않았다 → 담당자 보고 전까지 `UNKNOWN`으로 표시한다.
+2차 Java 저장소의 Test PR #76·#77·#78은 모두 2026-10-22 병합됐다 (2차 `origin/develop` `8da2bec` = 3차 `main`).
+
+| V | Branch / PR | Kotlin (Git) | Kotlin (담당자 보고) | MIGRATION_CODE_COMPLETE | KOTLIN_QUALITY_REVIEWED | UNIT_TEST_VERIFIED | INTEGRATION_TEST_VERIFIED | CONTRACT_REGRESSION_VERIFIED | CROSS_DOMAIN_INTEGRATED | API_DOC_UPDATED | Blocker |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 공통 (M0) | 3차 PR #1 `chore/kotlin-setup` (MERGED → `cdaaa13`) | 환경 검증 파일 2개 | UNKNOWN | — | — | — | — | — | — | — | Owner 미지정 (D-NOW-01), DL-003·004·014 승인 기록, M0-FOLLOWUP-01~03 (`TECH-STACK-DECISIONS` §5-A) |
+| V1 | 2차 PR #76 `test/auth-tests` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
+| V2 | 2차 PR #78 `test/workplace-tests` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
+| V3 | 2차 PR #77 `test/schedule-state-consistency` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
+| V4 | 없음 (Delivery Sheet 시범: `docs/delivery/V4-substitute.md`) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
+| V5 | 없음 | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
+
+Java 실행 결과 (모든 V 공통): D0-B 조사 당시 Java Snapshot `243f77c`에서 266 Test PASS — EV-002, EV-003. **최종 Java Baseline(`BL-TBD`)이 아니다.** PR #76·#77·#78은 병합됐고 후보 SHA는 `8da2bec`이지만, `8da2bec`(2차 CI Run `39729371810`)와 3차 `cdaaa13`(EV-008)에는 **CI Suite success만** 있고 개별 Test 결과·Test 수 기록이 없다. 최종 Baseline(`BL-TBD`)은 B3 검증 후 선언한다 (DL-013). 이것은 **Java** 검증이며 Kotlin 상태 칸에 쓰지 않는다.
+
+## 3. Domain별 필수 Regression Test (재사용할 기존 Test)
+
+실행 결과: EV-002 (D0-B 조사 당시 Snapshot `243f77c`, MySQL 9.7.2 RC, 266/266 PASS). 수는 Class별 실행 수. **아래 수는 `243f77c` 기준이며 PR #76~78이 추가한 Test(`backend/src/test` 11개 파일 변경)는 포함하지 않는다.** 최종 Java Baseline(`BL-TBD`) 확정 후 다시 갱신한다.
+
+| V | 기존 Test (실행 수) | 합계 | 보존 계약 (G-03 C-ID, V 배정은 `docs/references/README.md` §5) | 보강 필요 (G-05 §9 제안, 승인 전) |
+|---|---|---|---|---|
+| V1 | `UserServiceTest` (11), `RqTest` (5) | 16 | C-01~C-07 | 실제 Security Filter + JWT HTTP Test 0건 → AUTH-EV-01. PR #76이 `CustomAuthenticationFilterTest`, `ApiV1UserControllerTest` 추가, `UserServiceTest` 보강 (병합됨, 내용·실행 수 미기록) |
+| V2 | `RegularShiftPatternControllerTest` (45), `WorkplaceServiceTest` (6), `WorkplaceMemberServiceTest` (1) | 52 | C-08~C-17 | Workplace Join 성공/실패, DB Unique 실존 (PR #78이 Workplace Controller·Repository·Security·Integration Test 추가, 병합됨, 실행 수 미기록) |
+| V3 | `UnavailableTimeServiceTest` (37), `ScheduleServiceTest` (23), `ShiftServiceTest` (14), `ScheduleControllerTest` (5), `UnavailableTimeRepositoryTest` (5, **H2에서 실행**), `ScheduleTest` (4), `ShiftScheduleConcurrencyTest` (4), `UnavailableTimeConcurrencyTest` (3) | 95 | C-18~C-39 | Publish 성공/실패 DB 최종 상태 (현재 Mock), Shift CREATE/UPDATE 성공, Official Shift Query Repository Test. PR #77이 `ScheduleRollbackIntegrationTest`, `ShiftModifyIntegrationTest` 추가 (병합됨, 실행 수 미기록) |
+| V4 | `SubstituteRequestServiceTest` (Approve 8, Close 11, Create 8, List 5, SentRequests 2), `SentSubstituteRequestResponseTest` (6), `SubstituteCandidateServiceTest` (6), `SubstituteRequestConcurrencyTest` (4), `SubstituteCandidateRepositoryTest` (2) | 52 | C-40~C-50 | **APPROVE 후 `Shift.member` DB 재조회** (C-48, 현재 Mock만), Candidate Filter 실제 DB |
+| V5 | `NotificationServiceTest` (14), `NotificationTest` (3), `SchedulePublishedEventListenerIntegrationTest` (1), `NotificationReadConcurrencyTest` (1) | 19 | C-51~C-56 | 알림 Row 검증 0 → Publish / Substitute 알림 Row |
+| 공통 | `TimeRangeUtilsTest` (15), `GlobalExceptionHandlerTest` (7), `ApiResponseTest` (4), `UtTest` (3), `BaseEntityAuditingTest` (2), `BackendApplicationTests` (1) | 32 | 응답 형식, 시간 Util | — |
+| **합계 (Snapshot `243f77c`)** | | **266** | | |
+
+Kotlin 전환 PR의 최소 PASS 조건 (제안): 해당 V 행의 기존 Test 전부 + 공통 행 + 전체 `./gradlew check` 통과. Test 기대값 변경 0.
+
+## 4. Domain별 기술 선행조건과 손대지 않을 구간
+
+| V | 기술 선행조건 (`TECH-STACK-DECISIONS` §3의 `TS-` ID) | 보존 구간 (Migration에서 변경 금지) | 관련 Decision |
+|---|---|---|---|
+| V1 | M0 완료, TS-08 (Lombok) | `SecurityConfig` Matcher 목록 그대로 (G03-OQ-01), Cookie·JWT 설정 | G03-D-23, G03-D-24, G03-D-28, G03-OQ-01 |
+| V2 | M0 완료, TS-03 (JPA), TS-06 (Jackson) | Unique (`workplace_id,user_id`, `invite_code`), `leftAt` 처리 현행 | G03-D-02, G03-D-11~14, G03-D-25 |
+| V3 | M0 완료, TS-03, TS-06 | `@Lock` Query, Publish 충돌 검사 순서, Cross-Workplace 현행 동작 (DL-001) | G03-D-03~08, G03-D-26, G03-D-27, DL-001, DL-002 |
+| V4 | M0 완료, TS-03, TS-06 | `@Lock` Query, 상태 전이, Candidate 재검증 | G03-D-09, G03-D-15, G03-D-17, G03-D-19, G03-D-21 |
+| V5 | M0 완료 | `@TransactionalEventListener` phase, 알림 생성 시점 | G03-D-10, G03-D-16, G03-D-18, G03-D-20, G03-D-22 |
+| 공통 | M0 완료 | `ApiResponse` 형식, `ErrorCode` 인터페이스, `GlobalExceptionHandler` 매핑, `BaseEntity` Auditing | G03-D-01 |
+
+## 5. 코드 의존 관계 (develop `243f77c`, main, `import` 기준)
+
+| From → To | import 문 수 |
+|---|---|
+| workplace (controller/entity/repository/service) → user (entity/service) | 5 |
+| shift → workplace (entity/repository/service/exception) | 19 |
+| shift → user (entity/repository/service) | 4 |
+| substitute → shift (entity/repository/exception) | 15 |
+| substitute → workplace | 13 |
+| substitute → user (service) | 2 |
+| notification → substitute.event | 6 |
+| notification → shift.event | 1 |
+| notification → workplace (entity/repository) | 3 |
+| `global/security` → user (`UserService`, `UserErrorCode`) | 3 |
+| `global/config/InitData` → user, workplace | 7 |
+| 모든 Domain → `global` (`BaseEntity`, `ApiResponse`, `ErrorCode`, `Rq` 등) | 다수 |
+
+의존 방향: `user ← workplace ← shift(V2 Pattern + V3) ← substitute ← notification`, 그리고 `global ↔ user/workplace` 순환.
+
+전환 순서에 주는 의미:
+- 5명이 동시에 전환하면 Kotlin 코드가 아직 Java인 다른 Domain의 Lombok Class를 호출한다 → `kotlin("plugin.lombok")` (TS-08) 또는 순서 조정이 필요하다.
+- 공통 `global`의 `BaseEntity` / `ApiResponse` / `ErrorCode`를 언제 누가 바꿀지 정해야 한다. 공통 Owner의 별도 PR로 하고, 그 전까지 Java로 둔다 (제안).
+- V3·V4의 Lock 구간은 H6 재현 결과 전에는 의미 변경 없이 옮기기만 한다.
+
+## 6. 개선 후보 등록부 (D3, 승인 전)
+
+| ID | 후보 | 구분 | 사용자 가치 | 영향 Domain | 구현 부담 | Test 부담 | 선행조건 | 승인 |
+|---|---|---|---|---|---|---|---|---|
+| IMP-01 | 실제 Security Filter 경계 검증 (AUTH-EV-01) | 안전 위험 (검증 후 필수 가능) | 무토큰 접근 차단 확인 | V1 | 작음 (Test) | 중간 | M0 무관, PR #76 확인 | PENDING |
+| IMP-02 | 동시 ACCEPT 재현 (SUB-EV-05) RR / RC 대조 | 안전 위험 | 대타 중복 확정 방지 | V4 | 작음 (Harness 있음, LOCAL_ONLY) | 중간 | T-02A/B 공유 승인 | PENDING |
+| IMP-03 | 서버 Logout (H1) | 팀 선택 | 보안 | V1 | 중간 | 중간 | G03-D-23 | PENDING |
+| IMP-04 | Membership 종료 최소안 (H2). 구체안 ML-DECISION-01·ML-SUB-STATE-01·ML-CONCURRENCY-01-R은 ② `PROPOSED`, 팀 문서 미작성 | 팀 선택 | 퇴사자 처리 | V2~V5 | 큼 | 큼 | G03-D-11 | PENDING |
+| IMP-05 | DRAFT 조회에 다른 근무지 충돌 boolean 표시 | 팀 선택 (P1 후보) | 관리자 사전 인지 | V3 | 중간 | 중간 | DL-001 | PENDING |
+| IMP-06 | Outbox / Retry (H5) | 팀 선택 (비권장) | 알림 유실 감소 | V5 | 큼 | 큼 | G03-D-22 | PENDING |
+| IMP-07 | Kotlin 컨벤션 도구 (ktlint/detekt) | 공식 MUST 지원 | 코드 품질 | 전체 | 작음 | 작음 | M0 | PENDING |
+
+구분: 공식 MUST / 기존 승인 P0 (현재 0건) / 안전 위험 (검증 후 필수 가능) / 팀 선택.
