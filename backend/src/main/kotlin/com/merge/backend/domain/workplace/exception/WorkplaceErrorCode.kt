@@ -1,14 +1,13 @@
-package com.merge.backend.domain.workplace.exception;
+package com.merge.backend.domain.workplace.exception
 
-import com.merge.backend.global.exception.ErrorCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import com.merge.backend.global.exception.ErrorCode
+import org.springframework.http.HttpStatus
 
-@Getter
-@RequiredArgsConstructor
-public enum WorkplaceErrorCode implements ErrorCode {
-
+enum class WorkplaceErrorCode(
+    private val httpStatus: HttpStatus,
+    private val code: String,
+    private val message: String
+) : ErrorCode {
     INVALID_INVITE_CODE(
         HttpStatus.NOT_FOUND,
         "WPL-001",
@@ -35,8 +34,9 @@ public enum WorkplaceErrorCode implements ErrorCode {
         "존재하지 않는 근무지입니다."
     );
 
+    override fun getHttpStatus(): HttpStatus = httpStatus
 
-    private final HttpStatus httpStatus;
-    private final String code;
-    private final String message;
+    override fun getCode(): String = code
+
+    override fun getMessage(): String = message
 }
