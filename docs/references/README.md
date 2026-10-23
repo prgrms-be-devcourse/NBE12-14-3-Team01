@@ -9,6 +9,9 @@
 | 파일 | 원본 | 작성 시점 | 기준 Java SHA | 내용 | 3차 문서에서의 쓰임 |
 |---|---|---|---|---|---|
 | [`G-03-contract-review.md`](G-03-contract-review.md) | 작성자 로컬 `switch-v3-ai/reviews/G-03-contract-preserve-decision-review.md` | 2026-10-21 (AI 분석, Human Follow-up 반영본) | 2차 Original `985861263c576308168ca539159552d4a4e47606` | Canonical Contract C-01~C-56, Implementation Preserve IP-01~03, Decision Register G03-D-01~28, Open Question G03-OQ-01~03 | `CONTRACT-BASELINE`·`MIGRATION-MATRIX`·`DECISION-LOG`·Delivery Sheet·Test Inventory가 C-ID·G03-D-ID로 참조 |
+| [`ml/ML-DECISION-01-FINAL.md`](ml/ML-DECISION-01-FINAL.md) | 작성자 로컬 AI 대화 Log | 2026-10-22 | 2차 `8da2bec` | 퇴사 Command 패키지 (과거 제안) | 정책 카드 ML-H1·ML-2~5의 이전 제안 (§7) |
+| [`ml/ML-SUB-STATE-01.md`](ml/ML-SUB-STATE-01.md) | 작성자 로컬 AI 대화 Log | 2026-10-22 | 2차 `8da2bec` | 대타 후보 자격 상실 B+ (과거 제안) | 정책 카드 ML-3의 이전 제안 (§7) |
+| [`ml/ML-CONCURRENCY-01-R.md`](ml/ML-CONCURRENCY-01-R.md) | 작성자 로컬 AI 대화 Log | 2026-10-22 | 2차 `8da2bec` | 퇴사 경합 Membership Guard Lock (과거 제안) | 정책 카드 ML-5의 이전 제안 (§7) |
 
 기준 SHA 차이: G-03은 Original `9858612` 기준이다. 3차 문서의 Java 기준(2차 Snapshot `243f77c`, Baseline 후보 `8da2bec`, 3차 `cdaaa13`)과 Production Java 코드는 같지만 설정이 다르다 (전역 READ COMMITTED 등, `docs/README.md` §4-1). G-03은 이 설정 차이를 반영하지 않는다.
 
@@ -18,7 +21,7 @@
 2. 현재 동작은 코드에서 다시 확인한다. G-03과 코드가 다르면 어느 쪽도 고르지 않고 `DECISION-LOG`에 `DISCREPANCY / PENDING`으로 기록한다 (`docs/ai/AI-RULES.md` §3).
 3. G-03의 Decision 후보·선택지·제안은 결정이 아니다. 질문과 상태는 `DECISION-LOG` §2에서 관리한다.
 4. G-03의 Test·Runtime 계획(§11)은 G-03 시점의 제안이다. 현재 Test 상태는 [`TEST-INVENTORY`](../evidence/TEST-INVENTORY.md), 실행 근거는 [`TEST-EVIDENCE`](../evidence/TEST-EVIDENCE.md)를 본다.
-5. Membership Lifecycle 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 G-03 이후 별도 분석이며 G-03에 없다. G-03에는 질문(G03-D-11~16)만 있다.
+5. Membership Lifecycle 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 G-03 이후 별도 분석이며 G-03에 없다. G-03에는 질문(G03-D-11~16)만 있다. 구체안 원문은 `ml/`에 있다 (§7). 지금 검토 중인 정책 카드는 `docs/decisions/proposals/`에 있고, 원문과 카드가 다르면 **카드가 최신 검토본**이다 (그래도 팀 승인 전).
 
 ## 3. 원본과 공유본의 차이
 
@@ -82,5 +85,23 @@ G-03은 C-ID를 원 Audit(A-01~A-07) 절로 묶는다. 3차 문서의 V 배정�
 | AI-GUIDE, AUDIT-MAP, SOURCE-INDEX, 프롬프트, scratch | LOCAL_ONLY | 분석 작업 도구. 상태 용어가 STATUS-AXES와 달라 혼동 위험. 역할은 `docs/ai/AI-RULES.md`가 대신함 |
 | 초기 P0 진단 메모 | LOCAL_ONLY | 외부 대화 링크 포함, 오래된 제안 |
 | D0-B / D0-C 초안, D0-D 인계서 | LOCAL_ONLY | 내용은 이미 `docs/`에 반영됨. 인계서는 로컬 세션 기록 경로 포함 |
-| 로컬 세션 기록 (ML 분석 원문) | LOCAL_ONLY | 대화 원문. Membership Lifecycle 문서를 쓸 때 내용을 정리해 옮김 (그대로 복사 금지) |
+| 로컬 세션 기록 (ML 분석 원문) | 일부 공유 (2026-10-23) | 최종본 3종만 `ml/`에 원문 그대로 공유 (§7, 사용자 결정 2026-10-23. 이전 기준 "정리해 옮김, 그대로 복사 금지"를 바꿈). 직전안·사용자 입력 메시지·Log 파일 자체는 LOCAL_ONLY |
 | H6 Harness Source, 실행 Log | LATER (Harness, DL-009) / LOCAL_ONLY (Log) | Harness는 docs가 아니라 별도 Test PR로. Log는 개인 경로 포함, 요약은 `TEST-EVIDENCE` EV-001~007 |
+
+## 7. ML 제안 원문 (`ml/`)
+
+| 항목 | 내용 |
+|---|---|
+| 성격 | 과거 AI 제안 원문. **현행 계약 아님, 팀 승인 전.** 각 파일 머리말에 이후 대체 관계를 적었다 |
+| 원본 | 작성자 로컬 Claude Code 대화 Log (2차 분석 작업공간 세션). 저장소에 없음 |
+| 추가 | 각 파일 맨 앞 머리말 (HTML 주석 1줄 + 제목 + 안내 blockquote) |
+| 변경 | 본문 0줄. 머리말 아래는 대화 Log의 Assistant 응답 Text를 그대로 옮김 |
+| 공유 전 검사 | 본문에서 개인 절대 경로·Log 파일 경로·Secret·Token 값·Password·Email·외부 URL 검색: 0건. 머리말의 출처는 경로 없이 "작성자 로컬 AI 대화 Log"로 적음 |
+
+| 파일 | 원본 위치 (1-based line, 시각) | 본문 SHA-256 | 대체·후속 |
+|---|---|---|---|
+| `ml/ML-DECISION-01-FINAL.md` | line 9431, 2026-10-22T07:26:20Z | `3856b3f836dd80c6524ce11e271b371bb4e9bd5a30dbc36ecff1d2c410b8c357` | 대타 정리 → ML-SUB-STATE-01로 대체. Lock 순서 → ML-CONCURRENCY-01-R로 대체. 이력·재가입 → 카드 ML-H1 |
+| `ml/ML-SUB-STATE-01.md` | line 9601, 2026-10-22T08:24:40Z | `58e23d1a33d925c70e9f457bf67e6e049007e09cb419ef4d8d2c06c01d336e67` | 후속 카드 ML-3 (미작성) |
+| `ml/ML-CONCURRENCY-01-R.md` | line 9678, 2026-10-22T08:49:49Z | `76caf22eea69d5ccbd6db860e1697b802ebf2cba29e8adcdcd1ce49aeb32b590` | 후속 카드 ML-5 (미작성). 실행 근거 없음 (H6 미실행) |
+
+검증 방법: 각 파일에서 머리말(첫 `---` 줄까지와 그 다음 빈 줄)과 파일 끝 줄바꿈 1개를 뺀 본문의 SHA-256이 위 값과 같다.
