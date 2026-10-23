@@ -14,6 +14,7 @@ import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
+import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
@@ -42,6 +43,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
+import com.merge.backend.global.exception.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,11 +51,14 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -184,6 +189,41 @@ class SubstituteRequestServiceTest {
         given(candidateUser.getId()).willReturn(candidateUserId);
         given(candidateMember.getUser()).willReturn(candidateUser);
         given(candidate.getMember()).willReturn(candidateMember);
+    }
+
+    // 승인 직전 단계(Request/Workplace/ACCEPTED Candidate 조회)까지 정상 설정
+    private void setupApprovableRequest() {
+        setupValidRequestFullInfo();
+        given(substituteRequestRepository.findByIdForUpdate(requestId))
+            .willReturn(Optional.of(request));
+        given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
+            .willReturn(Optional.of(candidate));
+    }
+
+    // 예외 타입뿐 아니라 "어떤 에러코드"로 실패했는지까지 확인
+    private static void assertBusinessError(ThrowingCallable action, ErrorCode expected) {
+        assertThatThrownBy(action)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(expected);
+    }
+
+    // 실패한 경우 승인(Shift 담당자 변경)과 이벤트 발행이 일어나지 않아야 한다
+    private void assertApproveFails(ErrorCode expected) {
+        assertBusinessError(() -> substituteRequestService.approve(requestId, actorId), expected);
+
+        verify(request, never()).approveRequest(any(), any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
+    }
+
+    // 실패한 경우 종료 처리와 이벤트 발행이 일어나지 않아야 한다
+    private void assertCloseFails(ErrorCode expected) {
+        assertBusinessError(() -> substituteRequestService.close(requestId, actorId), expected);
+
+        verify(request, never()).closeByManager(any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     // ===================== SUB-04 대체 근무 승인 =====================
@@ -337,200 +377,256 @@ class SubstituteRequestServiceTest {
         }
 
         @Test
-        @DisplayName("요청 상태가 ACCEPTED가 아니면 예외가 발생한다")
-        void approve_fail_invalid_request_status() {
+        @DisplayName("실패: 존재하지 않는 요청이면 예외가 발생한다")
+        void approve_fail_request_not_found() {
             // given
-            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.empty());
+
+            // when & then
+            assertBusinessError(
+                () -> substituteRequestService.approve(requestId, actorId),
+                SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND
+            );
+            verify(applicationEventPublisher, never()).publishEvent(any());
+        }
+
+        @ParameterizedTest(name = "Request 상태 = {0}")
+        @EnumSource(value = RequestStatus.class, names = {"OPEN", "APPROVED", "CLOSED"})
+        @DisplayName("실패: 아무도 수락하지 않았거나(OPEN) 이미 끝난 요청은 승인할 수 없다")
+        void approve_fail_invalid_request_status(RequestStatus status) {
+            // given
+            given(request.getStatus()).willReturn(status);
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
 
             // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode.INVALID_REQUEST.getMessage());
+            assertApproveFails(SubstituteRequestErrorCode.INVALID_REQUEST);
+
+            // 상태 검증에서 막혔으므로 다음 단계(권한 확인, User Lock)로 넘어가지 않는다
+            verify(workplaceMemberService, never()).requireManager(any(), any());
+            verify(userService, never()).getByIdForUpdate(any());
         }
 
         @Test
-        @DisplayName("근무 시작일이 이미 지난 경우 예외가 발생한다")
-        void approve_fail_past_shift_start_time() {
-            // given
-            setupValidRequestFullInfo();
-            setupValidCandidateInfo();
-
-            given(shift.getStartAt()).willReturn(now.minusHours(1));
-
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate));
-
-            // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(ShiftErrorCode.INVALID_TIME_VALUE.getMessage());
-        }
-
-        @Test
-        @DisplayName("승인 요청자가 해당 근무지 소속이 아니거나 매니저가 아닌 경우 예외가 발생한다")
+        @DisplayName("실패: 승인 요청자가 해당 근무지 소속이 아니면 예외가 발생한다")
         void approve_fail_actor_not_in_workplace() {
             // given
             setupValidRequestBasicInfo();
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
-
             given(workplaceMemberService.requireManager(actorId, workplaceId))
                 .willThrow(new BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER));
 
             // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
+            assertApproveFails(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER);
+            verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(any(), any());
         }
 
         @Test
-        @DisplayName("수락 Candidate가 현재 EMPLOYEE가 아니면 승인할 수 없다")
-        void approve_fail_candidate_not_employee() {
-
+        @DisplayName("실패: 승인 요청자가 MANAGER가 아니면 예외가 발생한다")
+        void approve_fail_actor_not_manager() {
             // given
-            setupValidRequestFullInfo();
+            setupValidRequestBasicInfo();
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.of(request));
+            given(workplaceMemberService.requireManager(actorId, workplaceId))
+                .willThrow(new BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED));
 
-            given(candidateMember.getWorkplace())
-                .willReturn(workplace);
+            // when & then
+            assertApproveFails(WorkplaceErrorCode.MANAGER_REQUIRED);
+            verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(any(), any());
+        }
 
-            given(candidateMember.getLeftAt())
-                .willReturn(null);
+        @Test
+        @DisplayName("실패: 근무표가 공개 전(DRAFT)이면 승인할 수 없다")
+        void approve_fail_schedule_not_published() {
+            // given
+            setupValidRequestBasicInfo();
+            given(schedule.getStatus()).willReturn(ScheduleStatus.DRAFT);
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.of(request));
 
-            // 수락 당시에는 EMPLOYEE였지만
-            // 승인 시점에는 더 이상 EMPLOYEE가 아닌 상황
-            given(candidateMember.getRole())
-                .willReturn(WorkplaceRole.MANAGER);
+            // when & then
+            assertApproveFails(ScheduleErrorCode.NOT_PUBLISHED);
+        }
 
-            given(candidate.getMember())
-                .willReturn(candidateMember);
+        @Test
+        @DisplayName("실패: Shift가 취소됐으면 승인할 수 없다")
+        void approve_fail_shift_cancelled() {
+            // given
+            setupValidRequestBasicInfo();
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.CANCELLED);
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.of(request));
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.IS_CANCELED_SHIFT);
+        }
+
+        @Test
+        @DisplayName("실패: 요청 이후 Shift 담당자가 바뀌었으면 승인할 수 없다")
+        void approve_fail_shift_member_changed() {
+            // given
+            setupValidRequestBasicInfo();
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+
+            WorkplaceMember currentShiftMember = mock(WorkplaceMember.class);
+            given(currentShiftMember.getId()).willReturn(999L);
+            given(shift.getMember()).willReturn(currentShiftMember);
+
+            given(requesterMember.getId()).willReturn(requesterMemberId);
+            given(request.getRequesterMember()).willReturn(requesterMember);
 
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
 
-            given(workplaceRepository.findById(workplaceId))
-                .willReturn(Optional.of(workplace));
-
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId,
-                CandidateStatus.ACCEPTED
-            )).willReturn(Optional.of(candidate));
-
             // when & then
-            assertThatThrownBy(
-                () -> substituteRequestService.approve(
-                    requestId,
-                    actorId
-                )
-            )
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(
-                    ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE
-                        .getMessage()
-                );
-
-            // Candidate 자체가 현재 승인 대상이 아니므로
-            // User의 시간 Lock까지 갈 필요가 없음
-            verify(userService, never())
-                .getByIdForUpdate(any());
-
-            verify(request, never())
-                .approveRequest(
-                    any(),
-                    any()
-                );
+            assertApproveFails(SubstituteRequestErrorCode.INVALID_MEMBER);
         }
 
         @Test
-        @DisplayName("후보자에게 충돌하는 기존 Shift가 존재하는 경우 예외가 발생한다")
+        @DisplayName("실패: Request는 ACCEPTED인데 ACCEPTED Candidate가 없으면 예외가 발생한다")
+        void approve_fail_accepted_candidate_not_found() {
+            // given
+            setupValidRequestFullInfo();
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.of(request));
+            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
+            given(substituteCandidateRepository.findByRequestIdAndStatus(
+                requestId, CandidateStatus.ACCEPTED))
+                .willReturn(Optional.empty());
+
+            // when & then
+            assertApproveFails(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE);
+            verify(userService, never()).getByIdForUpdate(any());
+        }
+
+        @Test
+        @DisplayName("실패: 수락한 사람이 퇴사했으면 승인으로 이어지지 않는다")
+        void approve_fail_accepted_member_left() {
+            // given
+            setupApprovableRequest();
+            given(candidate.getMember()).willReturn(candidateMember);
+            given(candidateMember.getWorkplace()).willReturn(workplace);
+            given(candidateMember.getLeftAt()).willReturn(now.minusHours(1));
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+            verify(userService, never()).getByIdForUpdate(any());
+        }
+
+        @Test
+        @DisplayName("실패: 수락한 사람이 다른 근무지 소속이면 승인할 수 없다")
+        void approve_fail_accepted_member_other_workplace() {
+            // given
+            setupApprovableRequest();
+            Workplace otherWorkplace = mock(Workplace.class);
+            given(otherWorkplace.getId()).willReturn(999L);
+            given(candidate.getMember()).willReturn(candidateMember);
+            given(candidateMember.getWorkplace()).willReturn(otherWorkplace);
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+            verify(userService, never()).getByIdForUpdate(any());
+        }
+
+        @Test
+        @DisplayName("실패: 수락한 사람이 현재 EMPLOYEE가 아니면 승인할 수 없다")
+        void approve_fail_candidate_not_employee() {
+            // given
+            setupApprovableRequest();
+            given(candidate.getMember()).willReturn(candidateMember);
+            given(candidateMember.getWorkplace()).willReturn(workplace);
+            given(candidateMember.getLeftAt()).willReturn(null);
+
+            // 수락 당시에는 EMPLOYEE였지만 승인 시점에는 MANAGER가 된 상황
+            given(candidateMember.getRole()).willReturn(WorkplaceRole.MANAGER);
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+
+            // 승인 대상이 아니므로 User 시간 Lock까지 갈 필요가 없다
+            verify(userService, never()).getByIdForUpdate(any());
+        }
+
+        @Test
+        @DisplayName("실패: 근무 시작 시각이 이미 지났으면 승인할 수 없다")
+        void approve_fail_past_shift_start_time() {
+            // given
+            setupApprovableRequest();
+            setupValidCandidateInfo();
+            given(shift.getStartAt()).willReturn(now.minusHours(1));
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.INVALID_TIME_VALUE);
+            verify(shiftRepository, never()).existsConflictingShift(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("실패: 근무 시작 시각이 정확히 now(경계값)이면 승인할 수 없다")
+        void approve_fail_shift_starts_exactly_now() {
+            // given
+            setupApprovableRequest();
+            setupValidCandidateInfo();
+            given(shift.getStartAt()).willReturn(now);
+
+            // when & then
+            assertApproveFails(ShiftErrorCode.INVALID_TIME_VALUE);
+        }
+
+        @Test
+        @DisplayName("실패: 후보자에게 충돌하는 기존 Shift가 존재하면 승인할 수 없다")
         void approve_fail_conflicting_shift() {
             // given
-            setupValidRequestFullInfo();
+            setupApprovableRequest();
             setupValidCandidateInfo();
-
             given(shift.getStartAt()).willReturn(now.plusDays(1));
             given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate));
-
             given(shiftRepository.existsConflictingShift(
-                eq(candidateUserId), any(), any())).willReturn(true);
-
-            // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode.CONFLICT_SHIFT.getMessage());
-        }
-
-        @Test
-        @DisplayName("후보자의 불가능한 시간과 중복되는 경우 예외가 발생한다")
-        void approve_fail_conflicting_unavailable_time() {
-            // given
-            setupValidRequestFullInfo();
-            setupValidCandidateInfo();
-
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
-            given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
-
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate));
-
-            given(shiftRepository.existsConflictingShift(
-                eq(candidateUserId), any(), any())).willReturn(false);
-            given(unavailableTimeRepository.existsOverlappingUnavailableTime(
-                eq(candidateUserId), any(), any())).willReturn(true);
-
-            // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(
-                    SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME.getMessage());
-        }
-
-        @Test
-        @DisplayName("후보자가 다른 활성 대타 약속과 시간 충돌이 있는 경우 예외가 발생한다")
-        void approve_fail_conflicting_active_substitute() {
-            // given
-            setupValidRequestFullInfo();
-            setupValidCandidateInfo();
-
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
-            given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
-
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate));
-
-            given(shiftRepository.existsConflictingShift(
-                eq(candidateUserId), any(), any())).willReturn(false);
-            given(unavailableTimeRepository.existsOverlappingUnavailableTime(
-                eq(candidateUserId), any(), any())).willReturn(false);
-            given(substituteCandidateRepository.existsConflictingActiveSubstitute(
-                eq(candidateUserId), eq(requestId), any(), any(), any()))
+                candidateUserId, now.plusDays(1), now.plusDays(1).plusHours(8)))
                 .willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(
-                    SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
+            assertApproveFails(SubstituteRequestErrorCode.CONFLICT_SHIFT);
+        }
+
+        @Test
+        @DisplayName("실패: 후보자의 근무 불가 시간과 겹치면 승인할 수 없다")
+        void approve_fail_conflicting_unavailable_time() {
+            // given
+            setupApprovableRequest();
+            setupValidCandidateInfo();
+            given(shift.getStartAt()).willReturn(now.plusDays(1));
+            given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
+
+            given(unavailableTimeRepository.existsOverlappingUnavailableTime(
+                candidateUserId, now.plusDays(1), now.plusDays(1).plusHours(8)))
+                .willReturn(true);
+
+            // when & then
+            assertApproveFails(SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME);
+        }
+
+        @Test
+        @DisplayName("실패: 후보자가 다른 활성 대타 약속과 겹치면 승인할 수 없다")
+        void approve_fail_conflicting_active_substitute() {
+            // given
+            setupApprovableRequest();
+            setupValidCandidateInfo();
+            given(shift.getStartAt()).willReturn(now.plusDays(1));
+            given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
+
+            given(substituteCandidateRepository.existsConflictingActiveSubstitute(
+                candidateUserId, requestId,
+                now.plusDays(1), now.plusDays(1).plusHours(8), now))
+                .willReturn(true);
+
+            // when & then
+            assertApproveFails(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE);
         }
     }
 
@@ -625,8 +721,10 @@ class SubstituteRequestServiceTest {
                 .willReturn(List.of());
 
             // when & then
-            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertBusinessError(
+                () -> substituteRequestService.list(workplaceId, actorId),
+                SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_NOT_FOUND
+            );
         }
 
         @Test
@@ -653,8 +751,10 @@ class SubstituteRequestServiceTest {
                 .willReturn(List.of(candidate, candidate2));
 
             // when & then
-            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertBusinessError(
+                () -> substituteRequestService.list(workplaceId, actorId),
+                SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_DUPLICATED
+            );
         }
 
         @Test
@@ -663,9 +763,11 @@ class SubstituteRequestServiceTest {
         void list_NotFoundWorkplace_ThrowsException() {
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(WorkplaceErrorCode.WORKPLACE_NOT_FOUND.getMessage());
+            assertBusinessError(
+                () -> substituteRequestService.list(workplaceId, actorId),
+                WorkplaceErrorCode.WORKPLACE_NOT_FOUND
+            );
+            verify(substituteRequestRepository, never()).findAllByWorkplaceId(any(), any());
         }
 
         @Test
@@ -675,8 +777,12 @@ class SubstituteRequestServiceTest {
             given(workplaceMemberService.requireManager(actorId, workplaceId))
                 .willThrow(new BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED));
 
-            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertBusinessError(
+                () -> substituteRequestService.list(workplaceId, actorId),
+                WorkplaceErrorCode.MANAGER_REQUIRED
+            );
+            // 권한이 없으면 요청 목록을 조회하지 않는다
+            verify(substituteRequestRepository, never()).findAllByWorkplaceId(any(), any());
         }
     }
 
@@ -981,8 +1087,11 @@ class SubstituteRequestServiceTest {
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertBusinessError(
+                () -> substituteRequestService.close(requestId, actorId),
+                SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND
+            );
+            verify(applicationEventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -998,9 +1107,7 @@ class SubstituteRequestServiceTest {
             given(workplaceMemberService.requireManager(actorId, workplaceId))
                 .willThrow(new BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER));
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
+            assertCloseFails(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER);
         }
 
         @Test
@@ -1015,9 +1122,7 @@ class SubstituteRequestServiceTest {
 
             given(request.getStatus()).willReturn(RequestStatus.APPROVED);
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode.ALREADY_TERMINATED.getMessage());
+            assertCloseFails(SubstituteRequestErrorCode.ALREADY_TERMINATED);
         }
 
         @Test
@@ -1032,9 +1137,7 @@ class SubstituteRequestServiceTest {
 
             given(request.getStatus()).willReturn(RequestStatus.CLOSED);
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode.ALREADY_TERMINATED.getMessage());
+            assertCloseFails(SubstituteRequestErrorCode.ALREADY_TERMINATED);
         }
 
         @Test
@@ -1050,8 +1153,7 @@ class SubstituteRequestServiceTest {
             given(request.getStatus()).willReturn(RequestStatus.OPEN);
             given(schedule.getStatus()).willReturn(ScheduleStatus.DRAFT);
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertCloseFails(ScheduleErrorCode.NOT_PUBLISHED);
         }
 
         @Test
@@ -1068,8 +1170,7 @@ class SubstituteRequestServiceTest {
             given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
             given(shift.getStatus()).willReturn(ShiftStatus.CANCELLED);
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class);
+            assertCloseFails(ShiftErrorCode.INVALID_STATUS_VALUE);
         }
 
         @Test
@@ -1087,10 +1188,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
             given(shift.getStartAt()).willReturn(now.minusMinutes(1));
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode
-                    .SHIFT_ALREADY_STARTED_NOT_CLOSE.getMessage());
+            assertCloseFails(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED_NOT_CLOSE);
         }
 
         @Test
@@ -1108,10 +1206,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
             given(shift.getStartAt()).willReturn(now);
 
-            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining(SubstituteRequestErrorCode
-                    .SHIFT_ALREADY_STARTED_NOT_CLOSE.getMessage());
+            assertCloseFails(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED_NOT_CLOSE);
         }
 
         @Test
@@ -1513,12 +1608,16 @@ class SubstituteRequestServiceTest {
         }
 
         private void assertCreateFails(SubstituteRequestErrorCode expected) {
-            assertThatThrownBy(() -> substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(expected);
+            assertBusinessError(
+                () -> substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID),
+                expected
+            );
 
+            // 검증에서 막혔다면 후보 조회 → Request/Candidate 저장 → 알림까지 이어지면 안 된다
+            verify(substituteCandidateService, never()).findCandidates(any(), any(), any());
             verify(substituteRequestRepository, never()).save(any(SubstituteRequest.class));
+            verify(substituteCandidateService, never()).createCandidates(any(), any());
+            verify(applicationEventPublisher, never()).publishEvent(any());
         }
     }
 

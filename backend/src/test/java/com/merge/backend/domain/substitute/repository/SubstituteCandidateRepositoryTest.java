@@ -158,6 +158,63 @@ class SubstituteCandidateRepositoryTest {
             CandidateStatus.PENDING
         );
 
+        // 7. 다른 사용자에게 온 요청 → userId 조건 확인
+        WorkplaceMember otherMember = persistMember(
+            workplace, "other@test.com", WorkplaceRole.EMPLOYEE, now
+        );
+
+        createCandidate(
+            publishedSchedule,
+            requesterMember,
+            otherMember,
+            now.plusHours(7),
+            ShiftStatus.SCHEDULED,
+            RequestStatus.OPEN,
+            CandidateStatus.PENDING
+        );
+
+        // 8. 같은 사용자지만 이미 퇴사한 근무지의 요청 → leftAt 조건 확인
+        Workplace leftWorkplace = entityManager.persist(
+            new Workplace("퇴사한 매장", "LEFT1234")
+        );
+
+        WorkplaceMember leftMember = entityManager.persist(
+            new WorkplaceMember(
+                leftWorkplace,
+                candidateUser,
+                WorkplaceRole.EMPLOYEE,
+                now.minusMonths(2),
+                now.minusDays(1)
+            )
+        );
+
+        Schedule leftWorkplaceSchedule =
+            new Schedule(leftWorkplace, LocalDate.of(2026, 9, 21));
+
+        leftWorkplaceSchedule.publish(now.minusDays(1));
+        entityManager.persist(leftWorkplaceSchedule);
+
+        createCandidate(
+            leftWorkplaceSchedule,
+            requesterMember,
+            leftMember,
+            now.plusHours(8),
+            ShiftStatus.SCHEDULED,
+            RequestStatus.OPEN,
+            CandidateStatus.PENDING
+        );
+
+        // 9. 시작 시각이 더 이른 정상 Candidate → 정렬(startAt ASC) 확인
+        SubstituteCandidate earlierCandidate = createCandidate(
+            publishedSchedule,
+            requesterMember,
+            candidateMember,
+            now.plusHours(1),
+            ShiftStatus.SCHEDULED,
+            RequestStatus.OPEN,
+            CandidateStatus.PENDING
+        );
+
         entityManager.flush();
         entityManager.clear();
 
@@ -171,7 +228,17 @@ class SubstituteCandidateRepositoryTest {
         // then
         assertThat(result)
             .extracting(SubstituteCandidate::getId)
-            .containsExactly(validCandidate.getId());
+            .containsExactly(earlierCandidate.getId(), validCandidate.getId());
+
+        // 다른 사용자 입장에서는 본인 요청만 보여야 한다
+        assertThat(
+            substituteCandidateRepository.findReceivedRequests(
+                otherMember.getUser().getId(),
+                now
+            )
+        )
+            .extracting(candidate -> candidate.getMember().getId())
+            .containsOnly(otherMember.getId());
     }
 
     @Test
@@ -301,6 +368,21 @@ class SubstituteCandidateRepositoryTest {
             CandidateStatus.ACCEPTED
         );
 
+        // 8. 다른 사용자가 수락한 요청 → userId 조건 확인
+        WorkplaceMember otherMember = persistMember(
+            workplace, "other2@test.com", WorkplaceRole.EMPLOYEE, now
+        );
+
+        createCandidate(
+            publishedSchedule,
+            requesterMember,
+            otherMember,
+            now.plusHours(8),
+            ShiftStatus.SCHEDULED,
+            RequestStatus.ACCEPTED,
+            CandidateStatus.ACCEPTED
+        );
+
         entityManager.flush();
         entityManager.clear();
 
@@ -317,6 +399,156 @@ class SubstituteCandidateRepositoryTest {
             .containsExactly(validCandidate.getId());
     }
 
+    @Test
+    @DisplayName("SUB-01/03 - 이미 수락한 활성 대타 약속과 시간이 겹치는지 확인한다")
+    void existsOverlappingAcceptedSubstitute() {
+
+        // given
+        LocalDateTime now = LocalDateTime.of(2026, 9, 21, 12, 0);
+        LocalDateTime startAt = now.plusDays(1);     // 내일 12:00
+        LocalDateTime endAt = startAt.plusHours(4);  // 내일 16:00
+
+        ConflictFixture fixture = createConflictFixture(now, startAt, "overlap");
+
+        Long candidateUserId = fixture.candidateMember().getUser().getId();
+        Long otherUserId = fixture.otherMember().getUser().getId();
+
+        // then - 같은 사용자 + 겹치는 시간 → 충돌
+        assertThat(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
+            candidateUserId, startAt.plusHours(2), endAt.plusHours(2), now
+        )).isTrue();
+
+        // then - 다른 사용자 → 충돌 아님 (userId 조건)
+        assertThat(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
+            otherUserId, startAt, endAt, now
+        )).isFalse();
+
+        // then - 끝나는 시각에 바로 시작(경계값) → 충돌 아님
+        assertThat(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
+            candidateUserId, endAt, endAt.plusHours(4), now
+        )).isFalse();
+
+        // then - 이미 시작된 대타 약속은 활성 약속으로 보지 않는다
+        assertThat(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
+            candidateUserId, startAt, endAt, startAt
+        )).isFalse();
+
+        // then - Request가 CLOSED 된 수락 Candidate는 활성 약속이 아니다
+        assertThat(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
+            candidateUserId,
+            fixture.closedStartAt(),
+            fixture.closedStartAt().plusHours(4),
+            now
+        )).isFalse();
+    }
+
+    @Test
+    @DisplayName("SUB-04 - 승인 시 현재 Request를 제외한 다른 활성 대타 약속과의 충돌만 확인한다")
+    void existsConflictingActiveSubstitute() {
+
+        // given
+        LocalDateTime now = LocalDateTime.of(2026, 9, 21, 12, 0);
+        LocalDateTime startAt = now.plusDays(1);
+        LocalDateTime endAt = startAt.plusHours(4);
+
+        ConflictFixture fixture = createConflictFixture(now, startAt, "conflict");
+
+        Long candidateUserId = fixture.candidateMember().getUser().getId();
+        Long otherUserId = fixture.otherMember().getUser().getId();
+        Long acceptedRequestId = fixture.acceptedCandidate().getRequest().getId();
+
+        // then - 승인하려는 Request 자기 자신은 충돌로 보지 않는다
+        assertThat(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            candidateUserId, acceptedRequestId, startAt, endAt, now
+        )).isFalse();
+
+        // then - 다른 Request 기준으로는 충돌
+        assertThat(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            candidateUserId, -1L, startAt, endAt, now
+        )).isTrue();
+
+        // then - 다른 사용자 → 충돌 아님 (userId 조건)
+        assertThat(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            otherUserId, -1L, startAt, endAt, now
+        )).isFalse();
+    }
+
+    // 후보자가 수락한 활성 약속 1건 + CLOSED 된 수락 1건을 만든다
+    private ConflictFixture createConflictFixture(
+        LocalDateTime now,
+        LocalDateTime acceptedStartAt,
+        String suffix
+    ) {
+        Workplace workplace = entityManager.persist(
+            new Workplace("충돌 테스트 매장 " + suffix, "CF-" + suffix)
+        );
+
+        WorkplaceMember requesterMember = persistMember(
+            workplace, "requester-" + suffix + "@test.com", WorkplaceRole.EMPLOYEE, now
+        );
+        WorkplaceMember candidateMember = persistMember(
+            workplace, "candidate-" + suffix + "@test.com", WorkplaceRole.EMPLOYEE, now
+        );
+        WorkplaceMember otherMember = persistMember(
+            workplace, "other-" + suffix + "@test.com", WorkplaceRole.EMPLOYEE, now
+        );
+
+        Schedule schedule = new Schedule(workplace, LocalDate.of(2026, 9, 21));
+        schedule.publish(now.minusDays(1));
+        entityManager.persist(schedule);
+
+        SubstituteCandidate acceptedCandidate = createCandidate(
+            schedule,
+            requesterMember,
+            candidateMember,
+            acceptedStartAt,
+            ShiftStatus.SCHEDULED,
+            RequestStatus.ACCEPTED,
+            CandidateStatus.ACCEPTED
+        );
+
+        LocalDateTime closedStartAt = acceptedStartAt.plusDays(1);
+
+        createCandidate(
+            schedule,
+            requesterMember,
+            candidateMember,
+            closedStartAt,
+            ShiftStatus.SCHEDULED,
+            RequestStatus.CLOSED,
+            CandidateStatus.ACCEPTED
+        );
+
+        entityManager.flush();
+
+        return new ConflictFixture(
+            candidateMember,
+            otherMember,
+            acceptedCandidate,
+            closedStartAt
+        );
+    }
+
+    private WorkplaceMember persistMember(
+        Workplace workplace,
+        String email,
+        WorkplaceRole role,
+        LocalDateTime now
+    ) {
+        User user = entityManager.persist(new User(email, "password", email));
+
+        return entityManager.persist(
+            new WorkplaceMember(workplace, user, role, now.minusMonths(1))
+        );
+    }
+
+    private record ConflictFixture(
+        WorkplaceMember candidateMember,
+        WorkplaceMember otherMember,
+        SubstituteCandidate acceptedCandidate,
+        LocalDateTime closedStartAt
+    ) {
+    }
 
     private SubstituteCandidate createCandidate(
         Schedule schedule,                  // 어느 근무표의 Shift인지
