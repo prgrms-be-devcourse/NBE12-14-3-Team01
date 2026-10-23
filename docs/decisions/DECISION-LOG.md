@@ -35,7 +35,7 @@
 ## 2. G-03 / G-05 결정 후보 (외부 원문은 ID로 참조)
 
 미결정 시 처리는 모두 "현행 보존 (Migration 비차단)"이다. 상태는 모두 `PENDING`.
-G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있다 (승인된 결정 아님). G-05 원문은 저장소에 없다 (DL-005). `D-NOW-01~11`은 G-05 §0.3 "사람이 먼저 정할 것" 목록에서 온 실행 결정 후보다 (`docs/README.md` §5-1). Membership Lifecycle 관련 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 ② `PROPOSED`이며 아직 팀 문서가 없다. 아래 G03-D-11~16·26·27의 상태를 바꾸지 않는다.
+G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있다 (승인된 결정 아님). G-05 원문은 저장소에 없다 (DL-005). `D-NOW-01~11`은 G-05 §0.3 "사람이 먼저 정할 것" 목록에서 온 실행 결정 후보다 (`docs/README.md` §5-1). Membership Lifecycle 관련 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 ② `PROPOSED`인 과거 제안이며, 원문을 `docs/references/ml/`에 보존했다 (현행 계약 아님). 지금 검토 중인 정책 카드는 §3에 연결한다. 아래 G03-D-11~16·26·27의 상태를 바꾸지 않는다.
 
 | ID | 질문 (요약) | 시점 (G-05 제안) | 결정 주체 | 상태 |
 |---|---|---|---|---|
@@ -81,3 +81,13 @@ G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있
 | D-NOW-09 | AUTH-EV-02 / 03 Runtime Priority | DECIDE_NOW | 팀 | PENDING |
 | D-NOW-10 | Taxonomy 승인 (G-03 §9) | DEFER | 사람 | PENDING |
 | D-NOW-11 | 문서 Backlog (G02-DOC-BL-01, G03-DOC-BL-01~06) | DEFER | 사람 | PENDING |
+
+## 3. 정책 카드 연결
+
+정책 카드(`docs/decisions/proposals/`)가 있는 질문을 연결한다. 위 §1·§2 행의 상태는 바꾸지 않는다.
+카드의 ② `PROPOSED`와 사용자 잠정 결정은 팀 승인이 아니다. 팀이 승인하면 사람이 해당 §1·§2 행을 바꾸고 결정 내용·승인자·일자·근거 링크를 적는다 (`docs/decisions/PROCESS-CHARTER.md` §3-2).
+
+| 카드 | 연결 ID | 카드 상태 | 이 Log의 상태 | 비고 |
+|---|---|---|---|---|
+| [`ML-H1`](proposals/ML-H1-membership-history.md) Membership 이력 보존과 재가입 범위 | G03-D-13 (주), G03-D-11 (전제) | 사용자 잠정 결정 / ② `PROPOSED` / ③ `DRAFT` | G03-D-11 `PENDING`, G03-D-13 `PENDING` | 재가입 구현 범위는 미결정 (ML-H2). 신규 ErrorCode 후보는 G03-D-03과 함께 확인 |
+| [`G03-D-19`](proposals/G03-D-19-expiry.md) 대타 요청 만료 표현 | G03-D-19 (주), G03-D-20·26·27 (연결) | 제안 / ② `PROPOSED` / ③ `DRAFT`. 사용자 잠정 결정 확인 전 | G03-D-19 `PENDING` | 추천안 B1 (`closedAt = startAt`)은 Test 기대값 변경을 포함 |

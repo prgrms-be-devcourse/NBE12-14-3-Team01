@@ -14,10 +14,10 @@
 | 5 | Task Card (Delivery Board) + `docs/delivery/<Domain>.md` ([템플릿](delivery/TEMPLATE.md), [V4 Substitute 시범](delivery/V4-substitute.md)) | 이번 작업의 범위 확인 |
 | 6 | [`docs/migration/MIGRATION-MATRIX.md`](migration/MIGRATION-MATRIX.md) | Domain 작업 전 |
 | 7 | [`docs/contract/CONTRACT-BASELINE.md`](contract/CONTRACT-BASELINE.md) | API / Error / Enum / Transaction에 닿는 작업 전 |
-| 8 | [`docs/decisions/DECISION-LOG.md`](decisions/DECISION-LOG.md) | 정책이 걸린 작업 전 |
+| 8 | [`docs/decisions/DECISION-LOG.md`](decisions/DECISION-LOG.md), [`PROCESS-CHARTER`](decisions/PROCESS-CHARTER.md), 정책 카드 [`decisions/proposals/`](decisions/proposals/) | 정책이 걸린 작업 전. 정책 카드를 만들거나 결정할 때 |
 | 9 | [`docs/migration/TECH-STACK-DECISIONS.md`](migration/TECH-STACK-DECISIONS.md) | Gradle / Plugin / Version / Kotlin 환경 작업 전 |
 | 10 | [`docs/evidence/TEST-INVENTORY.md`](evidence/TEST-INVENTORY.md), [`docs/evidence/TEST-EVIDENCE.md`](evidence/TEST-EVIDENCE.md) | Test를 고르거나 결과를 보고·확인할 때 |
-| 11 | [`docs/references/README.md`](references/README.md) → [`G-03-contract-review.md`](references/G-03-contract-review.md) | C-ID·G03-D-ID의 원문 규칙·근거를 확인할 때 (참고 자료, 승인된 계약 아님) |
+| 11 | [`docs/references/README.md`](references/README.md) → [`G-03-contract-review.md`](references/G-03-contract-review.md), [`references/ml/`](references/ml/) | C-ID·G03-D-ID의 원문 규칙·근거, ML 과거 제안 원문을 확인할 때 (참고 자료, 승인된 계약 아님) |
 
 ## 2. 문서 목록과 책임
 
@@ -31,6 +31,8 @@
 | `docs/migration/MIGRATION-MATRIX.md` | Domain 범위, 필수 Test, 검증 상태, 선행조건 | 각 V Owner | 기술 진행 상태 | 각 PR과 함께 | 요청 시 수정 (Evidence 링크 필수) |
 | `docs/migration/TECH-STACK-DECISIONS.md` | 기술 의존성·Version 결정, M0 계획 | 공통 설정 Owner | 기술 환경 결정 | 의존성 변경 승인 시 | 조사 결과·적용 사실 추가 가능, 결정 표시 금지 |
 | `docs/decisions/DECISION-LOG.md` | 정책 결정·불일치 기록 | 결정자 (팀) | 정책 결정 | 회의·승인 직후 | `PENDING` / `DISCREPANCY` 행 추가와 사실 기록만 가능 |
+| `docs/decisions/PROCESS-CHARTER.md` | 정책 카드 작성·결정 절차, Test 기대값 변경 절차 (팀 승인 전 초안) | 팀 승인 | 결정 절차 | 팀 승인 시 | 초안 작성. 승인 표시 금지 |
+| `docs/decisions/proposals/*.md` | 검토 중인 정책 카드 (② `PROPOSED`) | 카드 작성자 → 해당 Domain Owner 리뷰 | 없음 (결정은 `DECISION-LOG`) | 카드 진행 시 | 작성 가능. 사용자 확인 문장만 "사용자 잠정 결정"으로 기록 |
 | `docs/delivery/TEMPLATE.md` | Domain Delivery Sheet 템플릿 | 공통 설정 Owner | 양식 | 양식 변경 승인 시 | 읽기 전용 |
 | `docs/delivery/V4-substitute.md` | V4 Substitute Delivery Sheet (시범) | V4 Owner | Domain 현황 요약 (계약·결정은 ID 참조만) | Domain PR과 함께 | 요청 시 수정 (근거 위치 필수) |
 | `docs/evidence/TEST-INVENTORY.md` | Test 목록·준비·실행 상태 | 각 V Owner | Test 목록 | Test 추가·실행 시 | 요청 시 수정. 실행 결과는 EV-ID로만 연결 |
@@ -38,6 +40,7 @@
 | `docs/images/*` | ERD, Architecture, Deployment 그림 (2차 종료 시점) | — | 참고 | — | 읽기 전용 |
 | `docs/references/README.md` | 선별 공유한 참고 자료 목록·차이·용어 대응 | 공통 설정 Owner | 참고 자료 범위 | 참고 자료 추가·제외 시 | 요청 시 수정 |
 | `docs/references/G-03-contract-review.md` | G-03 분석 원문 공유본 (Original `9858612` 기준) | — (스냅샷) | 없음 (참고 자료, 7순위) | 원본이 바뀌어도 자동 갱신하지 않음 | 읽기 전용 |
+| `docs/references/ml/*.md` | ML 과거 제안 원문 3종 (2차 `8da2bec` 기준) | — (스냅샷) | 없음 (참고 자료, 7순위) | 갱신하지 않음. 최신 검토는 정책 카드 | 읽기 전용 (머리말의 대체 관계만 추가 가능) |
 | `.github/pull_request_template.md` | PR 양식 (기존 파일, D0-B·D0-D에서 미수정. 보강안은 승인 대기) | 공통 설정 Owner | PR 양식 | 승인 시 | 읽기 전용 |
 | Notion WBS / Delivery Board | 일정·담당·진행 | 팀 | 일정·담당 | 매일 | 접근 불가 (링크만) |
 
@@ -99,7 +102,8 @@ Snapshot `243f77c`는 Original과 Production Java 코드가 같고, 다음이 �
 | AI 분석 보고서 | G-03 (C-ID·G03-D-ID 원문) | **`docs/references/G-03-contract-review.md`** (참고 공유본, 개인 경로 1줄만 바꿈) | Original `9858612` | 제안 / 참고. C-ID 상태는 원문 그대로 (`REVIEW_ACCEPTED` 54, `CONDITIONAL` C-40, `DECISION_PENDING` C-41) |
 | AI 분석 보고서 (미공유) | G-01, G-02, G-04, G-05 | 외부 (작성자 로컬 `switch-v3-ai/reviews`). 저장소에 없음. 제외 이유는 `docs/references/README.md` §6 | Original `9858612` (G-05는 develop 일부 반영) | 제안 |
 | 정책 결정 대기 | G03-D-01~28, OQ-01~03, D-NOW-01~11, DL-001~014 | `docs/decisions/DECISION-LOG.md` | G-03 / G-05 / D0-D | `PENDING` |
-| 정책 제안 (문서 없음) | Membership Lifecycle (ML-DECISION-01), ML-SUB-STATE-01 (B+), ML-CONCURRENCY-01-R (Guard Lock) | **팀 문서 없음** (분석은 작성자 로컬 세션 기록에만 있음). 위치 예정: `docs/decisions/membership-lifecycle/` (D0-D 이후 별도 PR) | — | ② `PROPOSED`, 현재 Java에 없음 |
+| 정책 제안 (과거 원문) | Membership Lifecycle (ML-DECISION-01), ML-SUB-STATE-01 (B+), ML-CONCURRENCY-01-R (Guard Lock) | `docs/references/ml/` (원문 보존본, 현행 계약 아님) | 2차 `8da2bec` | ② `PROPOSED`, 현재 Java에 없음 |
+| 정책 카드 (검토 중) | ML-H1 (Membership 이력·재가입 범위), G03-D-19 (대타 만료 표현) | `docs/decisions/proposals/`. 진행 절차는 `docs/decisions/PROCESS-CHARTER.md` | 3차 `develop` `c0427c2` | 카드 ② `PROPOSED`, `DECISION-LOG` `PENDING` |
 | 상태 체계 | 5개 축 | `docs/STATUS-AXES.md` | D0-C-R | 초안 |
 | Domain Delivery | 템플릿, V4 시범 | `docs/delivery/` | 2차 `8da2bec` | 초안 |
 | Test 목록 | 필드 정의, V4 구역 | `docs/evidence/TEST-INVENTORY.md` | 2차 `243f77c`·`8da2bec` | 초안 |
@@ -120,7 +124,7 @@ H1~H8은 Kotlin Migration(V1~V5)과 별개의 **개선(Technical Deepening) 항�
 | ID | G-05 §14 "내용" (원문) | 관련 ID (G-05 §14 "차이 / 확인 필요"·배치 칸, 3차 문서의 DL) |
 |---|---|---|
 | H1 | Security Integration (권한, Logout, Refresh 무효화 / Rotation) | G03-D-23 (Logout), D-NOW-05 |
-| H2 | Membership Lifecycle | G03-D-11, D-NOW-05. 구체안 ML-* 은 `PROPOSED` (문서 미작성) |
+| H2 | Membership Lifecycle | G03-D-11, D-NOW-05. 구체안 ML-* 원문은 `docs/references/ml/` (`PROPOSED`), 검토 카드는 `docs/decisions/proposals/ML-H1-*` |
 | H3 | Schedule State Consistency | SCH-DC-01 (재현·판정), D-NOW-04 |
 | H4 | Idempotency / State Machine | SUB-DC-01~04 (재현·판정) |
 | H5 | Outbox / Retry | G03-D-22, D-NOW-05 |

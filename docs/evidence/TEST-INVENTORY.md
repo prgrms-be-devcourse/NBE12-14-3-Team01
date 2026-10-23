@@ -2,7 +2,7 @@
 
 > ③ 문서 리뷰: **DRAFT** (D0-C-R 2026-10-23, D0-D 이관). 상태값은 `docs/STATUS-AXES.md`의 ④ 준비, ⑤ 실행 축을 쓴다.
 > 실제 실행 결과는 `docs/evidence/TEST-EVIDENCE.md`(Append-only)에 남기고, 이 Inventory는 EV-ID로 연결만 한다.
-> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (현재 V4만 시범).
+> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (V4 시범, V2는 ML-H1 카드 관련 부분만).
 
 ## 1. 필드
 
@@ -132,3 +132,31 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 
 V4-N-07의 "AS-IS 재현"은 새 정책 구현 Test가 아니라 별도 후속 항목(ML-CONCURRENCY-02, 아직 이 Inventory에 없음)이며, V4-N-05와 같이 DL-009가 먼저 결정돼야 한다.
 현재 동작 재현 Test 전반에 대한 일반 승인 규칙은 아직 문서화돼 있지 않다 (위 표는 각 행의 기존 기록을 모은 것이다).
+
+## 4. V2 Workplace — ML-H1 관련 부분
+
+V2 구역 전체 목록이 아니다. 정책 카드 [`ML-H1`](../decisions/proposals/ML-H1-membership-history.md)에 연결된 Test만 적었다. V2 전체 Inventory(`V2-T-*` 기존 Test 번호 부여)는 V2 Delivery Sheet를 쓸 때 만든다.
+
+### 4-1. 신규 제안 (⑤ 전부 `NOT_RUN`)
+
+| Test ID | Policy | 내용 (Given → Then) | 종류 · 환경 | 구분 | ② 개선 승인 | ④ 준비 | 구현 가능 여부 |
+|---|---|---|---|---|---|---|---|
+| V2-N-01 (ML-H1-T1) | ML-H1 H1-a, ML-H1-INV-02 | 퇴사 처리 → 같은 Member id 유지, `leftAt = Clock`, role·`joinedAt` 불변, Row 수 불변 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** (G03-D-11·13 `PENDING`) | SPECIFIED (작성 금지) | 불가 (퇴사 Command 없음, ML-4) |
+| V2-N-02 (ML-H1-T2) | ML-H1 H1-a, ML-H1-INV-01 | 퇴사 전 Shift·Request·Candidate·Notification → 퇴사 후 Row 유지, `member_id` 불변 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (ML-4, 보존 범위는 ML-2) |
+| V2-N-03 (ML-H1-T3) | G03-INV-03, C-11, C-12 | 종료 Row(5-인자 생성자로 준비) → `requireManager`·구성원 목록·내 근무지 목록에서 제외, 관리자 행위는 WPL-003 / WPL-004 | SLICE (DataJpa) + UNIT · H2 또는 MYSQL_TC (미정) | MIGRATION (현재 Java 동작 고정) | 해당 없음 (동작 변경 아님) | SPECIFIED | 가능. Task 승인 필요 (`docs/ai/AI-RULES.md` §1) |
+| V2-N-04 (ML-H1-T4) | ML-H1 H1-d | 종료 Row가 있는 User가 같은 초대 코드로 참여 → 새 ErrorCode (후보 WPL-006, 409), 새 Row 0 | UNIT · MOCK + SLICE (WebMvc) + INTEGRATION | PROPOSED_IMPROVEMENT | **PROPOSED** (ErrorCode 추가는 AI-RULES §2 승인 대상) | SPECIFIED (작성 금지) | 승인 후 가능 (퇴사 Command 없이 종료 Row 준비 가능) |
+| V2-N-05 (ML-H1-T5) | ML-H1-INV-02 | 이미 퇴사한 Member에 다시 퇴사 → `leftAt` 불변. 응답은 ML-4에서 결정 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (ML-4) |
+
+### 4-2. 회귀 대상 기존 Test (ID 미부여, 기대값 변경 0)
+
+H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ 실행 상태는 이 구역에서 확인하지 않았다 (V2 구역을 만들 때 기록).
+경로 기준: `backend/src/test/java/com/merge/backend/domain/workplace/`
+
+| Class · Method | 업무 상황 | 기대 결과 (불변) | 비고 |
+|---|---|---|---|
+| `service/WorkplaceServiceTest.rejectDuplicateJoin` | 현재 소속자 재가입 | `ALREADY_JOINED_WORKPLACE`, `save` 0회 | **Arrange(Mock 준비) 변경 가능성 있음** (Strict Stubs). 절차: `docs/decisions/PROCESS-CHARTER.md` §6-3 |
+| `service/WorkplaceServiceTest.joinAsEmployee` | 이력 없는 사용자 가입 | EMPLOYEE, `leftAt` null, `save` 1회 | — |
+| `service/WorkplaceServiceIntegrationTest.rejectDuplicateJoin` | 현재 소속자 재가입 (DB) | `ALREADY_JOINED_WORKPLACE` | — |
+| `service/WorkplaceServiceIntegrationTest.joinWorkplace` | 정상 가입 (DB) | Row 생성, `leftAt` null | — |
+| `controller/WorkplaceControllerTest.rejectDuplicateJoin` | Service가 WPL-002를 던짐 | 409, `code = WPL-002` | — |
+| `repository/WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` | 같은 조합 두 번 저장 | `DataIntegrityViolationException` | 재가입 구현(ML-H2) 시 기대값 변경 대상. 그때 별도 승인 |
