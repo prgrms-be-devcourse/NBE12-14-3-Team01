@@ -176,4 +176,17 @@ class ApiV1UserControllerTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-006"));
     }
+
+    @Test
+    @DisplayName("회원가입 요청에 email이 없으면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test7() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"password": "%s", "name": "유저2"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
 }
