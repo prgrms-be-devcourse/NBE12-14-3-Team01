@@ -7,7 +7,7 @@
 
 | 순서 | 문서 | 언제 |
 |---|---|---|
-| 1 | [`CLAUDE.md`](../CLAUDE.md) (루트) | 모든 AI 작업 시작 시 (자동 로드) |
+| 1 | [`AGENTS.md`](../AGENTS.md) (루트) | Codex 자동 로드 / Claude Code는 `CLAUDE.md`에서 참조 |
 | 2 | 이 문서 | 문서 위치·우선순위 확인 |
 | 3 | [`docs/ai/AI-RULES.md`](ai/AI-RULES.md) | 모든 작업 전 |
 | 4 | [`docs/STATUS-AXES.md`](STATUS-AXES.md) | 상태값을 읽거나 쓰기 전 |
@@ -23,7 +23,8 @@
 
 | 문서 | 목적 | 수정 담당 | Source of Truth | 갱신 시점 | AI 권한 |
 |---|---|---|---|---|---|
-| `CLAUDE.md` | AI 진입점 | 공통 설정 Owner (미지정) | 진입 규칙 | AI-RULES 변경 시 | 읽기 전용 (D0-D 최초 이관 때만 사실·경로 정정 허용, 사용자 지시 2026-10-23) |
+| `AGENTS.md` | 공통 AI 작업 진입점 (기존 CLAUDE.md 지침 이동) | 공통 설정 Owner (미지정) | 진입 규칙 | AI-RULES 변경 시 | 읽기 전용 (기존 CLAUDE.md 규칙 계승) |
+| `CLAUDE.md` | Claude Code용 AGENTS.md 참조 파일 | 공통 설정 Owner (미지정) | 진입 규칙 | AI-RULES 변경 시 | 읽기 전용 (D0-D 최초 이관 때만 사실·경로 정정 허용, 사용자 지시 2026-10-23) |
 | `docs/README.md` | 문서 Index | 공통 설정 Owner | 문서 위치 | 문서 추가·이동 시 | 요청 시 수정 |
 | `docs/ai/AI-RULES.md` | AI·팀원 변경 제한 규칙 | 팀 승인 (초안: H6 총괄) | 작업 규칙 | 팀 승인 시에만 | **읽기 전용** (D0-D 최초 이관 때만 사실·경로·상태 규칙 정정 허용, 사용자 지시 2026-10-23) |
 | `docs/STATUS-AXES.md` | 상태 5개 축 정의 | 공통 설정 Owner | 상태값 의미 | 팀 승인 시 | 읽기 전용 |
