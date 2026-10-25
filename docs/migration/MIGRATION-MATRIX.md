@@ -4,6 +4,7 @@
 > Domain별 상세(API, 정책, Test, DoD)는 `docs/delivery/<Domain>.md`, Test 행 단위는 `docs/evidence/TEST-INVENTORY.md`.
 > 이 문서는 기술 진행 상태의 Source of Truth다. 일정·담당은 Notion Delivery Board가 SoT이고, Board 행은 이 문서의 행 ID로 연결한다.
 > 검증 상태 칸은 **통과한 Run 링크가 있을 때만** 채운다. Test가 존재한다는 것만으로는 채우지 않는다.
+> S2-6B (2026-10-25): §3에 `a148a62` 정적 집계와 PASS 조건 보완을 추가했다. §2 상태 칸과 Migration 단계의 대응은 [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md) §2.
 
 ## 1. Domain 범위 (실제 Package 기준)
 
@@ -48,7 +49,21 @@ Java 실행 결과 (모든 V 공통): D0-B 조사 당시 Java Snapshot `243f77c`
 | 공통 | `TimeRangeUtilsTest` (15), `GlobalExceptionHandlerTest` (7), `ApiResponseTest` (4), `UtTest` (3), `BaseEntityAuditingTest` (2), `BackendApplicationTests` (1) | 32 | 응답 형식, 시간 Util | — |
 | **합계 (Snapshot `243f77c`)** | | **266** | | |
 
+**`a148a62` 정적 집계 (S2-6B, 2026-10-25, Test 실행 아님):** 위 표는 `243f77c` 기준이라 PR #76~78과 3차 PR #5가 추가한 Test가 빠져 있다. 아래는 `@Test`·`@ParameterizedTest`·`@RepeatedTest`가 붙은 Method 수(Domain 배정은 §1 Package 기준)다. ⑤는 이 저장소에 개별 실행 근거가 없어 전부 `UNKNOWN`이다. 최종 Java Baseline(`BL-TBD`)은 기준선 실행(TEST-STRATEGY §5) 후 확정한다.
+
+| V | Test Method | 파일 | 정적 계산 실행 사례 (Parameterized 입력 수·Repeated 횟수로 펼친 예상값, 실제 실행 아님) | 비고 |
+|---|---|---|---|---|
+| V1 | 26 | 4 | 26 | `UserServiceTest` 12, `ApiV1UserControllerTest` 6, `RqTest` 5, `CustomAuthenticationFilterTest` 3 |
+| V2 | 98 | 7 | 98 | Pattern 45 포함 |
+| V3 | 104 | 10 | 104 | |
+| V4 | 93 | 6 | 114 | 상세 TEST-INVENTORY §3-1-1 |
+| V5 | 19 | 4 | 19 | |
+| 공통 | 33 | 7 | 33 | `KotlinEnvironmentTest` 1 포함 |
+| **합계** | **373** | 38 | **394** | `@Test` 366 + `@ParameterizedTest` 3 (8건) + `@RepeatedTest` 4 (20회). 실제 실행: **`NOT_RUN`** (조건부 비활성화·동적 Test·환경 차이로 실제 수는 다를 수 있음) |
+
 Kotlin 전환 PR의 최소 PASS 조건 (제안): 해당 V 행의 기존 Test 전부 + 공통 행 + 전체 `./gradlew check` 통과. Test 기대값 변경 0.
+
+S2-6B 보완 (2026-10-25, 제안): ① Java ↔ Kotlin 호출 호환성을 위한 Test **호출 문법** 수정은 허용하되 Assertion 의미·기대 ErrorCode·HTTP 상태·DB 결과는 바꾸지 않는다 (호출 문법 수정 줄 목록을 PR에 첨부). ② Java SHA와 Kotlin SHA 양쪽의 실행 근거(EV)가 있어야 한다. ③ Test Case 목록·실행 사례 수가 같아도 그것만으로 동작 보존을 증명했다고 쓰지 않고, HTTP 계약 Snapshot과 Schema 비교를 함께 본다. 상세 [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md) §3·§5·§6, 리뷰 항목 [`KOTLIN-REVIEW-CHECKLIST`](KOTLIN-REVIEW-CHECKLIST.md).
 
 ## 4. Domain별 기술 선행조건과 손대지 않을 구간
 
