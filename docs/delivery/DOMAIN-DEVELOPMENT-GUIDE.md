@@ -85,7 +85,19 @@ Test MySQL Container는 JVM 동안 1개를 함께 쓰고, 정리 코드가 없�
 
 ## 4. Test 형식 예시 (Java, Step 1용)
 
-아래는 **형식 예시**다. 실제 Fixture·Class 이름은 각 Domain 코드에 맞춘다. 기존 Test의 방식(`@SpringBootTest` + `@AutoConfigureMockMvc`, Path는 `/api/v1` 없이 호출)을 따랐다.
+아래는 **형식 예시**다. 실제 Fixture·Class 이름은 각 Domain 코드에 맞춘다.
+
+**중요 (V5-J1 정적 확인):** `CustomAuthenticationFilter`는 요청 URI가 `/api/`로 시작할 때만 Token을 검사한다. 그래서 MockMvc로 `/notifications`처럼 Context Path 없이 부르면 **Filter가 Token 검사를 건너뛴다.** 실제 인증 경계를 확인하는 Test는 기존 `CustomAuthenticationFilterTest`·`WorkplaceSecurityIntegrationTest`처럼 `get("/api/v1/...").contextPath("/api/v1")`로 부른다. Context Path 없이 `@WithMockUser`로 부르는 기존 방식(예: `RegularShiftPatternControllerTest`)은 응답 형식 확인용이며 인증 경계의 근거가 아니다. 무토큰 401 `AUTH-004`, Bearer 형식 아님 401 `AUTH-005`, 잘못된 Token 401 `AUTH-006`.
+
+**`.contextPath("/api/v1")`를 붙였다는 것만으로 실제 Filter가 동작했다고 단정하지 않는다.** 응답으로 확인한다 (V5-J1 정적 확인):
+
+| 응답 | 누가 만드는가 | 증명하는 것 |
+|---|---|---|
+| Token 없음 → 401 `AUTH-004` | Spring Security의 `authenticationEntryPoint` (`SecurityConfig`) — `CustomAuthenticationFilter`는 헤더가 비면 그냥 통과시킨다 | Security Chain과 `authenticated()` 규칙이 그 경로에 적용됨 |
+| 잘못된 Token → 401 `AUTH-006`, Bearer 형식 아님 → 401 `AUTH-005` | **`CustomAuthenticationFilter`만** 만든다 | 그 요청 URI(`/api/...`)에서 **우리 Filter가 실제로 Token을 검사함** |
+| 정상 Token → 성공 응답 | Filter가 `SecurityContext`에 사용자를 넣고 `Rq.getActorId()`가 읽음 | Token → 실행자 연결 |
+
+그래서 인증 경계 Test는 **세 경우를 함께** 둔다. `CustomAuthenticationFilter`는 `@Component`(`OncePerRequestFilter`)이고 `SecurityConfig`에서 `addFilterBefore`로도 등록돼 있다 — `@AutoConfigureMockMvc`는 기본으로 Filter를 포함하므로 `addFilters = false`를 쓰지 않는다.
 
 ### 4-1. HTTP 계약 Snapshot (G-A1·A2)
 
@@ -103,7 +115,10 @@ class SubstituteRequestApiContractTest {
     void sentRequests_contract() throws Exception {
         // given: 고유 데이터로 요청 1건 (Fixture는 Domain에 맞춤)
 
-        mvc.perform(get("/substitute-requests/sent").header("Authorization", bearer(requester)))
+        // 요청 URI = /api/v1/... (Filter는 getRequestURI()가 /api/로 시작할 때만 Token 검사),
+        // contextPath = /api/v1 (Security 경로 규칙은 그 뒤 경로로 판단). 기존 CustomAuthenticationFilterTest와 같은 방식
+        mvc.perform(get("/api/v1/substitute-requests/sent").contextPath("/api/v1")
+                .header("Authorization", "Bearer " + accessTokenOf(requester)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.code").isString())
@@ -119,7 +134,7 @@ class SubstituteRequestApiContractTest {
 전환 전(Java)에 통과시키고, 전환 후(Kotlin) **같은 Test가 그대로** 통과해야 한다. Field 이름이 바뀌면 여기서 실패한다.
 
 - Field 이름은 실제 DTO에서 가져온다 (예: `SentSubstituteRequestResponse`는 `requestId`, `shiftId`, `workplaceId`, `workplaceName`, `startAt`, `endAt`, `status`, `closeReason`, `createdAt`, `approvedAt`, `closedAt`). 계약 Test는 **모든 Field의 이름과 null 여부**를 한 번씩 확인한다.
-- 인증: 실제 Filter 경계를 확인하려면 `Authorization: Bearer <accessToken>` (`CustomAuthenticationFilter` L53-61)을 쓴다. 응답 형식만 볼 때는 기존 Test처럼 `@WithMockUser` + `Rq` Mock을 써도 되지만, 그 Test는 Filter 경계(G-A5)의 근거가 되지 않는다.
+- 인증: 실제 Filter 경계를 확인하려면 **Context Path 포함 경로 + `.contextPath("/api/v1")` + `Authorization: Bearer <accessToken>`** (`CustomAuthenticationFilter` L40-61)을 쓴다. 응답 형식만 볼 때는 기존 Test처럼 `@WithMockUser` + `Rq` Mock을 써도 되지만, 그 Test는 Filter 경계(G-A5)의 근거가 되지 않는다.
 
 ### 4-2. Commit 후 알림 생성 (G-A3)
 
@@ -288,3 +303,5 @@ Task 이름은 작업 이름이며 Test ID가 아니다 (Test는 TEST-INVENTORY�
 |---|---|
 | 2026-10-25 | 초안. Domain별 출발점, 작업 순서 Step 0~6과 통과 조건, Test 작성 규칙 (Assertion 깊이, 공유 MySQL DB 규칙, 이름), Java Test 형식 예시 4종 (HTTP 계약·Commit 후 알림·Rollback·순서 강제), 경로 준비·통합 Test 소유, PR 확인 목록, V5 알림·동시성 담당 진행 순서 |
 | 2026-10-25 | 교차 검토 반영: 합의 전 제안 명시, 필요한 만큼만 추가, 역할 4종(경로 Owner·Domain Owner·공통 Owner·통합 리뷰), 통합 검증은 Domain 전환 직후 작게 반복, 공유 DB 규칙에 조회 범위·충분조건 아님 추가, 계획에 없던 항목 임시 담당 백혜승 (재배정 가능, 팀 확인 전), V5 Java 고정 Task 분할 J1~J5·K1·I1 |
+| 2026-10-25 | 보완: `.contextPath`만으로 Filter 동작을 단정하지 않음 — AUTH-004(Security entry point)·AUTH-005/006(우리 Filter만)·정상 Token 세 경우로 확인, 예시에 요청 URI·Context Path 주석 |
+| 2026-10-25 | 정정 (V5-J1 정적 확인): §4-1 HTTP 예시가 Context Path 없이 호출해 실제 Filter를 건너뛰는 형태였음 → `/api/v1/...` + `.contextPath("/api/v1")`로 수정, 인증 경계 Test와 응답 형식 Test 구분 명시 |
