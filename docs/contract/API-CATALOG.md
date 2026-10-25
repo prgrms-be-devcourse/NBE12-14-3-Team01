@@ -78,7 +78,7 @@
 | 권한 | API-LV-01과 같음 |
 | 요청 | `decisions[]`: { `shiftId`, `shiftStartAt`, `shiftEndAt` (G03-D-05 P2 비교용), `action`: `REASSIGN` + `targetMemberId` (**인계 대상의 현재 WorkplaceMember ID**) 또는 `CANCEL` } / `acknowledgedUnavailableConflicts[]` (G03-D-05 §5-1, 처음에는 빈 목록) / `regenerateInviteCode` (기본 `false`, ML-H2 H2-5) |
 | 검사 순서 | ① 권한 → ② 계획 유효성 P1~P5 (G03-D-05 §4-2) → ③ 우회할 수 없는 충돌 (인계 대상의 공식 근무 중복, 다른 근무지, 시작한 근무) → ④ 불가능 시간 확인 범위 (§5-3 겹침 구간 비교) |
-| 성공 응답 | 200. `data`: `leftAt`, `reassignedShifts[]`, `cancelledShifts[]`, `deletedDraftShifts[]`, `closedRequests` (사유별 수: `SHIFT_CHANGED`, `CANDIDATE_INELIGIBLE`), `ineligibleCandidacies`, `newInviteCode` (재발급했을 때만) |
+| 성공 응답 | 200. `data`: `leftAt`, `reassignedShifts[]`, `cancelledShifts[]`, `deletedDraftShifts[]`, `closedRequests` (총수와 사유별 수: `SHIFT_CHANGED`, `CANDIDATE_INELIGIBLE`. 세는 규칙은 API-PS-02 `closedSubstituteRequests`와 같다. 한 요청은 사유 하나로만 세므로 사유별 수의 합 = 총수), `ineligibleCandidacies`, `newInviteCode` (재발급했을 때만) |
 | 404 응답 | Path의 대상 소속이 없거나 다른 근무지 (API-LV-01과 같음). 요청 Body의 `targetMemberId`·`shiftId`가 그 근무지에 없거나 다른 근무지 것이어도 같은 404 (존재 여부를 드러내지 않음) |
 | 409 응답 | **CONFIRM_REQUIRED** (`data` = G03-D-05 §5-1 충돌 목록, 겹침 구간만) / **STALE** (계획이 지금과 다름 → 미리보기 다시 조회. 예: 같은 근무지의 인계 대상이 그 사이 퇴사, 근무가 그 사이 인계·취소됨, 퇴사자 담당 DRAFT가 새로 생김) / **STATE_CONFLICT** (진행 중 근무 — `data`에 종료 시각, 이미 종료된 소속, 대상이 MANAGER) / **FORBIDDEN_CONFLICT** (인계 대상의 공식 근무 중복. 기존 SFT·SCH code 재사용 여부는 S2-4) |
 | 상태 변경 (한 Transaction) | 대상 소속 `leftAt = now` / 인계 근무: `Shift.member = 대상` + 배정 이력 (`MEMBER_LEFT`) / 취소 근무: `CANCELLED` + 취소 사유 `MEMBER_LEFT`·시각·행위자 / DRAFT 삭제 / 퇴사자 근무의 활성 Request → `CLOSED / SHIFT_CHANGED` / 퇴사자가 후보인 Request: PENDING → `INELIGIBLE`, 수락자면 Request `CLOSED / CANDIDATE_INELIGIBLE` / (선택) 초대 코드 재발급. Pattern은 보존하고 자동 적용 제외 |
@@ -368,3 +368,4 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | B2 초안: 권한 모델 M1·M2·M3, 새 API 5개 (초대 코드 재발급, 빠진 근무, 내 소속 이력, 종료된 대타, 서버 로그아웃), 기존 API 동작 변경 6개 (재가입, SUB-05, SUB-07, 근무 상세, T1 code, 승인 권한 검사 순서), SUB-05·07 네 가지 구분, 질문 1개 |
 | 2026-10-25 | B2 보완: CHG-06을 대타 P0 묶음으로 사용자 잠정 결정. M3를 추가 검사로 정의. Security 도달 가능성 확인, 같은 패턴의 ID 직접 지정 API 4개 발견(CHG-07), 고칠 방향 5단계와 TOCTOU 판단, Test M3-T1~T6, CHG별 등급 표 |
 | 2026-10-25 | CHG-07 (가) 사용자 잠정 결정. API별 Lock 이후 재검증 조건 표(직원 소속은 바뀔 수 있음), 같은 User ≠ 같은 소속, 404/403/409 응답 규칙, 권한 확인 전 부작용 정적 확인(없음), 대타 종료·알림 읽음은 P0 검토 후보. 이전 TOCTOU 문단("범위 판단은 뒤집히지 않는다")은 대타 승인·종료에만 맞아 API별 표로 교체 |
+| 2026-10-25 | S2-5B: API-LV-02 `closedRequests`에 총수와 세는 규칙 연결 (ML-4 L113의 "총수와 사유별 수"와 맞춤, PS-02와 같은 규칙) |

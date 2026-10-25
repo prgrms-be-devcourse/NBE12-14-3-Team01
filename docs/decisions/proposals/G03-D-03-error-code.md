@@ -162,6 +162,10 @@ HTTP 상태는 큰 분류이고, 화면별 정확한 대응은 code로 정한다
 | D03-T3 | T1-02 정정 후: 시작된 근무 수락·거절 → `SUB-023` 409. 요청 생성은 `SUB-012` 400 그대로 | PROPOSED_IMPROVEMENT (기존 Test `SubstituteCandidateServiceTest` L435·L452·L631 기대값 변경) |
 | D03-T4 | Lock 대기 초과 주입 → 503, Transaction 전체 Rollback | H6 (ML-5 ML-14) |
 | D03-T5 | 새 code마다: HTTP·code·문구·DB 상태 불변 | 각 기능 카드 Test |
+| D03-T6 (S2-5B 추가) | T1-03 정정 후: 취소된 근무의 후보 수락 → `SUB-023` 409. 요청 생성의 `SUB-014`는 그대로 | PROPOSED_IMPROVEMENT (기존 Test `SubstituteCandidateServiceTest$AcceptTest.acceptCandidate_ShiftCancelled` L424 = V4-T-63 기대값 변경) |
+| D03-T7 (S2-5B 추가) | T1-05 정정 후: 취소된 근무의 대타 종료 → `SFT-013`과 같은 의미의 code | PROPOSED_IMPROVEMENT (기존 Test `close_ShiftNotScheduled_ThrowsException` L1161, 확인 L1173 = V4-T-43 기대값 변경). P1 낮음 |
+
+정식 ID: D03-T2·T3·T6·T7 = V4-N-40·41·42·43, D03-T1·T4·T5는 참조 ([TEST-INVENTORY](../../evidence/TEST-INVENTORY.md) §5-1). T1-03·T1-05는 S2-4A [ERROR-CODES](../../contract/ERROR-CODES.md)에서 새로 발견돼 이 표에 빠져 있었다.
 
 ## 8. 보장 범위와 제외 범위
 
@@ -183,3 +187,4 @@ HTTP 상태는 큰 분류이고, 화면별 정확한 대응은 code로 정한다
 | 일자 | 내용 | 이유 |
 |---|---|---|
 | 2026-10-25 | 초안. 사용자 잠정 결정 D03-1~7, 새 code 규칙, 409·503 대응, 목록 문서 형식 | 사용자 선택: 질문 1 (A), 질문 2 (가). 교차 검토 의견(사용처 전체 확인 후 정정, T1 P0 승격 조건, 재사용 기준, 409 세분, 503 자동 재시도 금지, 변경 전 값 보존, category는 문서 분류) 반영. 코드 정적 확인: `SFT-006` 사용처 1곳, `SUB-012` 사용처 3곳 |
+| 2026-10-25 | S2-5B: D03-T6·T7 추가 (T1-03·T1-05 기존 Test 기대값 변경), 정식 ID 연결 | S2-5A 교차 점검 X-3 |

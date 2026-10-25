@@ -58,7 +58,7 @@
 
 ### 2-6. Test 참조가 없는 code (0건)
 
-`SFT-002`, `SFT-007`, `SFT-008`, `SFT-010`, `SFT-011`, `SFT-016`, `SFT-017`, `SFT-019`, `SCH-003`, `SCH-008`, `SUB-003`. Migration 전에 현재 동작을 고정할 Test가 필요한지 S2-5에서 V3·V4 담당과 확인한다.
+`SFT-002`, `SFT-007`, `SFT-008`, `SFT-010`, `SFT-011`, `SFT-016`, `SFT-017`, `SFT-019`, `SCH-003`, `SCH-008`, `SUB-003`. Migration 전에 현재 동작을 고정할 Test가 필요한지 S2-5에서 V3·V4 담당과 확인한다. → S2-5B 정적 판정과 Migration 명세: [TEST-INVENTORY](../evidence/TEST-INVENTORY.md) §5-3 (V3-N-24~32, V4-N-48). 담당 확인은 아직이다.
 
 ### 2-7. 정정 범위와 우선순위 (모두 Improvement, Kotlin Migration은 기존 그대로)
 
@@ -248,3 +248,4 @@
 |---|---|
 | 2026-10-25 | 초안 (S2-4A). 87개 전체 목록(사용처·Test 참조·Frontend 의존), T1 3건 추가 발견(T1-03~05), 한 code 두 의미 M-01, 잠재 L-01, Test 참조 0인 code 11개, 새 code 12개 예약과 재사용 표, Frontend 분기 연결, 질문 2개 |
 | 2026-10-25 | 질문 2개 사용자 잠정 결정 반영 (§6). 정정 범위·우선순위·영향 Test 표(§2-7), 범위 밖 404 응답이 없는 ID와 같은지 정적 확인, `WPL-011`·`SFT-021`의 공통 형식, `SUB-006` 두 사용처 대조 |
+| 2026-10-25 | S2-5B: Test 0 code 11개를 TEST-INVENTORY §5-3에 연결 |
