@@ -10,8 +10,8 @@
 | 기준 코드 | 3차 `develop` `31ecaee` |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
-| 원문 | `docs/references/ml/ML-CONCURRENCY-01-R.md` (이 문서가 일부를 수정한다, §8) |
-| 앞선 카드 | ML-2, ML-3, ML-H2, ML-4, AUTH-1 |
+| 원문 | [`ML-CONCURRENCY-01-R`](../../references/ml/ML-CONCURRENCY-01-R.md) (이 문서가 일부를 수정한다, §8) |
+| 앞선 카드 | [ML-2](ML-2-leave-shifts-and-published-changes.md), [ML-3](ML-3-substitute-on-leave-and-shift-change.md), [ML-H2](ML-H2-rejoin-and-active-membership.md), [ML-4](ML-4-leave-command-and-access.md), [AUTH-1](AUTH-1-server-logout.md) |
 | 주관 / 리뷰 | H6 총괄(D-NOW-01 미정), V3·V4 Owner, 공통 설정 Owner |
 
 > 동시성은 SWITCH에서 정합성과 상태 전이를 지키는 핵심이다. 이 문서는 "어떤 순서로 잠그는가"만이 아니라 **잠근 뒤 무엇을 다시 확인하는가**, **아직 없는 Row가 생기는 경합을 무엇으로 막는가**, **실패를 어떻게 알리는가**를 함께 정한다.
@@ -277,9 +277,20 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | Repository | Membership `FOR SHARE` 조회, Shift ID Scalar 조회, 근무의 활성 Request `FOR UPDATE` 조회, 대상 사용자 미래 근무 조회 |
 | 리뷰 체크리스트 | 새 Command마다 "§5 순서 준수, Lock 후 판단, 1차 캐시" 확인 항목 |
 
+## S1 결정 연결 (2026-10-25)
+
+이 카드 본문은 이관 당시 그대로다. 아래는 2026-10-25에 기록한 사용자 잠정 결정(모두 ② `PROPOSED`, 팀 승인 전)과 이 카드의 연결 위치다. 결정 내용은 연결된 카드가 원본이다. 본문 수정이 필요한 곳은 S2-3 이후 해당 단계에서 고친다.
+
+| 이 카드의 위치 | 연결된 결정 | 요약 |
+|---|---|---|
+| Deadlock·Lock 대기 초과 503 | [G03-D-03](G03-D-03-error-code.md) §5-3 | 기술 후보. MySQL·Spring에서 Transaction 전체 Rollback 확인 후 적용. 변경 요청 자동 재시도 금지 |
+| Lock 표 (불가능 시간 쓰기 없음) | [G03-D-21](G03-D-21-unavailable-time.md) §8 D21-R1~R5 | 불가능 시간 등록·수정·삭제와 배정·수락 경합 5개를 이 카드의 Lock 표와 실험 목록에 추가할 것 (S2-3 이후) |
+| 퇴사 확정 재조회 409 | [G03-D-21](G03-D-21-unavailable-time.md) D21-8 | 확인한 불가능 시간 충돌 목록도 재조회 비교 대상 |
+
 ## 11. 변경 이력
 
 | 일자 | 내용 |
 |---|---|
 | 2026-10-23 | DRAFT 편집 소속 Guard를 필수로 수정 (ML-2-INV-02), ML5-T14·T15·R4 추가, 실험 성공 기준 표 추가 |
 | 2026-10-23 | 초안. AS-IS Lock 지도, 이전 순서 결함 4개, 수정 순서 후보(Shift를 Request 앞으로), 쌍별 순환 검사, 실패 응답, 재현 Test 계획 |
+| 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |

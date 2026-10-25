@@ -10,8 +10,8 @@
 | 기준 코드 | 3차 `develop` `31ecaee`. 정적 확인 |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
-| 앞선 카드 | ML-H1 (PR #6), ML-2 (`ML-2-leave-shifts-and-published-changes.md`), ML-3 (`ML-3-substitute-on-leave-and-shift-change.md`), ML-H2 (`ML-H2-rejoin-and-active-membership.md`) |
-| 원문 | `docs/references/ml/ML-DECISION-01-FINAL.md` (퇴사 Command ①, 종료 소속 조회 ③) |
+| 앞선 카드 | [ML-H1](ML-H1-membership-history.md) (PR #6), [ML-2](ML-2-leave-shifts-and-published-changes.md), [ML-3](ML-3-substitute-on-leave-and-shift-change.md), [ML-H2](ML-H2-rejoin-and-active-membership.md) |
+| 원문 | [`ML-DECISION-01-FINAL`](../../references/ml/ML-DECISION-01-FINAL.md) (퇴사 Command ①, 종료 소속 조회 ③) |
 | 주관 / 리뷰 | V2 Owner (주관). V3·V4·V5, Frontend |
 
 ---
@@ -220,9 +220,22 @@ ML-2·ML-3·ML-H2는 퇴사 Command 안에서 일어날 일을 정했다. 이 �
 - 재직·경력 증명 요구가 생길 때 → 이름 스냅샷, 공식 문서.
 - 계정 삭제 기능이 생길 때 → 관리자 0명, 과거 소속 이력의 개인정보 처리.
 
+## S1 결정 연결 (2026-10-25)
+
+이 카드 본문은 이관 당시 그대로다. 아래는 2026-10-25에 기록한 사용자 잠정 결정(모두 ② `PROPOSED`, 팀 승인 전)과 이 카드의 연결 위치다. 결정 내용은 연결된 카드가 원본이다. 본문 수정이 필요한 곳은 S2-3 이후 해당 단계에서 고친다.
+
+| 이 카드의 위치 | 연결된 결정 | 요약 |
+|---|---|---|
+| § 새 ErrorCode 3~4개 후보 (WPL) | [G03-D-03](G03-D-03-error-code.md) §4·§5-2 | 대상 MANAGER는 409(호출자 권한 부족은 403과 구분), 이미 종료·진행 중 근무 409, 미리보기 이후 변경 409 STALE. 번호는 S2-4 |
+| 미리보기 → 확정 (ML-4-8)과 불가능 시간 | [G03-D-21](G03-D-21-unavailable-time.md) D21-7·8 | 미리보기에 충돌 근무·직원·구간을 모두 보여 주고 한 번 확인. 확정 시 다시 계산, 다르면 409. 응답 형식은 G03-D-05 (미결, S2-3) |
+| 빠진 근무 (미래 + 최근 7일, 원래 시작 시각 기준) | [G03-D-22](G03-D-22-notification-delivery.md) S22-b | 종료된 대타 조회는 **효력 종료 시각** 기준 7일. 화면 목적이 달라 기준이 다르다 |
+| SUB-05·SUB-07 조회 범위 ("SUB-07은 ML-3으로 해결") | [G03-D-22](G03-D-22-notification-delivery.md) §6-4 | ML-3 종료로 결과는 막히지만 방어로 현재 소속 조건을 추가 (P0 조건). 이 카드의 판단과 충돌하지 않고 범위를 넓힘 |
+| 변경 알림 (보조 수단) | [G03-D-22](G03-D-22-notification-delivery.md) §5 | 알림 Type마다 대체 조회 화면 지정 |
+
 ## 12. 변경 이력
 
 | 일자 | 내용 |
 |---|---|
 | 2026-10-23 | §6-1 직원 조회 체계 추가 (내 근무 / 빠진 근무 / 과거 소속 분리). §8 ② "취소 근무 상세 허용"을 대체. V2-N-35 수정, V2-N-36~38 추가 |
 | 2026-10-23 | 초안. ML-4-1~8 사용자 잠정 결정. API별 퇴사 후 접근 점검, 근무 상세의 소속 미확인·취소 근무 거부 발견 (§8 ①②) |
+| 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |

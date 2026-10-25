@@ -87,10 +87,10 @@
 
 | 카드 | 위치 |
 |---|---|
-| AUTH-1 | `proposals/AUTH-1-server-logout.md` |
-| ML-2 + D-26 + D-27 | `proposals/ML-2-leave-shifts-and-published-changes.md` |
-| ML-3 + V4 Test 정정 메모 | `proposals/ML-3-substitute-on-leave-and-shift-change.md` (V4 Test 정정 메모는 S2-5에서 `TEST-INVENTORY`에 통합 예정, 원본 로컬 `drafts/D4-ML-3/`) |
-| ML-H2 | `proposals/ML-H2-rejoin-and-active-membership.md` |
-| ML-4 | `proposals/ML-4-leave-command-and-access.md` |
-| ML-5 | `proposals/ML-5-concurrency-and-lock-order.md` |
+| AUTH-1 | [`proposals/AUTH-1-server-logout.md`](proposals/AUTH-1-server-logout.md) |
+| ML-2 + D-26 + D-27 | [`proposals/ML-2-leave-shifts-and-published-changes.md`](proposals/ML-2-leave-shifts-and-published-changes.md) |
+| ML-3 + V4 Test 정정 메모 | [`proposals/ML-3-substitute-on-leave-and-shift-change.md`](proposals/ML-3-substitute-on-leave-and-shift-change.md) (V4 Test 정정 메모는 S2-5에서 `TEST-INVENTORY`에 통합 예정, 원본 로컬 `drafts/D4-ML-3/`) |
+| ML-H2 | [`proposals/ML-H2-rejoin-and-active-membership.md`](proposals/ML-H2-rejoin-and-active-membership.md) |
+| ML-4 | [`proposals/ML-4-leave-command-and-access.md`](proposals/ML-4-leave-command-and-access.md) |
+| ML-5 | [`proposals/ML-5-concurrency-and-lock-order.md`](proposals/ML-5-concurrency-and-lock-order.md) |
 | ML-H1, Charter, G03-D-19 | 저장소 (PR #6 병합) |

@@ -151,7 +151,7 @@ V2 구역 전체 목록이 아니다. 정책 카드 [`ML-H1`](../decisions/propo
 | V2-N-01 (ML-H1-T1) | ML-H1 H1-a, ML-H1-INV-02 | 퇴사 처리 → 같은 Member id 유지, `leftAt = Clock`, role·`joinedAt` 불변, Row 수 불변 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** (G03-D-11·13 `PENDING`) | SPECIFIED (작성 금지) | 불가 (퇴사 Command 없음, ML-4) |
 | V2-N-02 (ML-H1-T2) | ML-H1 H1-a, ML-H1-INV-01 | 퇴사 전 Shift·Request·Candidate·Notification → 퇴사 후 Row 유지, `member_id` 불변 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (ML-4, 보존 범위는 ML-2) |
 | V2-N-03 (ML-H1-T3) | G03-INV-03, C-11, C-12 | 종료 Row(5-인자 생성자로 준비) → `requireManager`·구성원 목록·내 근무지 목록에서 제외, 관리자 행위는 WPL-003 / WPL-004 | SLICE (DataJpa) + UNIT · H2 또는 MYSQL_TC (미정) | MIGRATION (현재 Java 동작 고정) | 해당 없음 (동작 변경 아님) | SPECIFIED | 가능. Task 승인 필요 (`docs/ai/AI-RULES.md` §1) |
-| V2-N-04 (ML-H1-T4) | ML-H1 H1-d | 종료 Row가 있는 User가 같은 초대 코드로 참여 → 새 ErrorCode (후보 WPL-006, 409), 새 Row 0 | UNIT · MOCK + SLICE (WebMvc) + INTEGRATION | PROPOSED_IMPROVEMENT | **PROPOSED** (ErrorCode 추가는 AI-RULES §2 승인 대상) | SPECIFIED (작성 금지) | 승인 후 가능 (퇴사 Command 없이 종료 Row 준비 가능) |
+| V2-N-04 (ML-H1-T4) — `SUPERSEDED` → V2-N-06 ([ML-H2](../decisions/proposals/ML-H2-rejoin-and-active-membership.md), 팀 승인 전) | ML-H1 H1-d | 종료 Row가 있는 User가 같은 초대 코드로 참여 → 새 ErrorCode (후보 WPL-006, 409), 새 Row 0 | UNIT · MOCK + SLICE (WebMvc) + INTEGRATION | PROPOSED_IMPROVEMENT | **PROPOSED** (ErrorCode 추가는 AI-RULES §2 승인 대상) | SPECIFIED (작성 금지) | 승인 후 가능 (퇴사 Command 없이 종료 Row 준비 가능) |
 | V2-N-05 (ML-H1-T5) | ML-H1-INV-02 | 이미 퇴사한 Member에 다시 퇴사 → `leftAt` 불변. 응답은 ML-4에서 결정 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (ML-4) |
 
 ### 4-2. 회귀 대상 기존 Test (ID 미부여, 기대값 변경 0)

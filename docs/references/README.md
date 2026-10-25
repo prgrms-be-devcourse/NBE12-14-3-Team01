@@ -100,8 +100,25 @@ G-03은 C-ID를 원 Audit(A-01~A-07) 절로 묶는다. 3차 문서의 V 배정�
 
 | 파일 | 원본 위치 (1-based line, 시각) | 본문 SHA-256 | 대체·후속 |
 |---|---|---|---|
-| `ml/ML-DECISION-01-FINAL.md` | line 9431, 2026-10-22T07:26:20Z | `3856b3f836dd80c6524ce11e271b371bb4e9bd5a30dbc36ecff1d2c410b8c357` | 대타 정리 → ML-SUB-STATE-01로 대체. Lock 순서 → ML-CONCURRENCY-01-R로 대체. 이력·재가입 → 카드 ML-H1 |
-| `ml/ML-SUB-STATE-01.md` | line 9601, 2026-10-22T08:24:40Z | `58e23d1a33d925c70e9f457bf67e6e049007e09cb419ef4d8d2c06c01d336e67` | 후속 카드 ML-3 (미작성) |
-| `ml/ML-CONCURRENCY-01-R.md` | line 9678, 2026-10-22T08:49:49Z | `76caf22eea69d5ccbd6db860e1697b802ebf2cba29e8adcdcd1ce49aeb32b590` | 후속 카드 ML-5 (미작성). 실행 근거 없음 (H6 미실행) |
+| `ml/ML-DECISION-01-FINAL.md` | line 9431, 2026-10-22T07:26:20Z | `3856b3f836dd80c6524ce11e271b371bb4e9bd5a30dbc36ecff1d2c410b8c357` | 대타 정리 → ML-SUB-STATE-01로 대체. Lock 순서 → ML-CONCURRENCY-01-R로 대체. 이력·재가입 → 카드 ML-H1·ML-H2. 근무 처리·퇴사 Command → 카드 ML-2·ML-4 (§8) |
+| `ml/ML-SUB-STATE-01.md` | line 9601, 2026-10-22T08:24:40Z | `58e23d1a33d925c70e9f457bf67e6e049007e09cb419ef4d8d2c06c01d336e67` | 후속 카드 ML-3 (§8) |
+| `ml/ML-CONCURRENCY-01-R.md` | line 9678, 2026-10-22T08:49:49Z | `76caf22eea69d5ccbd6db860e1697b802ebf2cba29e8adcdcd1ce49aeb32b590` | 후속 카드 ML-5 (§8). 실행 근거 없음 (H6 미실행) |
 
 검증 방법: 각 파일에서 머리말(첫 `---` 줄까지와 그 다음 빈 줄)과 파일 끝 줄바꿈 1개를 뺀 본문의 SHA-256이 위 값과 같다.
+
+## 8. ML 원문과 후속 정책 카드의 대응 (2026-10-25)
+
+원문 파일(`ml/`)은 수정하지 않는다. 후속 카드는 모두 **사용자 잠정 결정 / ② `PROPOSED`**이고 팀 승인 전이다. 원문과 카드가 다르면 카드가 최신 검토본이지만, 구현 기준이 되는 것은 `DECISION-LOG`의 `APPROVED` 행뿐이다 (현재 0건).
+
+| 원문 | 원문의 내용 | 후속 카드 | 바뀐 점 |
+|---|---|---|---|
+| [`ML-DECISION-01-FINAL`](ml/ML-DECISION-01-FINAL.md) | 퇴사자의 미래 공식 근무 **전부 CANCELLED** | [ML-2](../decisions/proposals/ML-2-leave-shifts-and-published-changes.md) | 근무마다 관리자가 **인계 또는 취소** 선택 |
+| 〃 | DRAFT·Pattern hard delete | ML-2 | DRAFT 삭제 + 목록 표시, **Pattern은 보존하고 자동 적용에서 제외** |
+| 〃 | 공개 근무표에 근무 추가 (C-31 예외), 단독 취소 제외 | ML-2 (D-26·D-27) | 공개 후 추가·취소·담당자 변경을 별도 Command로. 시간 변경은 보류 |
+| 〃 | 퇴사 Command (현재 MANAGER가 현재 EMPLOYEE를) | [ML-4](../decisions/proposals/ML-4-leave-command-and-access.md), [ML-H2](../decisions/proposals/ML-H2-rejoin-and-active-membership.md) H2-9 | 미리보기 → 확정, 재조회 409. 대상은 EMPLOYEE만 |
+| 〃 | 종료된 내 소속 조회 | ML-4 | 마이페이지 "내 소속 이력", 빠진 근무 |
+| 〃 | 재가입 UNKNOWN | [ML-H1](../decisions/proposals/ML-H1-membership-history.md) → ML-H2 | 새 Row로 재가입 포함 |
+| [`ML-SUB-STATE-01`](ml/ML-SUB-STATE-01.md) | `INELIGIBLE` / `CANDIDATE_INELIGIBLE` (B+) | [ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) | 유지 (구성 규칙 포함) |
+| 〃 | 요청자 퇴사 → `MANAGER_CLOSED` | ML-3 | **`SHIFT_CHANGED`** (근무 인계·취소가 원인) |
+| [`ML-CONCURRENCY-01-R`](ml/ML-CONCURRENCY-01-R.md) | 순서 Schedule → Request → Shift → Membership, R-Gating, 퇴사는 User를 잠그지 않음 | [ML-5](../decisions/proposals/ML-5-concurrency-and-lock-order.md) | 순서 후보 확장 (Workplace → Schedule → Shift → Request → User → Membership), 승인은 Shift → Request로 변경 후보. **분석 후보, 실험 검증 대기** |
+| 〃 | Deadlock·Lock 대기 초과 503 | ML-5, [G03-D-03](../decisions/proposals/G03-D-03-error-code.md) §5-3 | 기술 후보. MySQL·Spring Rollback 확인 후 적용 |

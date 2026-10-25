@@ -11,8 +11,8 @@
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
 | 관련 ID | G03-D-11 (퇴사 채택, 전제), **G03-D-15** (Substitute 관련 Membership Lifecycle), G03-D-17 (Request 종료 상태·어휘), G03-D-18 (재OPEN), G03-D-22 (알림 유실), C-42~C-50, V4-P05~P08, V4-N-06·N-07 (Inventory의 PROPOSED 자리) |
-| 앞선 카드 | ML-H1 (PR #6), ML-2·D-26·D-27 (`ML-2-leave-shifts-and-published-changes.md`) |
-| 원문 | `docs/references/ml/ML-SUB-STATE-01.md` (B+), `ML-CONCURRENCY-01-R.md` (`develop`, PR #6 병합) |
+| 앞선 카드 | [ML-H1](ML-H1-membership-history.md) (PR #6), ML-2·D-26·D-27 ([ML-2](ML-2-leave-shifts-and-published-changes.md)) |
+| 원문 | [`ML-SUB-STATE-01`](../../references/ml/ML-SUB-STATE-01.md) (B+), [`ML-CONCURRENCY-01-R`](../../references/ml/ML-CONCURRENCY-01-R.md) (`develop`, PR #6 병합) |
 | 주관 / 리뷰 | V4 Owner (주관). V2·V3 (퇴사·근무 변경 Command), V5 (알림), Frontend, 공통 설정 Owner (운영 DDL) |
 
 > 이 카드는 **근무 변경·퇴사가 대타 요청과 후보에 주는 영향**만 다룬다. Lock 순서는 ML-5, 퇴사 API·권한은 ML-4, 재가입은 ML-H2.
@@ -246,6 +246,17 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 알림 전달 보장 | G03-D-22 |
 | V4 Test Inventory 정정 (PR #5 반영) | 별도 메모 `V4-TEST-INVENTORY-DELTA-PR5.md` → 별도 문서 변경 |
 
+## S1 결정 연결 (2026-10-25)
+
+이 카드 본문은 이관 당시 그대로다. 아래는 2026-10-25에 기록한 사용자 잠정 결정(모두 ② `PROPOSED`, 팀 승인 전)과 이 카드의 연결 위치다. 결정 내용은 연결된 카드가 원본이다. 본문 수정이 필요한 곳은 S2-3 이후 해당 단계에서 고친다.
+
+| 이 카드의 위치 | 연결된 결정 | 요약 |
+|---|---|---|
+| ML-3-A, Candidate 금지 전이 (`ACCEPTED → *`) | [G03-D-22](G03-D-22-notification-delivery.md) §4-3 | 종료된 대타 조회가 "현재 ACCEPTED = 수락 이력"에 의존한다. 이 금지 전이를 유지해야 한다 |
+| 새 종료 사유 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE`의 `closedAt` | [G03-D-19](G03-D-19-expiry.md) §0-2, [G03-D-22](G03-D-22-notification-delivery.md) §4-3 | Command 시각을 DB `closedAt`에 저장 (B1 미적용). 구현 계약에서 확인 |
+| ML-3-H (APPROVED는 과거 이력) | [G03-D-22](G03-D-22-notification-delivery.md) S22-c | 승인된 수락자에게 "승인됨" 표시, 현재 담당과 구분. 승인 응답 DTO 재사용 금지 |
+| 알림 전달 보장 | [G03-D-22](G03-D-22-notification-delivery.md) D22-1·5 | 최선 노력. Outbox 등은 후속 |
+
 ## 16. 변경 이력
 
 | 일자 | 내용 |
@@ -253,3 +264,4 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 2026-10-23 | 초안. ML-3-Q1 (O1 + `SHIFT_CHANGED`), P-a, A-a 사용자 잠정 결정. H6-C1·C5·C6 기대값 수정, 종료 원인 연결(§4), 운영 DDL·Rollback(§9) 반영 |
 | 2026-10-23 | P1 구성 규칙 사용자 확인 → 잠정 결정. 퇴사·거절 공통 판정, 판단 시점은 ML-5, 승인 후보 다수 발견 시 처리 추가 |
 | 2026-10-23 | 교차 검증 반영: P1 구성 규칙을 "원문 B+ 구체화, 사용자 확인 대기"로 표시하고 사유 의미 정의. 기존 거절 종료 판정 변경 필요(L274-284) 추가. 승인 대상 식별 근거와 V4-N-21. §4를 최소 계약 / 상세 표시 후보로 분리. §7에 퇴사 범위·Lock 구체 항목. V4-N-18 조건부, V4-N-22 추가 |
+| 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |

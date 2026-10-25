@@ -11,7 +11,7 @@
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
 | 관련 ID | G03-D-11 (퇴사 채택, 전제), G03-D-12 (종료 최소 범위), G03-D-14 (Pattern), **G03-D-26** (CANCELLED 의미), **G03-D-27** (공개 후 정정 범위), G03-D-21 (불가능 시간 처리), G03-D-22 (알림 유실), G03-C-29, **G03-C-31** (공개 후 변경 제한, 계약 변경 대상), G03-INV-04·07 |
-| 앞선 카드 | ML-H1 (소속 이력 보존, PR #6) |
+| 앞선 카드 | [ML-H1](ML-H1-membership-history.md) (소속 이력 보존, PR #6) |
 | 주관 / 리뷰 | V3 Owner (주관). V2 (퇴사 Command), V4 (대타), V5 (알림), Frontend (필수) |
 
 > 저장소 위치 예정: `docs/decisions/proposals/ML-2-leave-shifts-and-published-changes.md`. 절차는 `docs/decisions/PROCESS-CHARTER.md`.
@@ -55,7 +55,7 @@
 ## 3. 이전 제안
 
 - `docs/references/ml/ML-DECISION-01-FINAL.md`: 미래 공식 근무 전부 CANCELLED, 공개 근무표에 근무 추가(C-31 예외), DRAFT·Pattern hard delete. **이 카드에서 일부를 바꿨다** (§13).
-- `docs/decisions/proposals/G03-D-19-expiry.md` §11: G03-D-27 채택 시 선행 제약 9개.
+- [`G03-D-19-expiry.md`](G03-D-19-expiry.md) §11: G03-D-27 채택 시 선행 제약 9개.
 
 ## 4. 사용자 잠정 결정
 
@@ -137,7 +137,7 @@
 | 퇴사 Command | 미리보기(미래 공식 근무 목록, 삭제될 DRAFT 목록) + 확정(근무별 선택 목록). 경로·주체는 ML-4 | 새 API |
 | 공개 후 Command | 추가, 취소, 담당자 변경 (각 1개). 관리자 권한, 시작 전만 | 새 API. **G03-C-31 계약 후보 변경** (Decision에 "유지하는 제한 / 대체하는 부분"을 명시) |
 | 공통 검증 | 주차 범위, 겹침, 다른 근무지 공식 근무 충돌, 불가능 시간, 현재 소속. 지금은 `ScheduleService` 안의 private 메서드라 공통 검증으로 분리 필요 (L365-520) | 내부 |
-| ① 불가능 시간 의미 | 추천: 관리자 기능이므로 DRAFT·Publish와 같은 **경고 후 확인**. 대타 승인(거부)과 다름 → G03-D-21과 함께 기록 | 결정 필요 |
+| ① 불가능 시간 의미 | 추천: 관리자 기능이므로 DRAFT·Publish와 같은 **경고 후 확인**. 대타 승인(거부)과 다름 → G03-D-21과 함께 기록 | 결정 필요 → **[G03-D-21](G03-D-21-unavailable-time.md) D21-1에서 사용자 잠정 결정 (2026-10-25)** |
 | Shift Column | 취소 사유, 취소 시각, 취소 행위자 (nullable) | DB 변경 |
 | 배정 이력 Table | 근무, 이전 담당자, 새 담당자, 사유(`MEMBER_LEFT`, `MANAGER_REASSIGNED`. `SUBSTITUTE_APPROVED`는 예약), 행위자, 시각 | 새 Table |
 | ④ 대타 승인과의 관계 | 1차에는 관리자 변경·퇴사 인계만 기록. 대타 승인 변경은 기존 `SubstituteRequest`(APPROVED)로 추적. 이력 Table에 넣으려면 V4 Improvement | — |
@@ -234,9 +234,22 @@
 - 퇴사는 `leftAt`만 기록한다. 현재 소속 유일성 Column은 U2'면 DB가 자동 계산한다 (U3면 같은 Command에서 함께 갱신).
 - (ML-4 연결) D27-6을 지키려면 근무 상세 API(`GET /shifts/{id}`)가 **현재 소속 본인의 CANCELLED 근무 상세를 허용**해야 한다. 지금은 `IS_CANCELED_SHIFT`로 거부한다 (ML-4 §8 ②).
 
+## S1 결정 연결 (2026-10-25)
+
+이 카드 본문은 이관 당시 그대로다. 아래는 2026-10-25에 기록한 사용자 잠정 결정(모두 ② `PROPOSED`, 팀 승인 전)과 이 카드의 연결 위치다. 결정 내용은 연결된 카드가 원본이다. 본문 수정이 필요한 곳은 S2-3 이후 해당 단계에서 고친다.
+
+| 이 카드의 위치 | 연결된 결정 | 요약 |
+|---|---|---|
+| §8 ① 불가능 시간 의미 (결정 필요) | [G03-D-21](G03-D-21-unavailable-time.md) D21-1·5 | 관리자 직접 배정(공개 후 추가·담당자 변경, 퇴사 인계)은 경고 후 확인. 확인으로 넘어갈 수 있는 것은 불가능 시간 경고뿐 |
+| 공개 후 담당자 변경과 대타 승인 거부 | [G03-D-21](G03-D-21-unavailable-time.md) D21-9 | 승인이 `SUB-006`으로 거부된 뒤 직접 배정하면 APPROVED를 만들지 않고 배정 이력·`SHIFT_CHANGED`로 기록 |
+| 시간 변경 보류 (D27-2) | [G03-D-19](G03-D-19-expiry.md) §0-6 | 공개 근무 시간 직접 변경을 도입하면 G03-D-19를 다시 연다 |
+| 공개 후 변경·퇴사 인계의 배포 | [G03-D-19](G03-D-19-expiry.md) §0-7, [IMPLEMENTATION-PRIORITY](../IMPLEMENTATION-PRIORITY.md) §3 묶음 B | 취소·인계는 ML-3 대타 종료와 ML-5 Shift 우선 Lock과 함께 배포 |
+| 알림 유실 (§후속) | [G03-D-22](G03-D-22-notification-delivery.md) D22-1·3 | 알림은 최선 노력. 근무 취소·인계는 "빠진 근무"가 대체 조회 화면 |
+
 ## 15. 변경 이력
 
 | 일자 | 내용 |
 |---|---|
 | 2026-10-23 | 초안. ML-2-A·B, D-26, D-27 사용자 잠정 결정 통합. 이전 잠정 결정과의 차이는 §13 |
 | 2026-10-23 | §8 조회 응답 수정: "내 근무가 CANCELLED도 반환" → "내 근무는 AS-IS, 빠진 근무는 새 API" (ML-4 §6-1). V3-N-09 기대값 수정. §14-1에 ML-H2·ML-4 연결 |
+| 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가, 머리 표·§3 경로를 링크로 변경, §8 ① "결정 필요" 칸에 G03-D-21 결정 연결 표시 (본문 판단 변경 없음) |

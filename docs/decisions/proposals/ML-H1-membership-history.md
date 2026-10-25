@@ -52,13 +52,15 @@
 | ID | 결정 문장 | 이유 (사용자 의견 요지) | 성격 |
 |---|---|---|---|
 | H1-a | 퇴사 처리에서 WorkplaceMember Row를 삭제하지 않고 `leftAt`을 기록한다. ID, `joinedAt`, role과 과거 업무(Shift·Pattern·Request·Candidate·Notification) FK를 보존하며, 종료된 Row는 재활성화하지 않는다. 계정 탈퇴·개인정보 파기는 별도 계약에 따른다 | 퇴사 직후 지울 필요가 없다. 다시 활성화하지 않아야 나중에 다시 처리되어도 문제가 없다 | 정책 |
-| H1-b | 재가입은 이번 SWITCH V3에서 **구현할 가능성이 높다.** 이번 프로젝트에서 제외를 확정하지 않는다. 현재는 퇴사 구현 묶음에서 **우선 분리**하고, ML-3과 ML-H2의 DB·동시성·이력 조회 비용을 검토한 뒤 이번 프로젝트 포함 여부를 최종 결정한다 | 나중에 필요하고, 이번에 넣을 가능성이 높다 | **구현 범위: 미결정** |
-| H1-c | 재가입을 구현한다면 새 Membership Row로 소속 기간을 구분하는 방식을 우선 후보로 둔다. 현재 DB Unique는 유지한다. Unique 변경과 활성 소속 유일성 구현 방법은 ML-H2에서 정한다 | 가입했다가 퇴사한 기록과 다시 회원이 된 사실은 서로 다른 정보다 | 설계 후보 |
-| H1-d | 재가입을 지원하지 않는 동안, 종료된 소속자가 다시 참여하면 WPL-002를 재사용하지 않고 새 ErrorCode로 거부한다. 현재 소속자의 중복 가입은 WPL-002를 유지한다. HTTP 409는 후보다 | 올바르게 응답하는 쪽 | **Improvement** (AS-IS 아님) |
+| H1-b | 재가입은 이번 SWITCH V3에서 **구현할 가능성이 높다.** 이번 프로젝트에서 제외를 확정하지 않는다. 현재는 퇴사 구현 묶음에서 **우선 분리**하고, ML-3과 ML-H2의 DB·동시성·이력 조회 비용을 검토한 뒤 이번 프로젝트 포함 여부를 최종 결정한다 | 나중에 필요하고, 이번에 넣을 가능성이 높다 | **구현 범위: 미결정** → `SUPERSEDED`: [ML-H2](ML-H2-rejoin-and-active-membership.md) H2-4 "재가입 = 유효한 초대 코드 + 현재 소속 없음"으로 이번 프로젝트 포함. 후속 사용자 잠정 결정으로 대체 (팀 승인 전, 구현 기준 전환은 팀 승인 필요) |
+| H1-c | 재가입을 구현한다면 새 Membership Row로 소속 기간을 구분하는 방식을 우선 후보로 둔다. 현재 DB Unique는 유지한다. Unique 변경과 활성 소속 유일성 구현 방법은 ML-H2에서 정한다 | 가입했다가 퇴사한 기록과 다시 회원이 된 사실은 서로 다른 정보다 | 설계 후보 → `SUPERSEDED`: [ML-H2](ML-H2-rejoin-and-active-membership.md) H2-1 (새 Row), H2-2·H2-8 (현재 소속 유일성, U2' 우선·실험 통과 조건부). "현재 DB Unique 유지"도 대체됨. 후속 사용자 잠정 결정으로 대체 (팀 승인 전, 구현 기준 전환은 팀 승인 필요) |
+| H1-d | 재가입을 지원하지 않는 동안, 종료된 소속자가 다시 참여하면 WPL-002를 재사용하지 않고 새 ErrorCode로 거부한다. 현재 소속자의 중복 가입은 WPL-002를 유지한다. HTTP 409는 후보다 | 올바르게 응답하는 쪽 | **Improvement** (AS-IS 아님) → `SUPERSEDED`: [ML-H2](ML-H2-rejoin-and-active-membership.md) §8 "H1-d(퇴사자 전용 오류)는 쓰지 않음". 재가입이 정상 경로가 되어 필요 없어짐. 후속 사용자 잠정 결정으로 대체 (팀 승인 전, 구현 기준 전환은 팀 승인 필요) |
 
 H1-c 예: 직원이 1월에 가입해 3월에 퇴사하고 6월에 다시 가입하면, 1~3월 소속과 6월 이후 소속을 별개 Row로 남긴다. 현재 `UNIQUE(workplace_id, user_id)` 때문에 이 방식은 그대로는 구현할 수 없다.
 
 **H1-b와 H1-d의 관계:** ML-H2에서 재가입을 퇴사와 같은 묶음에 넣기로 하면, 퇴사자가 재가입을 거부당하는 기간이 없어져 H1-d가 필요 없을 수 있다. 그래서 H1-d의 구현 여부도 ML-H2 결정 때 함께 다시 본다.
+
+> **후속 연결 (2026-10-25):** H1-b·H1-c·H1-d는 [ML-H2](ML-H2-rejoin-and-active-membership.md)의 사용자 잠정 결정(2026-10-23)으로 대체되었다. **H1-a는 그대로 유효**하며 ML-H2의 전제다. ML-H2도 팀 승인 전이므로, 구현 기준을 ML-H2로 바꾸는 것은 팀 승인(`DECISION-LOG` G03-D-11·13) 이후다. 원래 문장은 판단 근거로 남겨 둔다.
 
 **검토 반영:**
 - "영구 보존" 표현을 H1-a의 범위 문장으로 바꿈 (교차 검토 의견).
@@ -128,7 +130,7 @@ ID 규칙은 `PROCESS-CHARTER` §5-5를 따른다. 확인한 기존 ID: `G03-INV
 | V2-N-01 (ML-H1-T1) | 현재 EMPLOYEE Member M (id=m, role, `joinedAt`=j) | 퇴사 처리 (Clock = t) | 같은 id m의 Row가 남는다. `leftAt = t`. role·`joinedAt = j` 그대로. Row 수 변화 없음 | PROPOSED_IMPROVEMENT · 불가 (퇴사 Command 없음, ML-4) |
 | V2-N-02 (ML-H1-T2) | M이 퇴사 전에 Shift·Request·Candidate·Notification을 가짐 (삭제 가능 범위 제외) | 퇴사 처리 | 보존 범위의 각 Row가 그대로 있고 `member_id = m` | PROPOSED_IMPROVEMENT · 불가 (ML-4, 보존 범위는 ML-2) |
 | V2-N-03 (ML-H1-T3) | 종료된 Row (`leftAt` ≠ null)를 5-인자 생성자로 준비 | `requireManager`, 구성원 목록, 내 근무지 목록 조회 | M은 결과에 없다. M 명의의 관리자 행위는 WPL-003 / WPL-004 | **MIGRATION (현재 Java 동작 고정)** · 가능. 퇴사 Command 없이 작성할 수 있음 |
-| V2-N-04 (ML-H1-T4) | User U의 종료 Row가 Workplace W에 있음 (5-인자 생성자) | U가 W의 초대 코드로 참여 | 새 ErrorCode (후보 WPL-006, 409). 새 Row 저장 0 | PROPOSED_IMPROVEMENT · 승인 전 작성 금지 |
+| V2-N-04 (ML-H1-T4) — `SUPERSEDED` → ML-H2 V2-N-06 | User U의 종료 Row가 Workplace W에 있음 (5-인자 생성자) | U가 W의 초대 코드로 참여 | 새 ErrorCode (후보 WPL-006, 409). 새 Row 저장 0 | PROPOSED_IMPROVEMENT · 승인 전 작성 금지 |
 | V2-N-05 (ML-H1-T5) | M이 이미 퇴사함 (`leftAt = t1`) | 다시 퇴사 처리 (Clock = t2) | `leftAt = t1` 그대로. 응답(오류 또는 멱등 성공)은 **ML-4에서 정한다** | PROPOSED_IMPROVEMENT · 불가 (ML-4) |
 
 V2-N-03은 현재 동작을 고정하는 Test라 정책 승인 대상이 아니다. 작성하려면 Task 승인이 필요하다 (`TEST-INVENTORY` §3-4와 같은 기준).
@@ -146,7 +148,7 @@ V2-N-03은 현재 동작을 고정하는 Test라 정책 승인 대상이 아니�
 | `service/WorkplaceServiceIntegrationTest.rejectDuplicateJoin` L118 | 현재 소속자 재가입 (실제 DB) | `ALREADY_JOINED_WORKPLACE` | 변경 없음 |
 | `service/WorkplaceServiceIntegrationTest.joinWorkplace` L89 | 정상 가입 | Row 생성, `leftAt` null | 변경 없음 |
 | `controller/WorkplaceControllerTest.rejectDuplicateJoin` L283 | Service가 WPL-002를 던짐 | 409, `code = WPL-002` | 변경 없음 |
-| `repository/WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` L241 | 같은 조합 두 번 저장 | `DataIntegrityViolationException` | 변경 없음 (Unique 유지). **ML-H2에서 재가입을 넣으면 이 기대값이 바뀌므로 그때 별도 승인 필요** |
+| `repository/WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` L241 | 같은 조합 두 번 저장 | `DataIntegrityViolationException` | 변경 없음 (Unique 유지). **ML-H2에서 재가입을 넣으면 이 기대값이 바뀌므로 그때 별도 승인 필요** → [ML-H2](ML-H2-rejoin-and-active-membership.md)가 재가입 포함으로 잠정 결정함. 기대값 변경 대상 (승인 전 변경 금지) |
 
 ## 10. ML-H2 재검토 조건
 
@@ -166,6 +168,8 @@ ML-H2에서 결정할 때 두 가지를 나눠 비교한다.
 - G03-D-13이 팀에서 다른 방식으로 결정될 때.
 
 ML-H2 완료 조건: 이번 프로젝트 포함 여부, 포함 시 구조(H1-c 확정 여부), Unique DDL 절차, H1-d 유지 여부, 영향 Test 목록이 카드에 기록됨.
+
+> **재검토 결과 (2026-10-25 연결):** [ML-H2](ML-H2-rejoin-and-active-membership.md)에 기록됨 (사용자 잠정 결정 2026-10-23). 포함, 새 Row, U2' 우선(실험 통과 조건부, 실패 시 U3), H1-d 미사용. 팀 승인 전.
 
 ## 11. Cross-Domain 영향과 리뷰
 
@@ -195,3 +199,4 @@ ML-H2 완료 조건: 이번 프로젝트 포함 여부, 포함 시 구조(H1-c �
 |---|---|---|
 | 2026-10-23 | 초안 작성 (사용자 잠정 결정 H1-a~d) | 작성자 로컬 분석과 사용자 답변 |
 | 2026-10-23 | H1-b를 "이번 묶음에서 제외"에서 "구현 범위 미결정, 구현 가능성 높음"으로 수정. H1-b·H1-d 관계 추가 | 사용자 의견: 재가입은 이번 프로젝트에서 구현할 가능성이 높음 |
+| 2026-10-25 | H1-b·H1-c·H1-d와 §9 Unique 행, §10에 후속 카드 ML-H2 연결 표시 (`SUPERSEDED`, 팀 승인 전). 원래 문장은 그대로 둠 | S2-2 대체 관계 정리 |
