@@ -232,6 +232,7 @@ ML-2·ML-3·ML-H2는 퇴사 Command 안에서 일어날 일을 정했다. 이 �
 | SUB-05·SUB-07 조회 범위 ("SUB-07은 ML-3으로 해결") | [G03-D-22](G03-D-22-notification-delivery.md) §6-4 | ML-3 종료로 결과는 막히지만 방어로 현재 소속 조건을 추가 (P0 조건). 이 카드의 판단과 충돌하지 않고 범위를 넓힘 |
 | 변경 알림 (보조 수단) | [G03-D-22](G03-D-22-notification-delivery.md) §5 | 알림 Type마다 대체 조회 화면 지정 |
 | §6 확정 요청·미리보기 비교 (근무 ID 집합·담당자만 비교) | [G03-D-05](G03-D-05-confirmation-response.md) §4-2 P1~P5, D05-1·2 | 비교 항목에 근무 시각(P2), 인계 대상 현재 소속(P3), DRAFT·대타 영향의 증감 규칙(P5)을 더함. 불가능 시간은 확인 목록 재전송 + 부분집합. 409는 CONFIRM_REQUIRED와 STALE로 구분 |
+| §5 "대상이 다른 근무지 소속이거나 없음: 404 / 403" | [API-CATALOG](../../contract/API-CATALOG.md) §1·§6 | 둘 다 404로 통일 (새 API 범위, 사용자 잠정 결정 2026-10-25). G03-D-04는 팀 `PENDING` |
 
 ## 12. 변경 이력
 
