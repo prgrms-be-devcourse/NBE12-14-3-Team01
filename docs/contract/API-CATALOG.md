@@ -24,7 +24,7 @@
 | 현재 소속 | `leftAt IS NULL`. 현재 업무 화면과 Command는 현재 소속 기준 | G03-INV-03, [ML-4](../decisions/proposals/ML-4-leave-command-and-access.md) ML-4-3 |
 | 시각 | `LocalDateTime`, `Clock` (Asia/Seoul) | AS-IS `TimeConfig` |
 | 오류 종류 | INPUT 400 / AUTH 401 / PERMISSION 403 / NOT_FOUND 404 / DUPLICATE·STATE_CONFLICT·STALE·CONFIRM_REQUIRED·FORBIDDEN_CONFLICT 409 / TRANSIENT 503 (실험 후). 새 code는 `{DOMAIN}-{NNN}` 다음 순번 | [G03-D-03](../decisions/proposals/G03-D-03-error-code.md) §5 |
-| 409 대응 | CONFIRM_REQUIRED는 확인 화면, STALE은 미리보기 다시 조회. 오류 화면으로 처리하지 않는다. 변경 요청은 자동 재시도하지 않는다 | [G03-D-05](../decisions/proposals/G03-D-05-confirmation-response.md) D05-4·7 |
+| 409 대응 | CONFIRM_REQUIRED는 확인 화면, STALE(제출한 계획이 지금 상태와 맞지 않음)은 미리보기 다시 조회. 오류 화면으로 처리하지 않는다. 변경 요청은 자동 재시도하지 않는다. 화면별 대응은 [FRONTEND-CONTRACT](FRONTEND-CONTRACT.md) §2 | [G03-D-05](../decisions/proposals/G03-D-05-confirmation-response.md) D05-4·7 |
 | 경고 후 확인 | 새 Command는 충돌 목록 형식, 기존 API는 `boolean` 형식 유지 | G03-D-05 D05-8 |
 | 원자성 | 하나의 Command는 하나의 Transaction. 409·오류 시 DB 변경 0 | G03-D-05 D05-6, ML-2-A3 |
 | 검사 순서 | ① 실행자 권한 (그 근무지 현재 MANAGER) → ② Path·Body의 대상을 **그 근무지 범위 안에서** 조회 → ③ 대상의 현재 상태 → ④ 업무 검증. AS-IS DRAFT API도 같은 순서다 (`requireManager` → `validSchedule` → 담당자 → 시간) | AS-IS `ShiftService.create` L78-92 |
@@ -192,7 +192,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | 항목 | 내용 |
 |---|---|
 | 권한 모델 | M1. 실행자의 현재 소속 기준 |
-| 응답 | 근무별 한 줄: 근무 ID, 근무지, 원래 시작·종료, 사건(`CANCELLED` 또는 `REASSIGNED`), 사건 시각, 사건 사유(`MEMBER_LEFT`, `MANAGER_CANCELLED`, `MANAGER_REASSIGNED`). 인계면 새 담당 이름을 보여 줄지는 S2-3C에서 확인 (다른 직원 정보 노출 범위) |
+| 응답 | 근무별 한 줄: 근무 ID, 근무지, 원래 시작·종료, 사건(`CANCELLED` 또는 `REASSIGNED`), 사건 시각, 사건 사유(`MEMBER_LEFT`, `MANAGER_CANCELLED`, `MANAGER_REASSIGNED`). **새 담당자의 이름·ID는 넣지 않는다** ([FRONTEND-CONTRACT](FRONTEND-CONTRACT.md) §9-2, 사용자 잠정 결정 2026-10-25) |
 | 조회 범위 | 원래 근무 시작 시각 기준 **미래 + 최근 7일**. 조회 범위일 뿐 보존 기간이 아님 |
 | 데이터 출처 | ① `shift.member = 나의 현재 소속`이고 CANCELLED (Shift 취소 정보) ∪ ② 배정 이력에서 `이전 담당 = 나의 현재 소속` (가장 마지막 Row). 지금 내가 담당인 근무는 제외. 대타 승인으로 넘어간 근무는 제외 (SUB-05 APPROVED에서 봄) |
 | 상태 변경 | 없음 |
@@ -356,7 +356,7 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 
 **후속 확인 항목 (B1에서 결정하지 않음):**
 - 공개 후 근무 **추가**에도 생성 이력을 남길지 (ML-2-INV-04는 담당자 "변경"만 다룸). 기존 Shift의 생성 시각·생성자 기록으로 충분한지 먼저 확인 → ML-2 구현 계약, S3.
-- 같은 근무지의 인계 대상이 이미 퇴사한 경우를 409 STALE로 볼지 409 STATE_CONFLICT로 볼지. 서버는 그 퇴사가 미리보기 이후인지 알 수 없다 (요청에 미리보기 시점 정보가 없음). 사용자의 다음 행동("미리보기를 다시 보고 다른 대상 선택")은 같으므로 지금은 STALE로 적었다 → S2-3C에서 화면 대응과 함께 확정.
+- ~~같은 근무지의 인계 대상이 이미 퇴사한 경우의 409 종류~~ → **409 STALE로 사용자 잠정 결정 (2026-10-25, [FRONTEND-CONTRACT](FRONTEND-CONTRACT.md) §9-1).** STALE = "제출한 계획이 지금 상태와 맞지 않아 다시 조회해야 한다". 퇴사 대상 자체가 이미 종료된 경우는 STATE_CONFLICT, 없음·다른 근무지는 404.
 - 기존 400(`SFT-002`·`SFT-003`·`SFT-005`)은 Kotlin Migration에서 보존하는 **기존 계약**이고, 404·409는 V3 Improvement의 **신규 제안**이다. STATE_CONFLICT 등은 분류이며 실제 code 문자열은 S2-4에서 정한다. 새 공개 후 변경 Command는 Endpoint가 따로지만 시간 규칙·겹침·현재 소속 검사는 기존 검사 로직을 재사용할 수 있다 (ML-2 §8 "공통 검증으로 분리 필요"). 재사용 방식은 구현 설계에서 정한다.
 
 ## 7. 변경 이력
