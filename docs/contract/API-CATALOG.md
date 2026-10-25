@@ -172,6 +172,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | API-ME-01 | 내 소속 이력 | `GET /me/memberships?status=ENDED` (또는 `GET /workplaces/history`) | ML-4 §6, ML-4-5 |
 | API-SB-01 | 종료된 대타 (내가 수락한 요청) | `GET /substitute-requests/accepted/closed` | [G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) §6 |
 | API-AU-01 | 서버 로그아웃 | `POST /auth/logout` | [AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) |
+| API-SB-02 | 관리자 — 끝난 대타 요청 (종료·만료) | `GET /workplaces/{workplaceId}/substitute-requests/closed` | [USER-PATH-REVIEW](USER-PATH-REVIEW.md) §9-3 (S3-A) |
 
 #### API-WP-01 초대 코드 재발급
 
@@ -221,6 +222,29 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | DTO 출처 | 수락자 = Candidate. `SubstituteRequestResponse.from`(현재 `Shift.member`를 읽음)을 재사용하지 않는다 |
 | 상태 변경 | 없음. 이 목록의 항목에 수락·거절 Command는 기존 검사로 거부 |
 | Test | G03-D-22 D22-T2~T12, D22-T4b |
+
+#### API-SB-02 관리자 — 끝난 대타 요청 (종료·만료) (S3-A, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`)
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 알림을 놓친 관리자가 끝난 대타 요청을 다시 확인하고 필요한 조치(다른 직원에게 담당자 변경 등)를 판단 (G03-D-22 대체 화면 원칙, USER-PATH-REVIEW §8 빈칸 해소) |
+| Method · Path (후보) | `GET /workplaces/{workplaceId}/substitute-requests/closed?from=&to=&page=&size=` |
+| 권한 모델 | M1. Path 근무지의 현재 MANAGER (`requireManager`, 기존 403 `WPL-003`·`WPL-004`) |
+| 대상 | 그 근무지 근무의 Request 중 끝난 것: **CLOSED (모든 사유)** 또는 **OPEN·ACCEPTED이면서 `startAt ≤ now`** (계산된 만료, G03-D-19). APPROVED는 넣지 않는다 (승인 결과는 근무표에서 확인). `now`는 서버 `Clock`. 경계 `startAt == now`는 만료로 본다 — AS-IS 만료 판정 `!now.isBefore(startAt)` (`SentSubstituteRequestResponse` L35)과 같고, SUB-06의 `startAt > now`와 정확히 나뉜다 |
+| 기간 | `from`·`to` = 효력 종료 시각 범위, 기본값 최근 7일. **7일은 기본 필터일 뿐 보존 기간·조회 상한이 아니다.** 효력 종료 시각 = CLOSED는 저장된 `closedAt`, 만료는 `startAt` (API-SB-01과 같은 정의). DB 식 (**위 "대상" 조건으로 먼저 거른 행에만** 적용, APPROVED에는 쓰지 않음 — APPROVED도 `closedAt`을 씀): `CASE WHEN status = 'CLOSED' THEN closedAt ELSE shift.startAt END` — CLOSED 전이는 모두 `closedAt`을 쓴다 (`SubstituteRequest` L70-73, L92-95; S3-B 정적 확인). 필터·정렬·페이지는 DB에서 처리 (성능은 S4) |
+| 정렬·페이지 | 효력 종료 시각 내림차순, 같으면 Request ID 내림차순. `page`·`size` (최대 `size`는 구현 계약). 다음 페이지 여부 포함 |
+| 응답 항목 | 요청 ID / 근무 (ID, 시작·종료, 상태 `SCHEDULED`·`CANCELLED`) / `outcome` (`CLOSED` + `closeReason`, 또는 `EXPIRED`) / 효력 종료 시각 / 요청자 이름 + `requesterMembershipEnded` (요청 당시 소속 Row가 지금 종료됐는지) / 수락자 이름 (ACCEPTED 후보가 있었던 경우만) / **사실 Field:** `requesterStillAssigned` (지금 `Shift.member`가 요청 당시 요청자 소속 Row와 같은가), `shiftStarted`, `hasNewerActiveRequest` (같은 근무에 더 최근의 **진행 중** 요청이 있는가 — 진행 중 = DB OPEN·ACCEPTED ∧ `startAt > now`, SUB-06과 같은 정의) |
+| 이름 | 요청자·수락자 이름은 현재 `User.name`을 읽는다. 지금은 이름 변경 기능이 없어 요청 당시 이름과 같다 (`User` 생성자에서만 설정, S3 Commit 전 정적 확인). 이름 변경 기능이 생기면 스냅샷 보존을 다시 정한다 |
+| 넣지 않는 것 | **User ID·소속(WorkplaceMember) ID** (응답 ID는 요청 ID·근무 ID뿐), 거절·대기 후보 목록, 지금 담당자가 요청자가 아닐 때의 현재 담당자 이름(근무표에서 확인), 불가능 시간 사유, 다른 근무지 정보. 요청자를 **현재** 소속 ID와 연결하지 않는다 (재가입 후 새 소속과 합치지 않음) |
+| 후속 조치 판단 | 서버는 판단하지 않고 사실 Field만 준다. "조치 필요" 표시 규칙은 [FRONTEND-CONTRACT](FRONTEND-CONTRACT.md) §3-4 |
+| 기존 API와의 관계 | 관리자 진행 중 목록(SUB-06: OPEN·ACCEPTED ∧ `startAt > now`)은 바꾸지 않는다. 두 목록은 겹치지 않는다 |
+| 상태 변경 | 없음. 계산된 만료를 DB에 CLOSED로 저장하지 않는다 (G03-D-19 D19-2와 같음) |
+| 경로·ID 표기 | 실제 경로는 `/api/v1` 뒤 (§1). **`API-SB-02`는 새 API 목록 번호이고 V4 Delivery Sheet의 `SUB-02`(받은 요청)와 다른 것이다** |
+| 한계 | `SUBSTITUTE_NO_CANDIDATE`는 Request Row가 없어 나오지 않는다 (USER-PATH-REVIEW O-2) |
+| 선행 조건 | G03-D-19 만료 정의 (팀 `PENDING`). `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` 사유는 ML-3 이후에 생기며, 그 전에는 기존 사유만 나온다 |
+| 비용 (추정) | API 1, 효력 종료 시각을 계산·정렬하는 Query 1 (`COALESCE`), DTO 1, Test 6개, 승인 관리 화면 탭 1 |
+| 등급 | **P0 후보** (묶음 B) |
+| Test | V4-N-49~54 |
 
 #### API-AU-01 서버 로그아웃
 
@@ -317,23 +341,38 @@ ID가 IDENTITY(순번)라서 값을 바꿔 가며 시도하기 쉽다.
 |---|---|
 | ID가 없음 / 다른 근무지 것 / 볼 권한이 없음 | **404** (셋을 구별하지 않음) |
 | Path에 근무지 ID가 있고 실행자가 그 근무지의 현재 구성원인데 관리자가 아님 | 403 `WPL-004` (기존 `requireManager` 그대로, §1) |
-| Path에 근무지 ID가 없는 API(대타 승인·종료)에서 관리자가 아님 | **404** (근무지 맥락을 응답으로 드러내지 않음) |
+| Path에 근무지 ID가 없는 API(대타 승인·종료)에서 관리자가 아님 | **404** (근무지 맥락을 응답으로 드러내지 않음). → **S3-A에서 "역할 먼저 검사"(W안)로 대체** (아래) |
 | 볼 수 있는 Resource인데 업무 상태가 맞지 않음 (예: 본인 Candidate인데 이미 응답함) | 상태에 맞는 409 |
 | 실행자 자신의 소속이 이미 종료됨 | 그 API의 403 정책 (예: 후보 응답 `SUB-021`) |
 
 
 **기존 Test 기대값 영향 (S2-6A 정적 확인):** 위 규칙을 적용하면 범위 밖 접근을 확인하는 기존 Test 4개의 기대값이 403 → 404(없는 ID와 같은 code·message)로 바뀐다 (V4-T-26·39·58·68, [TEST-INVENTORY](../evidence/TEST-INVENTORY.md) §5-4). **역할만 부족한 같은 근무지 구성원(V4-T-74)은 S3에서 다시 정한다:** 그 요청과 관계없는 직원에게는 404가 다른 사람 요청의 존재·상태 노출을 막지만, 그 요청의 요청자·후보처럼 이미 볼 수 있는 실행자에게 404는 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋난다. Migration에서는 그대로 두고 CHG-06·07 승인 후 Improvement PR에서만 바꾼다. 알림 읽음의 403 → 404는 DECISION-LOG **G03-D-10 (`DEFER` / `PENDING`)과 같은 질문**이다. CHG-07 (가)가 G03-D-10을 대신 결정하지 않으며, 팀이 기준을 정하기 전에는 알림 읽음을 404 전환 대상으로 확정하지 않는다.
+
+**역할 먼저 검사 — 대타 승인(SUB-04)·종료(SUB-08) (S3-A, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`, [USER-PATH-REVIEW](USER-PATH-REVIEW.md) §9-1):** 관리자 전용 명령인데 Path에 근무지 ID가 없는 두 API에만 적용한다. **이 규칙과 위 M3 404 은닉은 DECISION-LOG G03-D-04 (다른 근무지·User 자원 접근 노출, `DEFER` / `PENDING`)의 답에 해당하므로 팀이 함께 검토·승인한다 (G03-D-04를 해결됨으로 표시하지 않음).**
+
+| 순서 | 검사 | 실패 응답 |
+|---|---|---|
+| 1 | 실행자가 **어느 근무지에서도** 현재 MANAGER가 아니다 (Request를 조회하기 **전**) | 403 `WPL-004`. 존재하는 ID와 없는 ID에 같은 응답 → 요청 존재가 드러나지 않음 |
+| 2 | Request를 잠그지 않고 조회해 그 근무지의 현재 MANAGER인지 확인 | 없는 ID·다른 근무지 요청 → 같은 404 `SUB-001` |
+| 3 | Request `FOR UPDATE` → **그 근무지의 현재 MANAGER인지 다시 확인** + 상태·업무 규칙 재검증 (CHG-06, ML-5 Lock 순서) | 기존 명령 계약 |
+
+- 1단계는 **빠른 거부 조건일 뿐 최종 인가가 아니다.** W1의 MANAGER이고 W2의 직원인 사용자의 W2 요청은 2단계에서 거부된다. 최종 인가는 2·3단계(그 근무지의 현재 MANAGER)다. 지금 기능에는 관리자 퇴사·역할 변경이 없어 Lock 사이에 관리자 권한이 바뀌지 않지만, 그런 기능이 생기면 3단계 재확인이 필수다 (S3-B).
+- 요청자·후보·관계없는 직원·퇴사자 모두 1단계에서 403이다. 요청자·후보에게 "없는 요청"이라 답하지 않고, 관계없는 직원은 ID를 바꿔도 존재 여부를 알 수 없다.
+- 남는 경우: 다른 근무지 MANAGER이면서 이 근무지 요청의 요청자·후보인 사용자 → 2단계 404 (드묾, 명령은 어차피 거부).
+- 적용 범위 밖: 후보 응답(SUB-03, 본인 Candidate 확인)과 알림 읽음은 위 응답 규칙(범위 밖 = 404)을 그대로 따른다. 알림 읽음의 응답 code는 G03-D-10 결정 전까지 AS-IS다.
+- 기존 Test 영향 (TEST-INVENTORY §5-4 갱신): V4-T-74는 code가 `WPL-004` 그대로이고 **검사 순서만** 바뀐다. V4-T-26·39는 실행자의 MANAGER 소속 유무에 따라 403 / 404로 나뉜다. Migration에서는 모두 AS-IS 유지.
+
 **권한 확인 전 부작용 (정적 확인, `a148a62`):** 다섯 API 모두 **권한 확인 전에는 DB 변경과 이벤트 발행이 없다.** 대타 종료는 `requireManager` 이후에 `closeByManager`와 이벤트 발행 (`SubstituteRequestService` L372 → L412·L414), 알림 읽음은 본인 확인 이후에 `markAsRead` (`NotificationService` L313-321). 알림 목록(`NotificationRepository` L19)과 읽음은 같은 조건(수신 소속의 User = 나, 현재 소속)이라 "목록에는 없는데 ID로 읽음 처리"되는 경로가 없다. 권한 확인 전에 남는 것은 **존재 노출과 Row Lock 점유**다. Lock 점유의 실제 영향은 실행 전까지 `UNKNOWN`이다.
 
 **검증 계약 (임시 ID, 전부 `SPECIFIED` / `NOT_RUN`, 번호는 S2-5):**
 
 | 임시 ID | 내용 |
 |---|---|
-| M3-T1 | 다른 근무지 관리자·같은 근무지 직원·퇴사자가 존재하는 `requestId`(상태별: OPEN·ACCEPTED·CLOSED)와 없는 `requestId`로 승인 시도 → **응답 Status·code·message가 모두 같음** (404), DB 변경 0 |
+| M3-T1 | 다른 근무지 관리자·같은 근무지 직원·퇴사자가 존재하는 `requestId`(상태별: OPEN·ACCEPTED·CLOSED)와 없는 `requestId`로 승인 시도 → **응답 Status·code·message가 모두 같음** (404), DB 변경 0. **S3-A (W안) 갱신:** 어디서도 MANAGER가 아닌 실행자(같은 근무지 직원·퇴사자)는 존재·없는 ID 모두 **403 `WPL-004`로 같음** (Request 조회·Lock 0), 다른 근무지 MANAGER는 없는 ID와 같은 404 |
 | M3-T2 | 권한 없는 승인 요청을 보내는 동안 실제 관리자의 같은 Request 승인 → 권한 없는 요청이 **Row Lock을 잡지 않음** (H6, `LockWaitProbe`로 대기 0) |
 | M3-T3 | 범위 확인 후 Lock 전에 다른 관리자가 그 Request를 종료 → Lock 이후 재검증으로 승인 거부, `Shift.member` 불변 (TOCTOU, H6) |
 | M3-T4 | 근무 상세: 다른 사람의 DRAFT·CANCELLED·공개 근무 ID → 같은 응답 |
-| M3-T5 | 후보 응답·대타 종료·알림 읽음: 남의 ID와 없는 ID → 같은 응답, Lock 없음 |
+| M3-T5 | 후보 응답·대타 종료·알림 읽음: 남의 ID와 없는 ID → 같은 응답, Lock 없음. **S3-A:** 대타 종료는 M3-T1과 같은 W안. 알림 읽음은 Lock 전 확인만 적용하고 응답 code는 G03-D-10 결정 전까지 AS-IS |
 | M3-T6 | 회귀: 권한 있는 정상 경로의 기존 응답과 상태 전이 그대로 |
 
 ### 5-6. CHG-07 결정 (사용자 잠정 결정 2026-10-25: (가))
@@ -372,3 +411,6 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | CHG-07 (가) 사용자 잠정 결정. API별 Lock 이후 재검증 조건 표(직원 소속은 바뀔 수 있음), 같은 User ≠ 같은 소속, 404/403/409 응답 규칙, 권한 확인 전 부작용 정적 확인(없음), 대타 종료·알림 읽음은 P0 검토 후보. 이전 TOCTOU 문단("범위 판단은 뒤집히지 않는다")은 대타 승인·종료에만 맞아 API별 표로 교체 |
 | 2026-10-25 | S2-5B: API-LV-02 `closedRequests`에 총수와 세는 규칙 연결 (ML-4 L113의 "총수와 사유별 수"와 맞춤, PS-02와 같은 규칙) |
 | 2026-10-25 | S2-6A: M3 응답 규칙의 기존 Test 기대값 영향과 G03-D-10 연결 명시 (결정 아님) |
+| 2026-10-25 | S3-A: 대타 승인·종료의 "역할 먼저 검사"(W안), M3-T1·T5 기대값 갱신, 새 API-SB-02 (관리자 끝난 대타 요청, P0 후보) — 사용자 잠정 결정, 팀 `PENDING` |
+| 2026-10-25 | S3-B: W안 3단계에 Lock 후 권한 재확인과 1단계가 최종 인가가 아님을 명시, API-SB-02에 경계(`startAt == now`)·`Clock`·DB 식·ID 비노출·만료 비저장·`/api/v1`·ID 혼동 주의 추가 (정적 확인 근거 포함) |
+| 2026-10-25 | S3 Commit 전: W안·M3와 G03-D-04 연결 명시, API-SB-02 DB 식의 적용 전제(대상 필터 후, APPROVED 제외), `hasNewerActiveRequest`의 진행 중 정의, 이름 스냅샷 사실 |

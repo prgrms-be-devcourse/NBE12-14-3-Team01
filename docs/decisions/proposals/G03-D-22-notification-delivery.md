@@ -37,7 +37,7 @@
 
 | API | 조건 | 근거 |
 |---|---|---|
-| SUB-06 받은 요청 `GET /substitute-requests/received` | 내 Candidate `PENDING` ∧ Request `OPEN` ∧ 시작 전 ∧ PUBLISHED ∧ SCHEDULED ∧ `c.member.leftAt IS NULL` | `SubstituteCandidateRepository` L55-70 |
+| SUB-02 받은 요청 `GET /substitute-requests/received` | 내 Candidate `PENDING` ∧ Request `OPEN` ∧ 시작 전 ∧ PUBLISHED ∧ SCHEDULED ∧ `c.member.leftAt IS NULL` | `SubstituteCandidateRepository` L55-70 |
 | SUB-07 수락한 요청 `GET /substitute-requests/accepted` | 내 Candidate `ACCEPTED` ∧ Request `ACCEPTED` ∧ 시작 전 ∧ PUBLISHED ∧ SCHEDULED. **`c.member.leftAt` 조건 없음** | `SubstituteCandidateRepository` L82-97 |
 | Candidate의 소속 | `SubstituteCandidate.member` → WorkplaceMember (NOT NULL). User가 아니라 **그때의 Membership**을 가리킨다 | `SubstituteCandidate` L25 |
 | 후보 선정 범위 | 근무지의 현재 구성원 중 요청자·MANAGER·충돌자 제외 **전원** | `SubstituteCandidateService` L48-66 |
@@ -113,7 +113,7 @@
 | 알림 (현재·예정) | 대체 조회 화면 | 상태 |
 |---|---|---|
 | 근무표 공개 | 내 근무 (예정 근무) | 있음 |
-| 대타 요청 받음 | SUB-06 받은 요청 | 있음 |
+| 대타 요청 받음 | SUB-02 받은 요청 | 있음 |
 | 후보 없음 | 생성 응답 + SUB-05 보낸 요청 | 있음 |
 | 수락됨 | 관리자 진행 중 목록, SUB-05 | 있음 |
 | 전원 거절, 관리자 종료, 승인 | SUB-05 (요청자). **수락했던 후보: D22-4 화면** | 요청자 있음. 후보는 D22-4 구현 후 |
@@ -232,3 +232,4 @@ S3 추적표에서 "알림 Type ↔ 대체 화면"을 빠짐없이 다시 확인
 | 2026-10-25 | 초안 작성. 사용자 잠정 결정 D22-1~6, 세부 S22-a·b는 추천 상태 | 사용자 선택: 질문 1 (가), 질문 2 (b). 교차 검토 의견(조회 가능 ≠ 변경 인지, 종료 이유 구분, 재가입 분리, Outbox 도입 조건) 반영 |
 | 2026-10-25 | S22-a·b를 사용자 잠정 결정으로 변경. §4-3 저장 데이터 재구성 검증, §4-4 S22-c(승인된 수락자 포함 여부, 확인 대기), §6-4 출시 차단 위험 평가(SUB-07·SUB-05·Publish 확인) 추가 | 사용자 선택과 교차 검토 요청. 코드 정적 확인 |
 | 2026-10-25 | S22-c를 (가) 포함으로 사용자 잠정 결정. 승인 이력과 현재 담당 구분 조건, 7일 기준 = `approvedAt`, 화면별 사실 표, D22-T4b 추가 | 사용자 선택. 교차 검토 의견(승인됨 ≠ 현재 담당) 반영 |
+| 2026-10-25 | S3: API ID 표기 정정 (받은 요청 SUB-06 → SUB-02, V4 Delivery Sheet B1 기준. 내용 변경 없음). L126의 "알림 Type ↔ 대체 화면" 추적은 [USER-PATH-REVIEW](../../contract/USER-PATH-REVIEW.md) §8 | S3 교차 대조 (X-5) |

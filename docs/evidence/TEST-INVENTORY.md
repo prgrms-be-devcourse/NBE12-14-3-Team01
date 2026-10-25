@@ -54,7 +54,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 |---|---|---|
 | Test Method (`@Test`·`@RepeatedTest`·`@ParameterizedTest`가 붙은 Method) | `c0427c2` 52 → `31ecaee` 93 = `a148a62` 93 | `git show <SHA>:<파일>` 정적 집계. `31ecaee` 이후 대타 Test·Production 변경 0 |
 | 그중 PR #5 변화 | 삭제 0, 이름 변경 3 (V4-T-09·11·12), 신규 41 (V4-T-53~93) | Method 목록 비교 |
-| 실행 사례 (JUnit이 실제로 실행하는 횟수) | 114 = 일반 86 + `@ParameterizedTest` 3개 Method 8건 (V4-T-11 2, V4-T-24 3, V4-T-61 3) + `@RepeatedTest(5)` 4개 Method 20건 (V4-T-49~52) | `@EnumSource` names, `REPEAT_COUNT = 5`. 스레드 수(10)는 실행 사례에 넣지 않는다 |
+| 정적 계산 실행 사례 (Parameterized 입력 수·Repeated 횟수로 펼친 예상값, **실제 실행 아님**, S3 표현 정정) | 114 = 일반 86 + `@ParameterizedTest` 3개 Method 8건 (V4-T-11 2, V4-T-24 3, V4-T-61 3) + `@RepeatedTest(5)` 4개 Method 20건 (V4-T-49~52) | `@EnumSource` names, `REPEAT_COUNT = 5`. 스레드 수(10)는 실행 사례에 넣지 않는다 |
 | 문서 시나리오 | 카드마다 다름 | 한 Method가 여러 시나리오를, 한 시나리오가 여러 Method를 가질 수 있다 (1:1 강제 안 함) |
 | PR #5 Delta 초안의 "94" | 원인 확인: 초안의 분류별 신규 수 합계가 41 (FindCandidates 2, Accept 13, Reject 5, Approve 9, Repository 2, ForcedOrder 4, Flow 6)인데 신규를 42로 적어 52 + 42 = 94가 됐다. 분류 안의 개별 수도 실제와 다르다 (Accept 신규는 12, `FindRequestsTest.findAcceptedPendingRequests_Success` 1개 누락). 두 차이가 상쇄돼 합은 41 | 초안 원문은 수정하지 않음 |
 
@@ -289,6 +289,22 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
 
+**S3 추가 (2026-10-25, [USER-PATH-REVIEW](../contract/USER-PATH-REVIEW.md) §11):** 새 통합 시나리오 Test는 임시 ID 없이 바로 정식 ID를 준다. 모두 `PROPOSED_IMPROVEMENT`, ④ `SPECIFIED` / ⑤ `NOT_RUN`.
+
+| 정식 ID | 경로 | 소유 | 내용 원본 |
+|---|---|---|---|
+| V2-N-53 | UP-06 퇴사 전체 흐름 | V2 | USER-PATH-REVIEW §7 |
+| V2-N-54 | UP-01 재가입 후 이전 소속 격리 | V2 | USER-PATH-REVIEW §2 |
+| V3-N-33 | UP-03 공개 근무 취소·담당자 변경 + 대타 종료 + 알림 | V3 | USER-PATH-REVIEW §4 |
+| V5-N-19 | UP-07 알림 ↔ 대체 화면 일치 | V5 | USER-PATH-REVIEW §8 (S3-A: 관리자 행은 API-SB-02 포함) |
+| V4-N-49 | API-SB-02 권한: 현재 MANAGER만. 직원 403 `WPL-004`, 비구성원 403 `WPL-003`, 다른 근무지 요청 미포함 | V4 | API-CATALOG API-SB-02 (S3-A) |
+| V4-N-50 | API-SB-02 대상: CLOSED 모든 사유 + 계산된 만료(`startAt ≤ now`, 경계 `startAt == now` 포함) 포함, APPROVED·진행 중 제외, SUB-06 목록과 겹침 0 | V4 | 같음 |
+| V4-N-51 | API-SB-02 기간·정렬·페이지: 기본 7일, `from`으로 7일 이전도 조회, 효력 종료 시각 내림차순 + ID 동률 처리, 페이지 경계 | V4 | 같음 |
+| V4-N-52 | API-SB-02 사실 Field: `requesterStillAssigned`·`shiftStarted`·`hasNewerActiveRequest` 각 참·거짓 경우 | V4 | 같음 |
+| V4-N-53 | API-SB-02 소속 경계: 요청자가 퇴사·재가입해도 `requesterMembershipEnded = true`, 새 소속과 합치지 않음. 거절 후보·다른 근무지 정보 없음 | V4 | 같음 |
+| V4-N-54 | API-SB-02 Query를 MySQL에서 (효력 종료 시각 `COALESCE` 정렬, 만료 계산) | V4 | 같음 (SLICE · MYSQL_TC) |
+| V5-N-20 | 실행한 관리자가 요청자이기도 한 경우: 관리자 대상 알림 0, 요청자 알림 1 | V5 | NOTIFICATION-TYPES §5 (S3-A) |
+
 ### 5-2. 중복 의심 대조 (사전조건·검증 대상·기대값이 모두 같을 때만 통합)
 
 | 쌍 | 사전조건 | 검증 대상 | 판정 | 처리 |
@@ -333,12 +349,13 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | SUB-05·`ShiftService.detail` 관련 (대상 Method는 ML-4 §8 승인 때 특정) | 현재 소속 확인 없음 | 현재 소속 기준 | ML-4 §8 | ML-4 승인 후 |
 | SUB-006 문구 (T1-04) | — | — | message를 확인하는 Test 없음 → 기대값 변경 0 | — |
 | Pattern `SHIFT-004`·`SHIFT-005` 4개 (`RegularShiftPatternControllerTest` L812·857·1449·1505) | 대상 직원 의미 | 그대로 (실행자 쪽 M-01 정정은 새 Test만) | ERROR-CODES M-01 | — |
-| V4-T-26 `approve_fail_actor_not_in_workplace` (L413) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일) | API-CATALOG §5-5 "ID가 없음 / 다른 근무지 것 / 볼 권한이 없음 → 404", M3-T1 (V4-N-44) | CHG-06 승인 후 |
-| V4-T-39 `close_NotManager_ThrowsException` (L1099) (S2-6A 발견). 이름과 달리 Mock은 `NOT_WORKPLACE_MEMBER` → **범위 밖** | `WPL-003` 403 | 404 `SUB-001` (위와 같음) | 같음, M3-T5 (V4-N-47) | CHG-07 승인 후 |
+| V4-T-26 `approve_fail_actor_not_in_workplace` (L413) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 실행자가 어디서도 MANAGER가 아니면 403 `WPL-004` (Request 조회 전, 없는 ID와 같은 응답), 다른 근무지 MANAGER면 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일). Unit Fixture를 실행자의 MANAGER 소속 유무로 나눈다. (S2-6A 안: 404 일괄) | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 (V4-N-44) | CHG-06 승인 후 |
+| V4-T-39 `close_NotManager_ThrowsException` (L1099) (S2-6A 발견). 이름과 달리 Mock은 `NOT_WORKPLACE_MEMBER` → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 위 V4-T-26과 같음 (어디서도 MANAGER 아님 → 403 `WPL-004`, 다른 근무지 MANAGER → 404 `SUB-001`) | 같음, M3-T5 (V4-N-47) | CHG-07 승인 후 |
 | V4-T-58 `acceptCandidate_NotOwnCandidate` (L348), V4-T-68 `rejectCandidate_NotOwnCandidate` (L577) (S2-6A 발견). Candidate는 본인만 볼 수 있음 → **범위 밖** | `SUB-020` 403 | 404 `SUB-019` "해당 대타 후보를 찾을 수 없습니다." (없는 Candidate ID와 동일) | M3-T5 (V4-N-47) | CHG-07 승인 후 |
-| V4-T-74 `approve_fail_actor_not_manager` (L428) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **미정 (S3 결정).** 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5, M3-T1 | S3 결정 후. 결정 전에는 변경 대상으로 확정하지 않음 |
-| `NotificationServiceTest` "다른 사용자의 알림은 읽음 처리할 수 없다" (L187, 확인 L232) (S2-6A 발견) | `NOT-002` 403 | M3-T5를 따르면 404. **단 G03-D-10 (`DEFER`)과 같은 질문이라 팀 결정 전에는 변경 대상으로 확정하지 않는다** | M3-T5 (V5-N-18), G03-D-10 | 팀 결정 후 |
-| V4-T-35 `list_NotManager_ThrowsException`, `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) | `WPL-004` / `NOT-002` | 그대로 (근무지 ID가 Path에 있음 / 실행자 자신의 소속 종료 → 403 정책) | API-CATALOG §5-5 | — |
+| V4-T-74 `approve_fail_actor_not_manager` (L428) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **S3-A 결정 (W안, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`): 어디서도 MANAGER가 아니면 403 `WPL-004` — 지금 code와 같고 검사 순서만 바뀐다 (Request 조회·Lock 전). 다른 근무지 MANAGER면 404 `SUB-001`.** (S3 검토 기록:) 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 | CHG-06 승인 후 |
+| `NotificationServiceTest` "다른 사용자의 알림은 읽음 처리할 수 없다" (L187, 확인 L232) (S2-6A 발견) | `NOT-002` 403 | M3-T5를 따르면 404. **단 G03-D-10 (`DEFER`)과 같은 질문이라 팀 결정 전에는 변경 대상으로 확정하지 않는다.** S3-A: 권한 확인 전 Lock 제거(CHG-07)는 응답 code와 별도로 진행 가능 | M3-T5 (V5-N-18), G03-D-10 | 팀 결정 후 |
+| V4-T-35 `list_NotManager_ThrowsException` | `WPL-004` | 그대로 (근무지 ID가 Path에 있음) | API-CATALOG §5-5 | — |
+| `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) — B-2 내 과거 소속 알림 (S3-B 분리) | `NOT-002` 403 | **미정 — G03-D-16 (`PENDING`) 결정 대기.** 현재 잠정 규칙(§5-5 "실행자 자신의 소속 종료 → 403")대로면 그대로, USER-PATH-REVIEW §9-2 선택지 B'면 404. 결정 전에는 변경 대상으로 확정하지 않는다 | G03-D-16, USER-PATH-REVIEW §9-2 | 팀 결정 후 |
 | ML-3 기존 거절 종료 판정 (V4-T-10) | `ALL_CANDIDATES_REJECTED` | 그대로 (INELIGIBLE 후보가 없는 Fixture) | ML-3 V4-N-22는 새 경우만 확인 | — |
 
 ## 6. V5 Notification (S2-5B 신설)
@@ -349,7 +366,9 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 |---|---|---|---|
 | V5-N-01~16 | NOTIFICATION-TYPES §5 NT-T1~T16 (번호 그대로) | NT-T3·T8·T12 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | V5-N-05에 V4-N-20 통합 (§5-2) |
 | V5-N-17 | G03-D-22 D22-T1 | MIGRATION | |
-| V5-N-18 | API-CATALOG M3-T5의 알림 읽음 부분 | PROPOSED_IMPROVEMENT | |
+| V5-N-18 | API-CATALOG M3-T5의 알림 읽음 부분 | PROPOSED_IMPROVEMENT | S3-A: Lock 전 확인은 진행 가능, 응답 code 부분은 G03-D-10 결정 대기 |
+| V5-N-19 | USER-PATH-REVIEW §8 알림 ↔ 대체 화면 | PROPOSED_IMPROVEMENT | S3 추가 |
+| V5-N-20 | NOTIFICATION-TYPES §5 (실행자 = 요청자) | PROPOSED_IMPROVEMENT | S3-A 추가. NT-T 번호 없음 |
 
 V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Delivery Sheet 때 붙인다. 기존 V4-N-04(Substitute Event별 알림 Row)는 V4에 두고 V5-N-01~ 와 관련 연결만 한다.
 
@@ -359,3 +378,6 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 |---|---|
 | 2026-10-25 | S2-5B: PR #5 이후 대타 Test 집계(§3-1-1, 정적), V4-T-07~12·24·49~52 경로 갱신(ID 유지), V4-T-53~93 등록, 정식 ID 대응표(§5-1), 중복 대조(§5-2), ErrorCode Test 0 판정·Migration 명세(§5-3), 기대값 보존/변경 연결(§5-4), V5 구역 신설(§6). Test 실행 0 |
 | 2026-10-25 | S2-6A: §5-4에 M3 응답 규칙으로 기대값이 바뀌는 기존 권한 실패 Test 추가 — 범위 밖 4개 (V4-T-26·39·58·68, Improvement 기대값 = 없는 ID와 같은 code·message), 역할만 부족한 V4-T-74는 S3 결정, 알림 읽음 1개는 G03-D-10 결정 대기 |
+| 2026-10-25 | S3: §3-1-1 "실행 사례"를 정적 계산값으로 표현 정정, §5-1에 통합 시나리오 Test 4개 (V2-N-53·54, V3-N-33, V5-N-19) |
+| 2026-10-25 | S3-A: §5-4 V4-T-26·39·74를 W안으로 갱신 (V4-T-74는 code 그대로·순서만 변경), 알림 읽음 행에 Lock 분리 표시, §5-1에 V4-N-49~54 (API-SB-02)·V5-N-20, §6에 V5-N-19·20 |
+| 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
