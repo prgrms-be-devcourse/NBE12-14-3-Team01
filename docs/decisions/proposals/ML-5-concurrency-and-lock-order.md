@@ -286,6 +286,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | Deadlock·Lock 대기 초과 503 | [G03-D-03](G03-D-03-error-code.md) §5-3 | 기술 후보. MySQL·Spring에서 Transaction 전체 Rollback 확인 후 적용. 변경 요청 자동 재시도 금지 |
 | Lock 표 (불가능 시간 쓰기 없음) | [G03-D-21](G03-D-21-unavailable-time.md) §8 D21-R1~R5 | 불가능 시간 등록·수정·삭제와 배정·수락 경합 5개를 이 카드의 Lock 표와 실험 목록에 추가할 것 (S2-3 이후) |
 | 퇴사 확정 재조회 409 | [G03-D-21](G03-D-21-unavailable-time.md) D21-8 | 확인한 불가능 시간 충돌 목록도 재조회 비교 대상 |
+| 여러 인계 대상의 User Lock 순서 | [G03-D-05](G03-D-05-confirmation-response.md) §7 | 대상 User Lock은 ID 오름차순, 불가능 시간 재계산은 Lock 이후. 전역 순서와의 정합은 실험으로 확인 (D05-R1~R3) |
 
 ## 11. 변경 이력
 

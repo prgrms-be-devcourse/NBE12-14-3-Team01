@@ -106,7 +106,7 @@ T1의 기본 등급은 **P1**이다. S2 점검에서 잘못된 code 때문에 Fr
 | 503 | **검증된** 일시적 처리 실패 (Deadlock, Lock 대기 초과로 Transaction 전체가 Rollback된 것이 확인된 경우). ML-5 실험 전까지 후보 |
 | 재사용 | 업무 의미, HTTP 분류, 사용자의 다음 행동이 **모두 같으면** 기존 code를 다른 API에서도 쓴다. 하나라도 다르면 새 code |
 | 문구 | 상황과 다음 행동을 말한다. 예: "근무 상태가 바뀌었습니다. 다시 확인해 주세요." |
-| 경고 응답 형식 | **G03-D-05 (미결, S2 API 계약에서 구현 전에 결정).** 현재 경고 응답은 `ConfirmationRequiredResponse(true)`뿐이라 충돌 목록을 담지 못한다. 추천 방향: 기존 Migration API는 현재 형식 유지, 새 퇴사·인계 Command는 충돌 대상 목록을 담는 응답, 확정 시 다시 계산해 다르면 409 (STALE), Publish 개선은 별도 영향 평가 후 등급 결정. 새 ErrorCode를 늘리기보다 응답 `data` 구조와 STALE 판단 기준을 함께 정한다 |
+| 경고 응답 형식 | **[G03-D-05](G03-D-05-confirmation-response.md) (사용자 잠정 결정 2026-10-25, 이전 문장은 결정 전 기록).** 현재 경고 응답은 `ConfirmationRequiredResponse(true)`뿐이라 충돌 목록을 담지 못한다. 추천 방향: 기존 Migration API는 현재 형식 유지, 새 퇴사·인계 Command는 충돌 대상 목록을 담는 응답, 확정 시 다시 계산해 다르면 409 (STALE), Publish 개선은 별도 영향 평가 후 등급 결정. 새 ErrorCode를 늘리기보다 응답 `data` 구조와 STALE 판단 기준을 함께 정한다 |
 
 ### 5-3. 409와 503의 Frontend 대응
 

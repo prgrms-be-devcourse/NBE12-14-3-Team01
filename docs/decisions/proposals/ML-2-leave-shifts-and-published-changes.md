@@ -245,6 +245,7 @@
 | 시간 변경 보류 (D27-2) | [G03-D-19](G03-D-19-expiry.md) §0-6 | 공개 근무 시간 직접 변경을 도입하면 G03-D-19를 다시 연다 |
 | 공개 후 변경·퇴사 인계의 배포 | [G03-D-19](G03-D-19-expiry.md) §0-7, [IMPLEMENTATION-PRIORITY](../IMPLEMENTATION-PRIORITY.md) §3 묶음 B | 취소·인계는 ML-3 대타 종료와 ML-5 Shift 우선 Lock과 함께 배포 |
 | 알림 유실 (§후속) | [G03-D-22](G03-D-22-notification-delivery.md) D22-1·3 | 알림은 최선 노력. 근무 취소·인계는 "빠진 근무"가 대체 조회 화면 |
+| 공개 후 추가·담당자 변경의 불가능 시간 확인 | [G03-D-05](G03-D-05-confirmation-response.md) D05-2·8 | 새 Command는 충돌 목록 형식(1건)을 쓴다. 기존 DRAFT·Publish의 boolean 확인은 그대로 |
 
 ## 15. 변경 이력
 

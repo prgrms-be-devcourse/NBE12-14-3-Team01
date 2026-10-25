@@ -163,7 +163,7 @@ DRAFT 생성·수정과 Publish의 `confirmUnavailableConflict`, 수락·승인�
 | 공개 후 추가·담당자 변경의 확인 Flag 형식 | ML-2 |
 | 경합 D21-R1~R5 | ML-5, S4 실험 |
 | 새 경고·불일치 ErrorCode, `OFFICIAL_SHIFT_CONFLICT`의 번호 없는 code와 400 | G03-D-03 |
-| 경고 응답 형식 | G03-D-05 |
+| 경고 응답 형식 | [G03-D-05](G03-D-05-confirmation-response.md) (사용자 잠정 결정 2026-10-25) |
 
 ## 13. 변경 이력
 
