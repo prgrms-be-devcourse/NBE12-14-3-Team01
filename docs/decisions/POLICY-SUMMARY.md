@@ -1,7 +1,7 @@
 # SWITCH V3 정책 요약 — 퇴사·재가입·공개 후 변경·로그아웃
 
 > 팀 공유용 요약 (2026-10-23 작성, 2026-10-25 저장소 이관, 원본 로컬 `drafts/D8-SUMMARY/`). 상세는 정책 카드별 Proposal(`proposals/`)에 있다.
-> 이관만 했다. 2026-10-25에 기록한 G03-D-19·21·22·03 결과는 아직 반영하지 않았다 (S2-6에서 갱신).
+> 2026-10-25 S2-6A에서 G03-D-19·21·22·03·05, M3, 알림 Type, ErrorCode, 정식 Test ID 결과를 반영했다 (§2 아래쪽 행, §4, §6). 묶음별 상세 추적은 [`IMPLEMENTATION-PRIORITY`](IMPLEMENTATION-PRIORITY.md) §3-1.
 > **이 문서의 정책은 모두 사용자 잠정 결정 / PROPOSED이며 팀 APPROVED가 아니다.** 구현 지시가 아니다 (AI-RULES §3).
 > Test·실험은 아직 실행하지 않았다 (SPECIFIED / NOT_RUN).
 
@@ -35,6 +35,12 @@
 | 대타 | 근무가 인계·취소되면 진행 중 요청을 `SHIFT_CHANGED`로 종료. 퇴사자가 대기 후보면 `INELIGIBLE`, 수락자면 요청을 `CANDIDATE_INELIGIBLE`로 종료. 이력 보존, 닫힌 요청 재오픈 없음 | ML-3 |
 | 조회 | "내 근무"는 지금 해야 할 근무만 (기존 그대로). 취소·인계된 근무는 새 "빠진 근무" API (원래 시작 시각 기준 미래 + 최근 7일, 조회 범위일 뿐 보존 기간 아님). 과거 소속은 마이페이지 "내 소속 이력". 현재 업무는 모두 **현재 소속 기준** | ML-4 |
 | 로그아웃 | Refresh Token이 DB 값과 같을 때만 조건부 무효화, 로그인마다 고유 jti, Origin 검증, 실패해도 화면 정리 + 다시 시도, 세션 쿠키·14일 유지 | AUTH-1 |
+| 대타 만료 표시 | 시작 시각이 지난 OPEN·ACCEPTED 요청은 조회 응답에서 CLOSED / EXPIRED, `closedAt = startAt` (응답에서 계산, DB 불변) | G03-D-19 |
+| 불가능 시간 충돌 | 관리자 배정(공개 후 추가·담당자 변경·퇴사 인계)은 경고 후 확인, 대타 수락·승인은 거부 | G03-D-21 |
+| 확인 응답 | 409 `CONFIRM_REQUIRED` + 충돌 목록, 확인한 목록을 다시 보내 확정. 미리보기 이후 상태가 바뀌면 409 `STALE` | G03-D-05 |
+| 알림 | 최선 노력 (실패해도 업무 성공). 알림 대신 볼 수 있는 화면을 둔다. 대타 종료는 사유별 Type, PENDING 후보·실행한 관리자는 받지 않음. 새 Type 6개 | G03-D-22, [NOTIFICATION-TYPES](../contract/NOTIFICATION-TYPES.md) |
+| ErrorCode | `{DOMAIN}-{NNN}` 형식 유지, 오류 종류는 목록 문서에만 기록. 새 code 12개 예약, 의미가 틀린 기존 code 5건(T1)은 P1 정정 | G03-D-03, [ERROR-CODES](../contract/ERROR-CODES.md) |
+| ID 직접 접근 (M3) | ID로 접근하는 승인·응답·종료·상세·알림 읽음은 Lock·상태를 보기 전에 권한 범위를 먼저 확인. 범위 밖은 없는 ID와 같은 404 | [API-CATALOG](../contract/API-CATALOG.md) CHG-06·07 |
 | 동시성 | 전역 Lock 순서 통일, 배정 시 대상 User Lock, Lock 후 재검증, Deadlock·Lock 대기 초과 503 / 상태 충돌 409, 자동 재시도 없음 | ML-5 |
 
 ## 3. 기존 코드·API·DB·Test에 주는 영향
@@ -57,6 +63,8 @@
 | Lock 순서 (ML-5) | 지금 코드에서 반례가 실제로 재현되는지 (R1~R3), 수정 순서의 경합 13개, 예외 매핑 (1213·1205) |
 | 보안 G03-OQ-01 (우선) | `/workplaces/**` permitAll 상태에서 무토큰 요청이 실제로 어디까지 통과하는지. 200·500이면 결함 후보로 즉시 공유 |
 | 퇴사 vs DRAFT 편집 | 퇴사 후 퇴사자 DRAFT 근무 0건 (ML-2-INV-02)을 Lock으로 지킬 수 있는지 (R4, T14·T15) |
+| Java → Kotlin 상호 호출 | Java Test를 그대로 둔 채 Production을 Kotlin으로 바꿀 수 있는지 (record DTO 52개의 accessor를 Test가 178회 호출, Entity 생성자 241회, `ReflectionTestUtils` 51회). S2-6B에서 방식 결정, M0-6 실험 |
+| Java 기준 실행 기록 | Migration 비교 기준이 될 Java Test 실행 결과 (현재 대타 93개 ⑤ `UNKNOWN`) |
 | 운영 환경 | 운영 MySQL 버전, Column 형식, Index 이름, 쿠키·CORS 운영값 (배포 담당) |
 
 ## 5. 아직 구현하지 않은 것
@@ -67,10 +75,12 @@
 
 | ID | 내용 | 누가 |
 |---|---|---|
-| G03-D-03 | ErrorCode Prefix·번호·400/409 규칙 (새 코드 10개 이상 전) | 팀 |
-| G03-D-19 | 대타 만료 표현 (B1 `closedAt = startAt`) | 사용자 → 팀 |
-| G03-D-21 | 불가능 시간 충돌: 관리자 기능은 경고 후 확인, 대타 승인은 거부 → 통일 여부 | 사용자 → 팀 |
-| G03-D-22 | 알림 유실 허용 수준 (지금: 로그만) | 팀 |
+| G03-D-03 | ErrorCode 규칙 — **사용자 잠정 결정 (2026-10-25)**, 팀 승인 대기 | 팀 |
+| G03-D-19 | 대타 만료 표현 — **사용자 잠정 결정 (B1)**, 팀 승인 대기. V4-T-02 기대값 변경 승인 포함 | 팀 |
+| G03-D-21 | 불가능 시간 충돌 — **사용자 잠정 결정 (관리자 배정 경고·확인, 수락·승인 거부)**, 팀 승인 대기 | 팀 |
+| G03-D-22 | 알림 전달 — **사용자 잠정 결정 (최선 노력 + 대체 화면)**, 팀 승인 대기. 다른 관리자 대체 화면 공백은 S3 차단 조건 | 팀 |
+| G03-D-10 | 남의 알림 403 / 404 (`DEFER`). CHG-07 알림 읽음 404 전환과 같은 질문 | 팀 |
+| 활성 대타 요청 2개 이상 | 기존 데이터에 그런 상태가 있을 때 처리 (ML-3·ML-5 미정) | ML-3 담당 → 팀 |
 | 운영 DDL·Rollback | 적용 절차, 배포 순서, 되돌릴 수 없는 지점 | 팀 + 배포 담당 |
 | DL-002·009·010 | RC 유지, Harness 공유, MySQL 동시성 검증 지위 | 팀 |
 | D-NOW-01 | 공통 설정·H6 담당자 | 팀 |
@@ -89,7 +99,7 @@
 |---|---|
 | AUTH-1 | [`proposals/AUTH-1-server-logout.md`](proposals/AUTH-1-server-logout.md) |
 | ML-2 + D-26 + D-27 | [`proposals/ML-2-leave-shifts-and-published-changes.md`](proposals/ML-2-leave-shifts-and-published-changes.md) |
-| ML-3 + V4 Test 정정 메모 | [`proposals/ML-3-substitute-on-leave-and-shift-change.md`](proposals/ML-3-substitute-on-leave-and-shift-change.md) (V4 Test 정정 메모는 S2-5에서 `TEST-INVENTORY`에 통합 예정, 원본 로컬 `drafts/D4-ML-3/`) |
+| ML-3 + V4 Test 정정 메모 | [`proposals/ML-3-substitute-on-leave-and-shift-change.md`](proposals/ML-3-substitute-on-leave-and-shift-change.md) (V4 Test 정정 메모는 S2-5B에서 `TEST-INVENTORY` §3-1-1·§3-2-1에 통합, 원본 로컬 `drafts/D4-ML-3/`) |
 | ML-H2 | [`proposals/ML-H2-rejoin-and-active-membership.md`](proposals/ML-H2-rejoin-and-active-membership.md) |
 | ML-4 | [`proposals/ML-4-leave-command-and-access.md`](proposals/ML-4-leave-command-and-access.md) |
 | ML-5 | [`proposals/ML-5-concurrency-and-lock-order.md`](proposals/ML-5-concurrency-and-lock-order.md) |

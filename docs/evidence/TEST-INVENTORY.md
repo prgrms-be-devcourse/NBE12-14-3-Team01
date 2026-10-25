@@ -333,6 +333,12 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | SUB-05·`ShiftService.detail` 관련 (대상 Method는 ML-4 §8 승인 때 특정) | 현재 소속 확인 없음 | 현재 소속 기준 | ML-4 §8 | ML-4 승인 후 |
 | SUB-006 문구 (T1-04) | — | — | message를 확인하는 Test 없음 → 기대값 변경 0 | — |
 | Pattern `SHIFT-004`·`SHIFT-005` 4개 (`RegularShiftPatternControllerTest` L812·857·1449·1505) | 대상 직원 의미 | 그대로 (실행자 쪽 M-01 정정은 새 Test만) | ERROR-CODES M-01 | — |
+| V4-T-26 `approve_fail_actor_not_in_workplace` (L413) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일) | API-CATALOG §5-5 "ID가 없음 / 다른 근무지 것 / 볼 권한이 없음 → 404", M3-T1 (V4-N-44) | CHG-06 승인 후 |
+| V4-T-39 `close_NotManager_ThrowsException` (L1099) (S2-6A 발견). 이름과 달리 Mock은 `NOT_WORKPLACE_MEMBER` → **범위 밖** | `WPL-003` 403 | 404 `SUB-001` (위와 같음) | 같음, M3-T5 (V4-N-47) | CHG-07 승인 후 |
+| V4-T-58 `acceptCandidate_NotOwnCandidate` (L348), V4-T-68 `rejectCandidate_NotOwnCandidate` (L577) (S2-6A 발견). Candidate는 본인만 볼 수 있음 → **범위 밖** | `SUB-020` 403 | 404 `SUB-019` "해당 대타 후보를 찾을 수 없습니다." (없는 Candidate ID와 동일) | M3-T5 (V4-N-47) | CHG-07 승인 후 |
+| V4-T-74 `approve_fail_actor_not_manager` (L428) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **미정 (S3 결정).** 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5, M3-T1 | S3 결정 후. 결정 전에는 변경 대상으로 확정하지 않음 |
+| `NotificationServiceTest` "다른 사용자의 알림은 읽음 처리할 수 없다" (L187, 확인 L232) (S2-6A 발견) | `NOT-002` 403 | M3-T5를 따르면 404. **단 G03-D-10 (`DEFER`)과 같은 질문이라 팀 결정 전에는 변경 대상으로 확정하지 않는다** | M3-T5 (V5-N-18), G03-D-10 | 팀 결정 후 |
+| V4-T-35 `list_NotManager_ThrowsException`, `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) | `WPL-004` / `NOT-002` | 그대로 (근무지 ID가 Path에 있음 / 실행자 자신의 소속 종료 → 403 정책) | API-CATALOG §5-5 | — |
 | ML-3 기존 거절 종료 판정 (V4-T-10) | `ALL_CANDIDATES_REJECTED` | 그대로 (INELIGIBLE 후보가 없는 Fixture) | ML-3 V4-N-22는 새 경우만 확인 | — |
 
 ## 6. V5 Notification (S2-5B 신설)
@@ -352,3 +358,4 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 일자 | 내용 |
 |---|---|
 | 2026-10-25 | S2-5B: PR #5 이후 대타 Test 집계(§3-1-1, 정적), V4-T-07~12·24·49~52 경로 갱신(ID 유지), V4-T-53~93 등록, 정식 ID 대응표(§5-1), 중복 대조(§5-2), ErrorCode Test 0 판정·Migration 명세(§5-3), 기대값 보존/변경 연결(§5-4), V5 구역 신설(§6). Test 실행 0 |
+| 2026-10-25 | S2-6A: §5-4에 M3 응답 규칙으로 기대값이 바뀌는 기존 권한 실패 Test 추가 — 범위 밖 4개 (V4-T-26·39·58·68, Improvement 기대값 = 없는 ID와 같은 code·message), 역할만 부족한 V4-T-74는 S3 결정, 알림 읽음 1개는 G03-D-10 결정 대기 |

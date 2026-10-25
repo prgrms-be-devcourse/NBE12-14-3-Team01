@@ -37,6 +37,25 @@
 | E. 직원 상태 조회 | 예정 근무 + 빠진 근무 + 종료된 대타(G03-D-22) + 내 소속 이력 + 접근 제어 | 해당 기능 묶음과 함께 |
 | F. 오류 복구 | 업무 오류 구분(G03-D-03) + 최신 상태 재조회 + 재확인 안내 | 각 묶음과 함께 |
 
+### 3-1. 묶음별 추적표 (S2-6A, 2026-10-25)
+
+한 줄로 "무엇을 왜 고치고, 어디가 바뀌고, 무엇으로 확인하는가"를 잇는다. 정책은 모두 사용자 잠정 결정 / ② `PROPOSED` / 팀 `PENDING`, Test는 모두 ④ `SPECIFIED` / ⑤ `NOT_RUN`. Test ID는 [`TEST-INVENTORY`](../evidence/TEST-INVENTORY.md) §5-1 정식 ID. "Migration에서 먼저 지킬 것"은 이 묶음을 구현하기 **전에** 현재 Java 동작 그대로 통과해야 하는 기존·회귀 Test다.
+
+| 묶음 | 문제 (지금 생기는 잘못된 결과) | 정책 카드 | API | 화면 ([FRONTEND](../contract/FRONTEND-CONTRACT.md)) | 새 ErrorCode · 알림 | 확인 Test | Migration에서 먼저 지킬 것 | 구현 전 차단 조건 |
+|---|---|---|---|---|---|---|---|---|
+| A. 서버 로그아웃 | 로그아웃해도 Refresh Token이 계속 유효 | AUTH-1 | API-AU-01 | §4-4 | `AUTH-007` · 알림 없음 | V1-N-01~12 | `UserServiceTest`, `ApiV1UserControllerTest`, `RqTest`, `CustomAuthenticationFilterTest` (기대값 변경 0) | G03-OQ-01 보안 실험 (S4), 쿠키 `SameSite`·CORS 운영값 (배포 담당) |
+| B. 공개 근무 변경 기반 | 공개 근무를 취소·인계할 수단이 없음. 바뀌어도 진행 중 대타가 남음 | ML-2 (D-26·27), ML-3, ML-5, G03-D-21, G03-D-05, NOTIFICATION-TYPES | API-PS-01·02·03 | §3-2, §3-3 | `SFT-020`·`SFT-021`·`SFT-022` · `SHIFT_ASSIGNED`, `SHIFT_CANCELLED`, `SHIFT_REASSIGNED_AWAY`, `SUBSTITUTE_SHIFT_CHANGED` | V3-N-01~19, V4-N-08~22·39, V5-N-01~16, 경합 H6-C1~C4 (보류) | V3 Shift·Schedule 기존 Test (번호 없음, 경로로 추적), V4-T-01~93, V3-N-24~32 (Test 0 ErrorCode), V3-N-20·21·22 | ML-5 Lock 실험 (S4), 알림 Type DB 형식 `UNKNOWN` (배포 담당), **다른 관리자 대체 화면 공백 (S3 차단)**, **한 근무에 활성 대타 요청 2개 이상인 기존 데이터 처리 (정책 미정, ML-3 담당)** |
+| B'. 대타 승인 권한·Lock | 관리자가 아닌 사용자가 `requestId`로 요청 존재·상태를 구분하고 Lock을 잡을 수 있음 | API-CATALOG CHG-06·07 (M3), ML-5 | 대타 승인·후보 응답·대타 종료·근무 상세·알림 읽음 | §2 (404 공통 처리) | 새 code 없음 (범위 밖 = 없는 ID와 같은 404) | V4-N-44~47, V3-N-23, V5-N-18, M3-T2·T3 = V4-N-45·46 (H6, `BLOCKED`) | V4-T-23~30·73~81 (승인), V4-T-36~46 (종료), V4-T-56~72 (응답) | ML-5 승인 Lock 순서 실험, **기존 권한 실패 Test 기대값 변경 — 범위 밖 4개 확정 후보, 역할만 부족한 V4-T-74는 S3 결정 (TEST-INVENTORY §5-4)**, **알림 읽음 404 전환은 G03-D-10 (`DEFER`)과 같은 질문 → 팀 결정** |
+| C. 퇴사 | 퇴사 기능이 없음. 수동 처리 시 미래 근무·대타·DRAFT가 퇴사자에게 남음 | ML-4, ML-2, ML-3, ML-5, G03-D-05, G03-D-21 | API-LV-01·02 | §3-1, §3-2, §6 | `WPL-006`~`WPL-011` · 대타 종료 2종 (`SUBSTITUTE_SHIFT_CHANGED`, `SUBSTITUTE_CANDIDATE_INELIGIBLE`) | V2-N-23~40 (ML-4), V2-N-41~52 (D21·D05), V4-N-12~16·22, ML5-T5~T9·T14·T15 (보류) | V2 Workplace 기존 Test (TEST-INVENTORY §4-2), B의 기존 Test | B 완료, ML-5 실험, `closedRequests` 세는 규칙 (API-LV-02, 정의함), 퇴사 vs DRAFT 편집 경합 (R4) |
+| D. 재가입 | 퇴사자가 같은 근무지에 다시 들어올 수 없음 (Unique `(workplace_id, user_id)`) | ML-H1, ML-H2, CHG-01~04 | 가입 (변경), API-WP-01 | §4-3, §9-3 | `WPL-006` 재사용, 현재 소속 유일 제약 · `WORKPLACE_MEMBER_JOINED` | V2-N-01~22, V2-N-06 (= ML-H1 V2-N-04 대체), V5-N-06 | `WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` (Migration에서는 그대로, ML-H2에서 기대값 변경) | C 완료, U2' 실험 (Hibernate 생성 Column + 복합 Unique), **운영 DDL·Rollback 절차 (배포 담당)** |
+| E. 직원 상태 조회 | 취소·인계된 근무, 종료된 대타, 과거 소속을 직원이 확인할 곳이 없음 | ML-4 §6, G03-D-22, G03-D-19 | API-SC-01, API-ME-01, API-SB-01, 보낸 요청 (CHG-02) | §4-1, §4-2, §4-3, §5, §7 | 새 code 없음 | V4-N-23~26 (D-19), V4-N-27~38 (D22), V3-N-09 등 (ML-2 조회) | V4-T-01~06 (`SentSubstituteRequestResponseTest`), V4-T-47·48 | 해당 기능 묶음과 함께. V4-T-02 기대값 변경은 D-19 승인 후 |
+| F. 오류 복구 | 오류가 났을 때 무엇이 바뀌었는지, 다시 무엇을 해야 하는지 알 수 없음 | G03-D-03, G03-D-05, FRONTEND §2 | 각 Command의 409 (`STALE`·`CONFIRM_REQUIRED`·`STATE_CONFLICT`) | §2, §3-2 | `WPL-010`·`WPL-011`·`SFT-021`, `COM-004` (503, 실험 전 미적용) | V4-N-40~43 (D03, P1), V2-N-41~52, D03-T4 = ML5-T12 (보류) | V4-N-01 방식 HTTP 계약 (각 Domain), T1 기존 Test 5종 (§5-4, Migration에서 그대로) | 503 매핑 실험 (ML-5 ML-14). T1 정정은 P1 |
+
+**묶음 공통으로 아직 해결되지 않은 것:**
+- 모든 Test가 실행 전이다. 대타 Test 93개도 이 저장소 기준 ⑤ `UNKNOWN`이라 Migration의 비교 기준(Java 실행 기록)부터 남겨야 한다 (S2-6B).
+- 다른 관리자 대체 화면 공백은 해결이 아니라 S3 차단 조건이다 ([NOTIFICATION-TYPES](../contract/NOTIFICATION-TYPES.md) §3-6).
+- S4 기술 실험은 "DB에서 실제로 어떻게 되는가"만 알려 준다. 정책 미정 항목(활성 요청 2개 이상, G03-D-10)은 실험으로 정하지 않는다.
+
 **줄일 수 있는 후보 (묶음 안 정합성은 유지):** 관리자의 **단독** 공개 후 근무 추가·담당자 변경 API와 화면. 퇴사 인계에 쓰는 내부 처리(묶음 B)는 유지한다.
 
 ## 4. 완료의 정의
@@ -55,6 +74,8 @@
 - 묶음별 담당자와 일정 (D-NOW-01)
 - 운영 DDL 적용 담당과 절차
 - 이 원칙의 채택
+- **G03-D-10 (남의 알림 403 / 404, `DEFER`)과 CHG-07 알림 읽음 404 전환의 관계.** CHG-07 (가)는 G03-D-10을 대신 결정하지 않는다. 둘 중 무엇을 기준으로 할지 팀이 정한다 (S2-6A 발견)
+- 한 근무에 활성 대타 요청이 2개 이상인 기존 데이터의 처리 (ML-3 담당, 정책 질문. S4는 그런 상태가 만들어지는지만 확인)
 
 ## 7. 변경 이력
 
@@ -63,3 +84,4 @@
 | 2026-10-25 | 초안 | 사용자 선택: P0·P1을 목표로 하고 P2는 일정 여유가 있을 때. 교차 검토 의견(배포에 필요한 DDL·필수 화면은 P0, 정합성 묶음 단위, SUB-07·Publish 위험 재평가) 반영 |
 | 2026-10-25 | §3에 묶음 B'(대타 승인 권한·Lock 정합성) 추가 | CHG-06 사용자 잠정 결정 |
 | 2026-10-25 | 묶음 B'에 CHG-07 등급 반영 | CHG-07 사용자 잠정 결정 |
+| 2026-10-25 | S2-6A: §3-1 묶음별 추적표 (문제 → 정책 → API → 화면 → ErrorCode·알림 → Test ID → Migration 보존 → 차단 조건), §6 팀 결정 2건 추가 | S2-5B 정식 Test ID 반영. 정적 확인 중 B'의 기존 Test 기대값 변경(범위 밖 4 + S3 결정 1)과 G03-D-10 연결 누락 발견 |
