@@ -71,6 +71,8 @@
 | 현재 근거 | CI(EV-008)에서는 `check`가 성공. 로컬 3차 저장소 실행 기록 없음 |
 | 범위 | **환경 확인만.** 전체 Test·DB 실험은 하지 않는다 (E1부터) |
 | 확인 항목 | ① 기준선 Worktree가 `a148a62`이고 작업 트리가 깨끗한가 ② `java -version`, `./gradlew --version`, `docker info --format '{{.ServerVersion}}'` ③ Testcontainers 조건 (Docker 실행 중, 이미지 받기 가능 여부 — 받기는 E1에서) ④ **운영 자원 연결 위험:** 셸 환경에 `SPRING_PROFILES_ACTIVE`·`MYSQLURL`·`MYSQLUSER`·`MYSQLPASSWORD`·`JWT_SECRET_KEY`·`APP_INIT_DEFAULT_PASSWORD`가 설정돼 있는지 **이름만** 확인 (값 출력 금지). 설정돼 있으면 E1 전에 해제 방법을 정한다. test Profile의 DB URL이 `jdbc:tc:`인지 재확인 ⑤ 결과 보관 위치(§2) 생성 가능 여부 ⑥ `.gitignore`가 `build/`를 제외하는지, 결과 보관 위치가 저장소 밖인지 ⑦ 원상복구 절차 (§2) |
+| 미리 알려진 사실 (S4-P Commit 후 정적 확인) | Gradle 9.3.0 배포본이 이 PC(`~/.gradle/wrapper/dists`)에 **없다** → `./gradlew --version`이 services.gradle.org에서 **내려받는다** (다운로드 발생 사실과 크기를 기록). Gradle toolchain 자동 내려받기 설정이 없어 **JDK 25가 이 PC에 설치돼 있어야 한다** (없으면 `ENVIRONMENT_BLOCKED`, 설치는 별도 승인). Docker CLI는 있음, Daemon 실행 여부는 모름 (`docker info`가 Daemon에 접속만 하고 Container는 시작하지 않음). `backend/.gitignore`가 `build/`·`.gradle`을 제외 |
+| 하지 않는 것 | 전체 Test, Docker Container 시작, DB 접속, Production·Test 코드 변경, 환경 변수 값 출력 |
 | 성공 기준 | ①~⑦ 모두 확인. JDK 25 사용. ④에서 운영 값이 하나도 없음 |
 | 실패 시 | 이후 실험 중단, 원인만 보고 (설치·설정 변경은 별도 승인) |
 | 필요 승인 | 기준선 Worktree 생성(허용 변경: `git worktree add --detach`로 새 폴더 1개, 기존 Branch·Worktree 변경 없음) + 결과 보관 폴더 생성 + 위 확인 명령 실행 |
@@ -185,30 +187,9 @@ E0 환경 → E1 Java 기준선 → E2·E3 (같은 실험 Worktree) → E4 → E
 | `application-test.yml`이 `src/main/resources`에 있음 → Boot Jar에 포함될 수 있음 | test Profile이 켜지지 않으면 쓰이지 않는다. 켜져도 `jdbc:tc:` 드라이버가 운영 classpath에 없어 기동 실패할 가능성이 높다 (추정). 위치가 의도와 다르다 | 정리 대상 (낮음) |
 | JUnit XML·로그 | `system-out`에 SQL·설정이 섞일 수 있음 | §2 민감 정보 검사 |
 
-**개선 제안 (승인된 Task에서만 적용 — `application*.yml`·Dockerfile 변경, AI-RULES):**
-1. **운영에서 필수 값이 없으면 기동 실패하게 (fail-fast).** `application-prod.yml`에 운영 필수 값을 기본값 없이 다시 선언한다. 공통 `application.yml`의 기본값은 dev·test 편의용으로 남는다.
-   ```yaml
-   custom:
-     jwt:
-       secret-key: ${JWT_SECRET_KEY}          # 기본값 없음: 없으면 기동 실패
-     cookie:
-       secure: ${COOKIE_SECURE}               # 운영은 true
-       same-site: ${COOKIE_SAME_SITE}         # Frontend·Backend 도메인이 다르면 None
-     cors:
-       allowed-origins: ${CORS_ALLOWED_ORIGINS}
-   ```
-2. **운영 이미지의 기본 Profile을 prod로.** `backend/Dockerfile`의 실행 단계에 `ENV SPRING_PROFILES_ACTIVE=prod`. Railway 환경 변수가 있으면 그 값이 우선하고, 빠져도 dev로 뜨지 않는다. 로컬 `bootRun`(dev 기본값)과 Docker CI(이미지 빌드만, 실행 안 함)에는 영향 없음.
-3. (선택) **공통 파일에서 JWT 기본 키 제거.** `application.yml`은 `${JWT_SECRET_KEY}`만 두고, 개발용 키는 `application-dev.yml`·`application-test.yml`에 "로컬 전용" 표시와 함께 둔다. 운영 키와 반드시 다른 값.
-4. (선택, 코드 변경) prod Profile 기동 검사: JWT 키 길이(HS256은 32 byte 이상), 알려진 개발용 키와 같지 않음, `COOKIE_SECURE=true`. Improvement Task로 분리.
-5. `application-test.yml`을 `src/test/resources`로 이동. 이동 전후 E1 결과 비교로 Test 동작이 같은지 확인.
+**개선안·배포 담당 확인 목록·배포 순서·되돌리기의 원본은 [`TASK-OPS-01`](../delivery/TASK-OPS-01-prod-config-failfast.md)이다.** 이 계획서는 S4에 필요한 것만 둔다: 실험 환경이 운영 자원에 연결되지 않는지 (E0 ④), 결과 파일에 비밀 값이 섞이지 않는지 (§2 민감 정보 검사). 이 정적 확인은 **운영이 안전하다는 검증이 아니다** — Railway의 실제 값·적용 상태, HTTPS, Cookie 실제 동작은 확인하지 않았다.
 
-**배포 담당 확인 목록 (값을 공유하지 않고 "있음/없음·같음/다름"만 답한다):**
-- Railway에 `SPRING_PROFILES_ACTIVE=prod`가 있는가
-- `JWT_SECRET_KEY`가 있고, 저장소 `application.yml`의 기본값과 **다른가**. 같거나 과거에 비어 있던 적이 있으면 **교체** (교체하면 기존 로그인·Refresh Token이 무효가 되어 사용자가 다시 로그인해야 함)
-- `COOKIE_SECURE=true`, `COOKIE_SAME_SITE`(다른 도메인이면 `None`), `CORS_ALLOWED_ORIGINS`(운영 Frontend 출처)가 있는가
-- `init-data` Profile이 운영에서 꺼져 있는가, `APP_INIT_DEFAULT_PASSWORD`가 운영에 남아 있지 않은가
-
-위 1·2는 Kotlin Migration·Improvement와 무관한 **배포 안전 항목**이라 먼저 처리할 가치가 있다 (G03-D-28 배포 전 점검과 같은 범주).
+위 항목은 Kotlin Migration·Improvement와 무관한 **배포 안전 항목**이다 (G03-D-28 배포 전 점검과 같은 범주). Task 초안: [`TASK-OPS-01`](../delivery/TASK-OPS-01-prod-config-failfast.md). **순서:** 설정 파일·Dockerfile 변경은 E1 Java 기준선 이후 (비교 조건 유지). 단 운영이 공개된 기본 키를 쓰거나 dev Profile로 기동 중인 것이 확인되면 보안 조치가 E1보다 우선이다.
 
 ## 6. 실행 전에 필요한 결정
 
@@ -226,3 +207,4 @@ E0 환경 → E1 Java 기준선 → E2·E3 (같은 실험 Worktree) → E4 → E
 |---|---|
 | 2026-10-25 | 초안 (S4-P). 원칙 6개, 공통 환경, Worktree·결과 보관·민감 정보 검사·원상복구, 실험 E0~E6, 순서·중단 조건, 남은 위험, 실행 전 결정. 실험 코드는 전용 Worktree에만 두고 버림 (사용자 결정). 실행 0 |
 | 2026-10-25 | 보완: 실험 코드 처리 기준(일회성·회귀 후보·Query·구현 반영·임시 파일), 실험 코드 로컬 Commit은 실험별 승인, E0 범위(환경 확인만, 운영 연결 위험 이름 확인, Git 제외·원상복구), E1 판정 `PASS`·`KNOWN_FAILURE`·`FLAKY`·`ENVIRONMENT_BLOCKED`와 정적 집계 분리, §5-1 환경·보안 관찰과 개선 제안·배포 담당 확인 목록. 초기 데이터 "기본 비밀번호" 기록 정정 (기본값 없음) |
+| 2026-10-25 | Commit 후 보완: §5-1 SameSite 결정 기준(같은 site 여부), 운영 Profile 보장 방식을 검토 항목으로, 설정 변경은 E1 이후·보안 사고 시 우선, TASK-OPS-01 연결. 이어서 §5-1의 개선안·확인 목록을 TASK-OPS-01로 넘기고 참조만 남김 (중복 제거), "운영 안전 검증 아님" 명시, E0에 Gradle 배포본 내려받기·JDK 25 필요·Docker Daemon 사실과 "하지 않는 것" 추가 |
