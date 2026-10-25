@@ -4,6 +4,7 @@
 > Domain별 상세(API, 정책, Test, DoD)는 `docs/delivery/<Domain>.md`, Test 행 단위는 `docs/evidence/TEST-INVENTORY.md`.
 > 이 문서는 기술 진행 상태의 Source of Truth다. 일정·담당은 Notion Delivery Board가 SoT이고, Board 행은 이 문서의 행 ID로 연결한다.
 > 검증 상태 칸은 **통과한 Run 링크가 있을 때만** 채운다. Test가 존재한다는 것만으로는 채우지 않는다.
+> 2026-10-26 (V5-J2): §3 V5 보강 칸, §4 공통 행 R1 분리, §4 아래에 Kotlin 전환 관문 문서 위치를 적었다.
 > S2-6B (2026-10-25): §3에 `a148a62` 정적 집계와 PASS 조건 보완을 추가했다. §2 상태 칸과 Migration 단계의 대응은 [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md) §2.
 
 ## 1. Domain 범위 (실제 Package 기준)
@@ -45,7 +46,7 @@ Java 실행 결과 (모든 V 공통): D0-B 조사 당시 Java Snapshot `243f77c`
 | V2 | `RegularShiftPatternControllerTest` (45), `WorkplaceServiceTest` (6), `WorkplaceMemberServiceTest` (1) | 52 | C-08~C-17 | Workplace Join 성공/실패, DB Unique 실존 (PR #78이 Workplace Controller·Repository·Security·Integration Test 추가, 병합됨, 실행 수 미기록) |
 | V3 | `UnavailableTimeServiceTest` (37), `ScheduleServiceTest` (23), `ShiftServiceTest` (14), `ScheduleControllerTest` (5), `UnavailableTimeRepositoryTest` (5, **H2에서 실행**), `ScheduleTest` (4), `ShiftScheduleConcurrencyTest` (4), `UnavailableTimeConcurrencyTest` (3) | 95 | C-18~C-39 | Publish 성공/실패 DB 최종 상태 (현재 Mock), Shift CREATE/UPDATE 성공, Official Shift Query Repository Test. PR #77이 `ScheduleRollbackIntegrationTest`, `ShiftModifyIntegrationTest` 추가 (병합됨, 실행 수 미기록) |
 | V4 | `SubstituteRequestServiceTest` (Approve 8, Close 11, Create 8, List 5, SentRequests 2), `SentSubstituteRequestResponseTest` (6), `SubstituteCandidateServiceTest` (6), `SubstituteRequestConcurrencyTest` (4), `SubstituteCandidateRepositoryTest` (2) | 52 | C-40~C-50 | **APPROVE 후 `Shift.member` DB 재조회** (C-48, 현재 Mock만), Candidate Filter 실제 DB |
-| V5 | `NotificationServiceTest` (14), `NotificationTest` (3), `SchedulePublishedEventListenerIntegrationTest` (1), `NotificationReadConcurrencyTest` (1) | 19 | C-51~C-56 | 알림 Row 검증 0 → Publish / Substitute 알림 Row |
+| V5 | `NotificationServiceTest` (14), `NotificationTest` (3), `SchedulePublishedEventListenerIntegrationTest` (1), `NotificationReadConcurrencyTest` (1) | 19 | C-51~C-56 | 알림 Row 검증 0 (V5 Package 기준) → Publish / Substitute 알림 Row. 단 V3 `ShiftScheduleConcurrencyTest.publishAndModifyKeepAssigneeAndNotificationConsistent`가 근무표 공개 알림 Row 수를 일부 확인한다 (V5-J3에서 중복 작성 주의). **HTTP 계약: V5-N-21~30 (2026-10-26, Test PR #16 Draft·`develop` 미반영, EV-017~020)** |
 | 공통 | `TimeRangeUtilsTest` (15), `GlobalExceptionHandlerTest` (7), `ApiResponseTest` (4), `UtTest` (3), `BaseEntityAuditingTest` (2), `BackendApplicationTests` (1) | 32 | 응답 형식, 시간 Util | — |
 | **합계 (Snapshot `243f77c`)** | | **266** | | |
 
@@ -79,7 +80,9 @@ S2-6B 보완 (2026-10-25, 제안): ① Java ↔ Kotlin 호출 호환성을 위�
 | V3 | M0 완료, TS-03, TS-06 | `@Lock` Query, Publish 충돌 검사 순서, Cross-Workplace 현행 동작 (DL-001) | G03-D-03~08, G03-D-26, G03-D-27, DL-001, DL-002 |
 | V4 | M0 완료, TS-03, TS-06 | `@Lock` Query, 상태 전이, Candidate 재검증 | G03-D-09, G03-D-15, G03-D-17, G03-D-19, G03-D-21 |
 | V5 | M0 완료 | `@TransactionalEventListener` phase, 알림 생성 시점 | G03-D-10, G03-D-16, G03-D-18, G03-D-20, G03-D-22 |
-| 공통 | M0 완료 | `ApiResponse` 형식, `ErrorCode` 인터페이스, `GlobalExceptionHandler` 매핑, `BaseEntity` Auditing | G03-D-01 |
+| 공통 | M0 완료 | `ApiResponse` 형식, `ErrorCode` 인터페이스, `GlobalExceptionHandler` 매핑, `BaseEntity` Auditing. **단 R1(Controller 없는 경로가 마지막 `Exception` 처리로 가서 500 `COM-500`, MockMvc 관찰)은 보존할 계약이 아니다** — 전환에서 일부러 바꾸지도, Test로 고정하지도 않고, 처리 방식은 별도 Improvement 결정으로 다룬다 (TEST-GAP-ANALYSIS §4-1 R1) | G03-D-01 |
+
+**Kotlin 전환 관문 문서 위치 (역할 구분, 2026-10-26):** 이 §4는 **기술 선행조건(TS-ID)과 보존 구간**만 다룬다. Domain별 Kotlin 전환을 시작해도 되는지의 **Test 선행조건(관문)**은 [`DOMAIN-DEVELOPMENT-GUIDE`](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3에 있고 (예: V5는 V5-K1의 선행 = V5-J5(J2~J4 + 기존 394 실행 기록), E2·E3 결과), 실제 진행 상태는 이 문서 §2에 기록한다. 관문을 여기에 새로 만들지 않는다. 관문 판단 때는 §7-3에 적힌 **모든** 선행조건을 확인한다 (일부만 충족하면 준비 완료가 아님).
 
 ## 5. 코드 의존 관계 (develop `243f77c`, main, `import` 기준)
 

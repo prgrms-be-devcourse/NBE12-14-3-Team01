@@ -288,11 +288,11 @@ Task 이름은 작업 이름이며 Test ID가 아니다 (Test는 TEST-INVENTORY�
 | Task | 목표 | 범위 | 산출물 | 선행 |
 |---|---|---|---|---|
 | V5-J1 | 현재 Java 알림 동작 확인 | 코드 읽기: 목록 Query(`rm.leftAt is null`), 읽음(`findByIdForUpdate` → 본인·현재 소속 확인 → `markAsRead`), 7개 Listener(AFTER_COMMIT, 예외 로그), 생성(`REQUIRES_NEW`), 받는 사람 조회(`findAllById`) | 동작 표 (Delivery Sheet V5 초안) | — |
-| V5-J2 | 알림 HTTP 계약 고정 | `GET /notifications`, `PATCH /notifications/{id}/read` — 성공, 없는 ID, 남의 알림, 과거 소속 알림, 이미 읽은 알림 다시 읽기, 무토큰 401. JSON Field 이름·자료형·null, 다른 알림 불변 | Java Test (Security Filter 포함) | G-A2 범위 합의 (`ApiResponse` 부분) |
-| V5-J3 | Commit 후 알림·Rollback·알림 실패 | 현재 Event 6개 × G-A3의 4경우. 알림 실패는 Test 전용 Bean 교체(`@MockitoSpyBean` 등)로 주입 | Java 통합 Test (Commit 사용, §3-2 규칙) | V4 Owner와 V4-N-04 범위 조율 |
+| V5-J2 | 알림 HTTP 계약 고정 | `GET /notifications`, `PATCH /notifications/{id}/read` — 성공, 없는 ID, 남의 알림, 과거 소속 알림, 이미 읽은 알림 다시 읽기, 무토큰 401. JSON Field 이름·자료형·null, 다른 알림 불변 | Java Test (Security Filter 포함) | G-A2 범위 합의 (`ApiResponse` 부분). **진행 (2026-10-26): Test PR #16 Draft, V5-N-21~30, 로컬 10/10·전체 404/404, CI 성공 (EV-017~020), `develop` 미반영** |
+| V5-J3 | Commit 후 알림·Rollback·알림 실패 | 현재 대타 Event 6개 × G-A3의 4경우. **근무표 공개 알림(Listener 7번째)의 Rollback·알림 실패 경우를 넣을지는 J3 분석에서 정한다** — 기존 `SchedulePublishedEventListenerIntegrationTest`(Service Mock, Commit 후 호출 시점만)와 V3 `ShiftScheduleConcurrencyTest`(공개 알림 Row 수 일부)를 먼저 대조하고, 경로 담당(V3 Owner)과 위치를 정한다 (중복 작성 금지). 알림 실패는 Test 전용 Bean 교체(`@MockitoSpyBean` 등)로 주입 | Java 통합 Test (Commit 사용, §3-2 규칙) | V4 Owner와 V4-N-04 범위 조율 |
 | V5-J4 | 목록 Query·소속 격리 | 현재 소속만 반환, 종료된 소속 알림 제외, 다른 사용자 알림 제외 (MySQL) | Java Repository·통합 Test | — |
 | V5-J5 | Java 회귀 기준선 기록 | J2~J4 + 기존 394 실행, EV 기록 | TEST-EVIDENCE EV | J2~J4 |
-| V5-K1 | V5 Kotlin 전환 (Step 2) | Production만 | Migration PR | J5, E2·E3 결과 |
+| V5-K1 | V5 Kotlin 전환 (Step 2) | Production만 | Migration PR | J5, E2·E3 결과 (= V5 **전환 관문**. 진행 상태는 MIGRATION-MATRIX §2에 기록) |
 | V5-I1 | V3 알림 정책 (Step 5) | 새 Type·받는 사람 규칙·X-4·읽음 code | Feature PR | 정책 승인 |
 
 **V5에서 특히 볼 불변식:** 업무가 실패하면 알림 0건 / 업무가 성공하면 알림 실패가 업무를 되돌리지 않음 / 받지 않아야 할 사람 0건 (PENDING 후보, 실행한 관리자, 다른 소속) / 같은 알림을 동시에 읽어도 첫 `readAt` 유지.
@@ -304,4 +304,5 @@ Task 이름은 작업 이름이며 Test ID가 아니다 (Test는 TEST-INVENTORY�
 | 2026-10-25 | 초안. Domain별 출발점, 작업 순서 Step 0~6과 통과 조건, Test 작성 규칙 (Assertion 깊이, 공유 MySQL DB 규칙, 이름), Java Test 형식 예시 4종 (HTTP 계약·Commit 후 알림·Rollback·순서 강제), 경로 준비·통합 Test 소유, PR 확인 목록, V5 알림·동시성 담당 진행 순서 |
 | 2026-10-25 | 교차 검토 반영: 합의 전 제안 명시, 필요한 만큼만 추가, 역할 4종(경로 Owner·Domain Owner·공통 Owner·통합 리뷰), 통합 검증은 Domain 전환 직후 작게 반복, 공유 DB 규칙에 조회 범위·충분조건 아님 추가, 계획에 없던 항목 임시 담당 백혜승 (재배정 가능, 팀 확인 전), V5 Java 고정 Task 분할 J1~J5·K1·I1 |
 | 2026-10-25 | 보완: `.contextPath`만으로 Filter 동작을 단정하지 않음 — AUTH-004(Security entry point)·AUTH-005/006(우리 Filter만)·정상 Token 세 경우로 확인, 예시에 요청 URI·Context Path 주석 |
+| 2026-10-26 | §7-3: V5-J2 진행 (PR #16), V5-J3 범위에 근무표 공개 포함 여부는 J3 분석에서 결정 (기존 V3·V5 Test 대조), V5-K1 선행조건이 전환 관문이며 진행 상태는 MATRIX §2라는 위치 표시 |
 | 2026-10-25 | 정정 (V5-J1 정적 확인): §4-1 HTTP 예시가 Context Path 없이 호출해 실제 Filter를 건너뛰는 형태였음 → `/api/v1/...` + `.contextPath("/api/v1")`로 수정, 인증 경계 Test와 응답 형식 Test 구분 명시 |

@@ -358,6 +358,16 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | V4-T-35 `list_NotManager_ThrowsException` | `WPL-004` | 그대로 (근무지 ID가 Path에 있음) | API-CATALOG §5-5 | — |
 | `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) — B-2 내 과거 소속 알림 (S3-B 분리) | `NOT-002` 403 | **미정 — G03-D-16 (`PENDING`) 결정 대기.** 현재 잠정 규칙(§5-5 "실행자 자신의 소속 종료 → 403")대로면 그대로, USER-PATH-REVIEW §9-2 선택지 B'면 404. 결정 전에는 변경 대상으로 확정하지 않는다 | G03-D-16, USER-PATH-REVIEW §9-2 | 팀 결정 후 |
 | ML-3 기존 거절 종료 판정 (V4-T-10) | `ALL_CANDIDATES_REJECTED` | 그대로 (INELIGIBLE 후보가 없는 Fixture) | ML-3 V4-N-22는 새 경우만 확인 | — |
+| **V5-N-28** `NotificationHttpContractTest.markAsReadFailsWhenNotificationBelongsToAnotherUser` (PR #16, V5-J2) | `NOT-002` 403, DB `readAt` 불변 | **변경 후보.** 위 L187 행과 같은 질문 (M3-T5를 따르면 404). 팀 결정 전에는 변경 대상으로 확정하지 않는다 | G03-D-10, M3-T5 (V5-N-18) | 팀 결정 후 |
+| **V5-N-29** `…markAsReadFailsWhenRecipientMembershipLeft` (PR #16) | `NOT-002` 403, DB `readAt` 불변 | **변경 후보.** 위 L240 행과 같은 질문 (G03-D-16 결정 대기) | G03-D-16, USER-PATH-REVIEW §9-2 | 팀 결정 후 |
+| **V5-N-23** `…getNotificationsReturnsOnlyOwnActiveMembershipNotifications`의 "퇴사한 소속 알림 제외" 부분 (PR #16) | 목록에서 제외 | **변경 후보.** 퇴사했거나 다시 가입한 사람에게 이전 소속 알림을 보여 줄지 | G03-D-16, G03-D-11, ML-H2 | 팀 결정 후 |
+| V5-N-27 `…markAsReadFailsWhenNotificationNotFound` (PR #16) | `NOT-001` 404 | **연관만 (유지 예상).** 없는 ID의 404는 G03-D-10이 어떻게 정해져도 바뀔 가능성이 낮다 | G03-D-10 | — |
+| V5-N-23~26의 성공 `code` `"200"` (PR #16) | `"200"` | **연관만 (유지 예상).** G03-D-10 제목에 Success code가 포함됨 (G-03 P-38) | G03-D-10 | — |
+| `NotificationReadConcurrencyTest` | 동시 읽음 후 첫 `readAt` 유지 | **연관만 (기대값 유지 예상).** CHG-07은 Lock과 권한 확인의 **순서**만 바꾼다 | CHG-07 | CHG-07 승인 후 (순서 변경만) |
+
+**구분:** "변경 후보" = 그 결정에 따라 기대값이 바뀔 수 있음. "연관만" = 같은 결정과 관련 있지만 기대값은 유지될 것으로 예상.
+
+**운영 규칙 (제안, 2026-10-26):** 정책 결정으로 Test 기대값을 바꿀 때는 **같은 PR에서 이 §5-4 행과 `DECISION-LOG`의 해당 ID를 함께 갱신**한다. 그래야 Test가 실패했을 때 의도한 정책 변경인지, Kotlin 전환 실수인지 구분할 수 있다. 결정이 `PENDING`인 동안 이 표의 Improvement 기대값은 확정이 아니다.
 
 ## 6. V5 Notification (S2-5B 신설)
 
@@ -372,6 +382,30 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | V5-N-20 | NOTIFICATION-TYPES §5 (실행자 = 요청자) | PROPOSED_IMPROVEMENT | S3-A 추가. NT-T 번호 없음 |
 
 V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Delivery Sheet 때 붙인다. 기존 V4-N-04(Substitute Event별 알림 Row)는 V4에 두고 V5-N-01~ 와 관련 연결만 한다.
+
+### 6-1. V5-J2 알림 HTTP 계약 (V5-N-21~30)
+
+[DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3 V5-J2. **현재 Java 알림 API의 HTTP 계약을 고정**한 Test다. 구분 `MIGRATION` (현재 동작 고정, 새 계약을 정하는 Test 아님). ④ `IMPLEMENTED` — Test PR #16 (**Draft, `develop` 미반영**). Class: `domain.notification.controller.NotificationHttpContractTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`, `/api/v1/...` + `.contextPath("/api/v1")`로 실제 `CustomAuthenticationFilter`·Security 설정 통과, `TestClock`, MYSQL_TC, `@Transactional` Rollback, DB 확인은 `flush()`·`clear()` 후 재조회).
+
+| Test ID | Method | 확인하는 현재 Java 동작 | ⑤ 실행 |
+|---|---|---|---|
+| V5-N-21 | `getNotificationsRequiresAuthentication` | Token 없이 `GET /api/v1/notifications` → 401 `AUTH-004`, `data: null` | LOCAL_PASSED |
+| V5-N-22 | `markAsReadRequiresAuthentication` | Token 없이 `PATCH …/{id}/read` → 401 `AUTH-004`, DB `readAt` 불변 | LOCAL_PASSED |
+| V5-N-23 | `getNotificationsReturnsOnlyOwnActiveMembershipNotifications` | 현재 소속의 내 알림만 (다른 사용자·퇴사한 소속 제외), `createdAt` 내림차순 → id 내림차순, 항목 key 7개와 자료형, 안 읽은 알림 `readAt: null` key 유지 | LOCAL_PASSED |
+| V5-N-24 | `getNotificationsReturnsEmptyArrayWhenNoNotification` | 알림이 없으면 `data: []` | LOCAL_PASSED |
+| V5-N-25 | `markAsReadUpdatesOnlyTargetNotification` | 200, `data` = {`notificationId`, `readAt`}, 응답과 DB `readAt` 같음, 다른 알림 불변 | LOCAL_PASSED |
+| V5-N-26 | `markAsReadTwiceKeepsFirstReadAt` | 다시 읽음 처리해도 200, 최초 `readAt` 유지 (응답·DB) | LOCAL_PASSED |
+| V5-N-27 | `markAsReadFailsWhenNotificationNotFound` | 없는 ID → 404 `NOT-001` | LOCAL_PASSED |
+| V5-N-28 | `markAsReadFailsWhenNotificationBelongsToAnotherUser` | 남의 알림 → 403 `NOT-002`, DB 불변 (§5-4 변경 후보) | LOCAL_PASSED |
+| V5-N-29 | `markAsReadFailsWhenRecipientMembershipLeft` | 퇴사한 소속의 내 알림 → 403 `NOT-002`, DB 불변 (§5-4 변경 후보) | LOCAL_PASSED |
+| V5-N-30 | `dateTimeWithFractionalSecondsContract` + V5-N-23·25·26 안의 날짜 검사 | `LocalDateTime` JSON 문자열: 시간대 표기 없음, 초 표시, 소수 초 끝 0 생략 (`…T10:00:00`, `…T10:00:00.123456`, `…T12:00:00.5`), DB 재조회 값과 같음. 나노초(7자리 이상)는 범위 밖 | LOCAL_PASSED |
+
+**⑤ 상태의 뜻 (섞지 않는다):**
+- `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 10/10 (EV-017), 전체 404/404 (EV-018). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- CI: PR #16의 `Backend CI`·`Docker Build CI Test` 성공 (EV-020). **Workflow 단위 성공**이며 개별 Test 결과 근거가 아니다.
+- `develop` 미반영: PR #16 Merge 전까지 `develop`에는 이 Test가 없다. G-A2(PR #15)와 **합쳐 실행한 적 없음** (예상 410건, TEST-GAP-ANALYSIS §4-1 C5).
+- Kotlin Migration 이후: `NOT_RUN`.
+- 범위 밖 (이 Test가 보장하지 않음): Commit 후 알림 생성·Rollback·알림 실패 (V5-J3), `AUTH-005`·`006` 자체 (기존 `CustomAuthenticationFilterTest`), Frontend 화면·다른 브라우저의 날짜 해석. P2로 미룬 것: V5-N-31 (잘못된 ID 형식 `COM-003`), V5-N-32 (알림 API의 `AUTH-006`).
 
 ## 7. 공통 `global` (CM) — G-A2 공통 응답 계약
 
@@ -402,4 +436,5 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S3-A: §5-4 V4-T-26·39·74를 W안으로 갱신 (V4-T-74는 code 그대로·순서만 변경), 알림 읽음 행에 Lock 분리 표시, §5-1에 V4-N-49~54 (API-SB-02)·V5-N-20, §6에 V5-N-19·20 |
 | 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
 | 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
+| 2026-10-26 | V5-J2: §5-4에 알림 Test 6행 (V5-N-28·29·23 변경 후보, V5-N-27·성공 code·읽음 동시성 연관만)과 구분·운영 규칙, §6-1에 V5-N-21~30 (PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN`) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |

@@ -166,7 +166,7 @@
 | `COM-001` | 400 | INPUT | 요청 값이 올바르지 않습니다. | GlobalExceptionHandler.handleMethodArgumentNotValidException L63 | 정상 | 11 | — |
 | `COM-002` | 400 | INPUT | 요청 형식이 올바르지 않습니다. | GlobalExceptionHandler.handleHttpMessageNotReadableException L44 | 정상 | 9 | — |
 | `COM-003` | 400 | INPUT | 요청 파라미터가 올바르지 않습니다. | GlobalExceptionHandler.handleMethodArgumentTypeMismatchException L95<br>GlobalExceptionHandler.handleMissingServletRequestParameterException L109 | 정상 | 4 | — |
-| `COM-500` | 500 | INTERNAL | 서버 내부 오류가 발생했습니다. | GlobalExceptionHandler.handleException L120 | T3 HTTP 번호 형식 | 1 | — |
+| `COM-500` | 500 | INTERNAL | 서버 내부 오류가 발생했습니다. | GlobalExceptionHandler.handleException L120 | T3 HTTP 번호 형식. **R1 (Known Limitation, 2026-10-26):** 현재 Java MockMvc에서 **Controller가 없는 URL** 요청도 이 처리로 와 500 `COM-500`이 관찰됨 (`NoResourceFoundException` 처리 없음). 의도된 최종 오류 계약이 아니며, 올바른 HTTP Status·ErrorCode는 별도 결정 후 수정. 지원하지 않는 HTTP Method(405 예상)가 여기로 오는지는 미검증 (추정) | 1 | — |
 
 ## 4. 새 code 예약 (`PROPOSED`, Enum 미적용)
 
@@ -249,3 +249,4 @@
 | 2026-10-25 | 초안 (S2-4A). 87개 전체 목록(사용처·Test 참조·Frontend 의존), T1 3건 추가 발견(T1-03~05), 한 code 두 의미 M-01, 잠재 L-01, Test 참조 0인 code 11개, 새 code 12개 예약과 재사용 표, Frontend 분기 연결, 질문 2개 |
 | 2026-10-25 | 질문 2개 사용자 잠정 결정 반영 (§6). 정정 범위·우선순위·영향 Test 표(§2-7), 범위 밖 404 응답이 없는 ID와 같은지 정적 확인, `WPL-011`·`SFT-021`의 공통 형식, `SUB-006` 두 사용처 대조 |
 | 2026-10-25 | S2-5B: Test 0 code 11개를 TEST-INVENTORY §5-3에 연결 |
+| 2026-10-26 | `COM-500` 행에 R1 관찰 기록 (Controller 없는 URL → 500, 최종 계약 아님, 405 경로 미검증). 정상 정책으로 확정하지 않음 |

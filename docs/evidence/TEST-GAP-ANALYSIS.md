@@ -52,9 +52,9 @@ ID 규칙: `G-<분류><번호>`는 **공백 ID**다. Test를 만들 때는 TEST-
 
 | ID | 공백 | 근거 | Domain | 우선 | 시점 | 관련 Test ID |
 |---|---|---|---|---|---|---|
-| G-A1 | **HTTP 계약 Snapshot** (Status, `ApiResponse` 형식, Field 이름·자료형, null 포함 여부, 날짜 형식, ErrorCode·문구) — HTTP Test가 없는 Controller 6개. **한 번에 전부 만들지 않는다:** 순서 = G-A2 공통 → 알림 핵심 → 대타 핵심 → Shift·불가능 시간 (각 Domain 전환 직전). Endpoint마다 대표 성공·대표 실패·Validation 실패부터 | §2: Controller 10개 중 6개 HTTP 0. DTO record → `data class` 전환에서 JSON이 바뀌어도 지금 Test는 모른다 (KOTLIN-REVIEW-CHECKLIST §1) | V4 (3), V5, V3 (Shift·UnavailableTime) | **최우선** | 그 Domain 전환 **전** | V4-N-01 (명세됨). V5·V3는 등록 필요 |
+| G-A1 | **HTTP 계약 Snapshot** (Status, `ApiResponse` 형식, Field 이름·자료형, null 포함 여부, 날짜 형식, ErrorCode·문구) — HTTP Test가 없는 Controller 6개. **한 번에 전부 만들지 않는다:** 순서 = G-A2 공통 → 알림 핵심 → 대타 핵심 → Shift·불가능 시간 (각 Domain 전환 직전). Endpoint마다 대표 성공·대표 실패·Validation 실패부터 | §2: Controller 10개 중 6개 HTTP 0. DTO record → `data class` 전환에서 JSON이 바뀌어도 지금 Test는 모른다 (KOTLIN-REVIEW-CHECKLIST §1) | V4 (3), V5, V3 (Shift·UnavailableTime) | **최우선** | 그 Domain 전환 **전** | V4-N-01 (명세됨). **V5: V5-N-21~30 (2026-10-26, PR #16 Draft)**. V3는 등록 필요 |
 | G-A2 | **공통 응답·예외 형식** (`ApiResponse`의 `success` Field 이름, `GlobalExceptionHandler` 매핑, Validation 실패 `COM-001`). **→ 2026-10-26 대표 계약 Java 고정 (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공). 남은 부분은 §4-1** | `ApiResponse.success`의 Java 접근자 `isSuccess()`와 JSON 이름이 전환에서 갈릴 수 있음 (S2-6B) | 공통 | **최우선** | `global` 전환 전 | `ApiResponseTest`·`GlobalExceptionHandlerTest` 보강 (JSON 수준) |
-| G-A3 | **Commit 후 알림 생성 통합 Test (현재 Java 동작 고정)** — **지금 Java에 있는** 대타 6개 Event (요청 생성 `SUBSTITUTE_REQUEST_RECEIVED`, 후보 없음 `SUBSTITUTE_NO_CANDIDATE`, 수락 `SUBSTITUTE_ACCEPTED`, 전원 거절 `SUBSTITUTE_ALL_REJECTED`, 승인 `SUBSTITUTE_APPROVED`, 관리자 종료 `SUBSTITUTE_MANAGER_CLOSED`). 확인할 경우: ① 업무 Commit → 받는 사람·Type·Row 수 ② **업무 Rollback → 그 업무의 알림 0건** ③ **알림 저장 실패 → 업무 Commit은 유지** (AFTER_COMMIT 이후라 되돌릴 수 없음, Listener가 예외를 잡아 로그만) ④ 받는 사람 조회 실패 시 그 사건 알림 전체 누락 (AS-IS 한계). V3 새 Type(`SUBSTITUTE_SHIFT_CHANGED` 등)·받는 사람 규칙(R1~R5, X-4)·퇴사자 필터는 **C (Improvement)**이며 여기 기대값으로 넣지 않는다 | §2: Unit(Mock)만. Kotlin 전환에서 Listener Proxy·`REQUIRES_NEW`·phase가 바뀌어도 Unit Test는 모른다 | V5 (+V4 Event) | **최우선** | V4·V5 전환 전 | V4-N-04 (명세됨) |
+| G-A3 | **Commit 후 알림 생성 통합 Test (현재 Java 동작 고정)** — **지금 Java에 있는** 대타 6개 Event (요청 생성 `SUBSTITUTE_REQUEST_RECEIVED`, 후보 없음 `SUBSTITUTE_NO_CANDIDATE`, 수락 `SUBSTITUTE_ACCEPTED`, 전원 거절 `SUBSTITUTE_ALL_REJECTED`, 승인 `SUBSTITUTE_APPROVED`, 관리자 종료 `SUBSTITUTE_MANAGER_CLOSED`). 확인할 경우: ① 업무 Commit → 받는 사람·Type·Row 수 ② **업무 Rollback → 그 업무의 알림 0건** ③ **알림 저장 실패 → 업무 Commit은 유지** (AFTER_COMMIT 이후라 되돌릴 수 없음, Listener가 예외를 잡아 로그만) ④ 받는 사람 조회 실패 시 그 사건 알림 전체 누락 (AS-IS 한계). V3 새 Type(`SUBSTITUTE_SHIFT_CHANGED` 등)·받는 사람 규칙(R1~R5, X-4)·퇴사자 필터는 **C (Improvement)**이며 여기 기대값으로 넣지 않는다 | §2: Unit(Mock)만. Kotlin 전환에서 Listener Proxy·`REQUIRES_NEW`·phase가 바뀌어도 Unit Test는 모른다 | V5 (+V4 Event) | **최우선** | V4·V5 전환 전 | V4-N-04 (명세됨). **범위 확인 필요 (2026-10-26):** Listener는 7개(대타 6 + 근무표 공개 1). 근무표 공개 알림의 Rollback·알림 실패 경우를 이 항목에 넣을지는 V5-J3 분석에서 정한다 — 기존 `SchedulePublishedEventListenerIntegrationTest`는 Service를 Mock으로 둬 Commit 후 호출 시점만, V3 `ShiftScheduleConcurrencyTest.publishAndModifyKeepAssigneeAndNotificationConsistent`가 공개 알림 Row 수를 일부 확인 (중복 작성 주의) |
 | G-A4 | **Transaction Rollback·원자성** — 대타 승인 실패 시 Request·Candidate·Shift 불변 | 근무표·근무지는 Rollback Test 있음, 대타는 없음 | V4 | 높음 | V4 전환 전 | V4-N-02 (명세됨) |
 | G-A5 | **실제 Security Filter 경계** — 대타·알림·근무 API의 무토큰 401, 다른 근무지 403/404 (현재 값 그대로) | §2: Filter 포함 HTTP Test는 근무지·회원·Pattern만. G03-OQ-01 (`/workplaces/**` permitAll) | 각 Domain | 높음 | 그 Domain 전환 전 | AUTH-EV-01 (IMP-01) |
 | G-A6 | **Test 없는 ErrorCode 11개** | TEST-INVENTORY §5-3 | V3, V4 | 중간 | 전환 전 | V3-N-24~32, V4-N-48 (명세됨) |
@@ -114,12 +114,36 @@ Frontend에 Test 체계가 없다 (`eslint`만). **이 공백은 해소되지 �
 
 | 아직 검증하지 않음 | 다음 |
 |---|---|
-| 인증 Filter·Security가 직접 쓰는 응답 `AUTH-004`·`005`·`006`과 정상 Token 경로 | V5-J2 |
-| 도메인 DTO의 날짜·시간 형식 (`LocalDateTime` 직렬화) | V5-J2 (알림 `createdAt`·`readAt`)부터 |
+| ~~인증 Filter·Security가 직접 쓰는 응답 `AUTH-004`·`005`·`006`과 정상 Token 경로~~ → 아래 V5-J2 표로 분리 | — |
+| 도메인 DTO의 날짜·시간 형식 (`LocalDateTime` 직렬화) — **알림 DTO는 V5-J2로 고정, 다른 Domain DTO는 남음** | 각 Domain G-A1 |
 | Commit 후 알림 생성 (AFTER_COMMIT), Rollback·알림 실패 | V5-J3 (G-A3) |
 | `COM-002`(요청 본문 오류), `COM-003`, `COM-500` 경로 | 필요 시 G-A2 추가 |
 | 각 Domain API의 HTTP 계약 | G-A1 (Domain별, 전환 직전) — G-A2와 별개 |
 | Kotlin Migration 이후 계약 유지 | 전환 PR에서 CM-N-01~06 재실행 |
+
+**V5-J2 — 현재 Java 알림 HTTP 계약 고정 (2026-10-26, Test PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공)**
+
+| 해결 (Test로 고정) | Test ID | 근거 |
+|---|---|---|
+| 알림 API의 인증 필수: 무토큰 → Security entry point 401 `AUTH-004` | V5-N-21·22 | EV-017·018 |
+| 정상 Token이 실제 `CustomAuthenticationFilter`를 통과해 인증됨 (정상 Token Test 7개) | V5-N-23~29 | EV-017·018 |
+| 목록 범위·정렬·항목 key, 읽음·다시 읽음, 없는 ID 404, 남의 알림·퇴사한 소속 403 (현재 값) | V5-N-23~29 | EV-017·018 |
+| 알림 DTO 날짜 문자열 (시간대 없음, 소수 초 0·6자리·끝 0 생략), `readAt: null` key 유지 | V5-N-30 | EV-017·018 |
+
+| 아직 검증하지 않음 | 다음 |
+|---|---|
+| `AUTH-005`(Bearer 형식 아님)·`AUTH-006`(잘못된 Token) — 기존 `CustomAuthenticationFilterTest`가 `/auth/me`에서 보호. 알림 API에서의 확인은 P2 (V5-N-32) | 필요 시 |
+| 다른 Domain DTO의 날짜 형식 | 각 Domain G-A1 |
+| Commit 후 알림·Rollback·알림 실패 | V5-J3 (G-A3) |
+| 목록 Query·소속 격리를 MySQL에서 (Query 단위) | V5-J4 (G-A8) |
+
+**Known Limitation과 미실행 (2026-10-26):**
+
+| ID | 내용 | 상태 |
+|---|---|---|
+| R1 | 현재 Java MockMvc에서 **Controller가 없는 URL** 요청이 404가 아니라 **500 `COM-500`**으로 처리되는 것을 관찰 (`NoResourceFoundException` 처리 없음 → 마지막 `Exception` 처리). 의도된 최종 오류 계약이 아니며 **Test로 고정하지 않는다.** 올바른 Status·ErrorCode는 별도 결정 후 수정 (MIGRATION-MATRIX §4 공통, ERROR-CODES `COM-500`). 지원하지 않는 HTTP Method(405 예상) 경로가 500이 되는지는 **미검증 (추정)** | Known Limitation |
+| R2 | 날짜 문자열의 소수 초 길이가 매번 다를 수 있다 (`…:00`, `….5`, `….123456`). Frontend의 해석 방식은 Node v24(V8)에서만 세 형식 모두 올바름을 확인. **Safari 등 다른 브라우저는 미검증** (ECMAScript 표준 형식은 소수 초 3자리) | 미검증 (Frontend 통합 과제) |
+| C5 | G-A2(PR #15)와 V5-J2(PR #16)를 **합친 상태(예상 410건)는 실행한 적 없음.** 두 PR CI는 각각 base `a148a62` 기준. 한쪽이 먼저 Merge되면 다른 쪽은 **바뀐 `develop` 기준으로 CI를 다시 실행**해 성공을 확인한 뒤 Merge한다 (base가 바뀌어도 CI는 자동으로 다시 돌지 않음) | 미실행 |
 
 ## 5. Kotlin 전환 전 최우선 회귀 Test (요약)
 
@@ -137,4 +161,5 @@ Frontend에 Test 체계가 없다 (`eslint`만). **이 공백은 해소되지 �
 |---|---|
 | 2026-10-25 | 초안. E1 기준선과 정적 분석 기반 검증 수준 기준(L0~L5), 기존 Test 구조(DB 분포, HTTP Controller 공백, 알림 Listener, 공유 MySQL DB 정리 방식), 경로별 수준, 공백 A8·B5·D5·E6, Kotlin 전환 전 최우선 회귀 Test |
 | 2026-10-25 | Commit 전 보완: §3 "최고 수준"의 뜻 (누적 아님), G-A1 작성 순서 (공통 → 알림 → 대타 → 근무), G-A3를 현재 Java Event 6개 고정으로 한정하고 Commit·Rollback·알림 실패·묶음 누락 4경우 명시 (V3 규칙은 C), 공유 DB에서 고유 데이터만으로 부족한 경우와 정리 전략 결정 시점, Frontend 공백 미해소·자동화 후보 구분 |
+| 2026-10-26 | V5-J2 진행 반영: §4-1 AUTH 행 분리 (V5-J2 = `AUTH-004`·정상 Token, `005`·`006`은 기존 Filter Test), 날짜 행을 "알림 완료·다른 DTO 남음"으로, V5-J2 해결·미검증 표, R1·R2 Known Limitation, C5 결합 미실행. G-A1 관련 ID에 V5-N-21~30, G-A3에 근무표 공개 포함 여부와 기존 V3 Test 메모 |
 | 2026-10-26 | G-A2 진행 반영: G-A2 행 상태, §4-1 진행 현황 (해결한 계약 5종과 남은 6종), §5 요약. Test 코드는 PR #15 (Draft, `develop` 미반영) |
