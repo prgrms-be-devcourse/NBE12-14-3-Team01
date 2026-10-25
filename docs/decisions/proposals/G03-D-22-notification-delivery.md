@@ -119,7 +119,7 @@
 | 전원 거절, 관리자 종료, 승인 | SUB-05 (요청자). **수락했던 후보: D22-4 화면** | 요청자 있음. 후보는 D22-4 구현 후 |
 | (예정) 근무 취소·인계 | 빠진 근무 (ML-4) | Draft |
 | (예정) 새 배정 | 예정 근무 | 있음 |
-| (예정) 대타 종료 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` | SUB-05 (label 추가), D22-4 화면 | Draft |
+| (예정) 대타 종료 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` | SUB-05 (label 추가), D22-4 화면. PENDING 후보·실행한 관리자는 받지 않음 ([NOTIFICATION-TYPES](../../contract/NOTIFICATION-TYPES.md) §6-3) | Draft |
 | (예정) 가입·재가입 | 관리자 구성원 목록 | 있음 |
 | (예정) 퇴사 결과 | 마이페이지 "내 소속 이력" (ML-4). 알림 자체는 퇴사자에게 보이지 않음 (§2) | Draft |
 

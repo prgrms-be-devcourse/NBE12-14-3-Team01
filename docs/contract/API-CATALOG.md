@@ -110,7 +110,7 @@
 | 권한 | 그 근무지의 현재 MANAGER |
 | 대상 | PUBLISHED·SCHEDULED·시작 전 근무. Path `workplaceId`·`scheduleId`·`shiftId`의 관계(`Shift → Schedule → Workplace`)가 맞지 않거나 없으면 404 (§1) |
 | 요청 | 없음 (사유 Code는 서버가 `MANAGER_CANCELLED`로 기록, ML-2 D26-3). 자유 입력 사유를 받을지는 범위 밖 (카드에 없음) |
-| 성공 응답 | 200 + 취소된 근무 (상태, 취소 사유·시각) |
+| 성공 응답 | 200 + 취소된 근무 (상태, 취소 사유·시각) + `closedSubstituteRequests` (이번 Command의 Transaction에서 OPEN·ACCEPTED → CLOSED로 실제 바뀐 서로 다른 대타 요청 수. 이미 APPROVED·CLOSED였던 요청, 후보 수, 알림 수, 근무 수는 세지 않는다). 실행한 관리자는 이 응답으로 결과를 보고 대타 종료 알림을 받지 않는다 ([NOTIFICATION-TYPES](NOTIFICATION-TYPES.md) §6-3) |
 | 오류 | 409 STATE_CONFLICT (이미 취소, 시작한 근무, PUBLISHED 아님) |
 | 상태 변경 (한 Transaction) | `CANCELLED` + 취소 사유·시각·행위자 / 그 근무의 활성 Request → `CLOSED / SHIFT_CHANGED` (ML-3-Q1). APPROVED Request는 과거 이력으로 그대로 (ML-3-H) |
 | Lock (ML-5 후보) | Schedule → Shift → 그 근무의 활성 Request |
@@ -126,7 +126,7 @@
 | 대상 | PUBLISHED·SCHEDULED·시작 전 근무. Path 관계 불일치·없음은 404 (§1). `targetMemberId`가 그 근무지에 없거나 다른 근무지 것이어도 404 |
 | 요청 | `targetMemberId` (새 담당의 현재 WorkplaceMember ID), `acknowledgedUnavailableConflicts[]` |
 | 검사 | 새 담당 현재 소속, 같은 근무표 안 겹침, 다른 근무지 공식 근무 겹침 (우회 불가), 불가능 시간 (확인 범위), 현재 담당과 같은 사람이면 거부 (409 STATE_CONFLICT 후보) |
-| 성공 응답 | 200 + 근무 (같은 근무 ID, 새 담당) |
+| 성공 응답 | 200 + 근무 (같은 근무 ID, 새 담당) + `closedSubstituteRequests` (세는 규칙은 API-PS-02와 같다). 실행한 관리자는 대타 종료 알림을 받지 않는다 (NOTIFICATION-TYPES §6-3) |
 | 상태 변경 (한 Transaction) | `Shift.member = 새 담당` / 배정 이력 1건 (`MANAGER_REASSIGNED`, 이전·새 담당, 행위자, 시각, ML-2 D27-4. 이력 저장 실패 시 전체 Rollback) / 그 근무의 활성 Request → `CLOSED / SHIFT_CHANGED` |
 | Lock (ML-5 후보) | Schedule → Shift → 그 근무의 활성 Request → 새 담당 User → 새 담당 소속 `FOR SHARE` |
 | 알림 | 새 담당 (근무 배정), 이전 담당 (다른 직원에게 넘어감, 현재 소속일 때), 대타 종료 관련자. 대체 조회 화면: 예정 근무, 빠진 근무 |

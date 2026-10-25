@@ -256,6 +256,7 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 새 종료 사유 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE`의 `closedAt` | [G03-D-19](G03-D-19-expiry.md) §0-2, [G03-D-22](G03-D-22-notification-delivery.md) §4-3 | Command 시각을 DB `closedAt`에 저장 (B1 미적용). 구현 계약에서 확인 |
 | ML-3-H (APPROVED는 과거 이력) | [G03-D-22](G03-D-22-notification-delivery.md) S22-c | 승인된 수락자에게 "승인됨" 표시, 현재 담당과 구분. 승인 응답 DTO 재사용 금지 |
 | 알림 전달 보장 | [G03-D-22](G03-D-22-notification-delivery.md) D22-1·5 | 최선 노력. Outbox 등은 후속 |
+| L126 알림 받는 사람 ("요청자, ACCEPTED·PENDING 후보, 현재 관리자") | [NOTIFICATION-TYPES](../../contract/NOTIFICATION-TYPES.md) §6-3 | `SHIFT_CHANGED` 종료에서 **PENDING 후보와 실행한 관리자는 받지 않는다** (사용자 잠정 결정 2026-10-25). 원래 문장은 그대로 둠 |
 
 ## 16. 변경 이력
 
