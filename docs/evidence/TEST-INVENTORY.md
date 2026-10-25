@@ -2,7 +2,7 @@
 
 > ③ 문서 리뷰: **DRAFT** (D0-C-R 2026-10-23, D0-D 이관). 상태값은 `docs/STATUS-AXES.md`의 ④ 준비, ⑤ 실행 축을 쓴다.
 > 실제 실행 결과는 `docs/evidence/TEST-EVIDENCE.md`(Append-only)에 남기고, 이 Inventory는 EV-ID로 연결만 한다.
-> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (V4 시범, V2는 ML-H1 카드 관련 부분만).
+> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (V4 시범, V2는 ML-H1 카드 관련 부분만), §5 Cross-Domain 카드의 임시 Test ID.
 
 ## 1. 필드
 
@@ -121,6 +121,12 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-N-05 | SUB-EV-05 / SUB-DC-01 | 동시 ACCEPT 결정적 재현, RC·RR 대조 | H6 · MYSQL_TC RC+RR | PROPOSED_IMPROVEMENT | PENDING (DL-009, DL-010) | **BLOCKED** (Harness LOCAL_ONLY) | Harness 공유 후 가능 |
 | V4-N-06 | ML-SUB-STATE-01 (B+) | 퇴사 후보 `INELIGIBLE` / `CANDIDATE_INELIGIBLE` | — | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (기능 없음) |
 | V4-N-07 | ML-CONCURRENCY-01-R | 퇴사 vs 후보 생성 경합 (H6-ML-01~03) | H6 · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (퇴사 기능 없음). AS-IS 재현만 Test 전용 `left_at` 갱신으로 가능 |
+| V4-N-23 | G03-D-19 D19-1 | 같은 만료 요청을 서로 다른 두 시각(`startAt` 이후)에 변환 → 두 응답의 `closedAt`이 같고 `== startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
+| V4-N-24 | G03-D-19 D19-2 | 만료 요청을 목록 조회한 뒤 DB Row 확인 → status OPEN/ACCEPTED, DB `closedAt` = null 그대로 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT (현재 동작 고정을 겸함) | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
+| V4-N-25 | G03-D-19 D19-1 | `getSentRequests_ReturnsLatestFirst_MarksExpired` (L1633)에 만료 응답 `closedAt == startAt` 확인 추가 (기존 기대값 유지) | UNIT · MOCK | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
+| V4-N-26 | G03-D-19 D19-1, D19-4 | OPEN이고 `now == startAt` → CLOSED / EXPIRED, `closedAt == startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
+
+G03-D-19 관련 기존 Test 변경 후보 (승인 전 변경 금지, `PROCESS-CHARTER` §6-2): V4-T-02 `closedAt` 기대값 `now` → `SHIFT_START` (**기대값 변경**), V4-T-03에 `closedAt == SHIFT_START` 확인 추가. V4-N-08~22는 로컬 ML-3 Draft가 예약한 번호라 G03-D-19는 23부터 쓴다.
 
 신규 행의 선행 조건은 종류가 다르다.
 
@@ -129,6 +135,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-N-01~04 | Kotlin 전환 전 현재 Java 동작 고정 (`MIGRATION`, 동작 변경 0) | 정책 승인 대상 아님. V4 Owner 확정과 Task 승인 (`docs/ai/AI-RULES.md` §1) |
 | V4-N-05 | 현재 동작의 동시성 재현 (Production 변경 0) | 정책 승인이 아니라 DL-009 (Harness 공유)·DL-010 (검증 지위) 결정. Harness가 `LOCAL_ONLY`라 ④ `BLOCKED` |
 | V4-N-06·07 | 새 정책(② `PROPOSED`) 구현 검증 | `DECISION-LOG`의 `APPROVED` 전 작성 금지 (④ `SPECIFIED`까지) |
+| V4-N-23~26 | 새 정책(G03-D-19, ② `PROPOSED`) 구현 검증 | 위와 같음. V4-N-24는 현재 동작 고정을 겸하지만 같은 카드에 묶여 있어 함께 승인 대상 |
 
 V4-N-07의 "AS-IS 재현"은 새 정책 구현 Test가 아니라 별도 후속 항목(ML-CONCURRENCY-02, 아직 이 Inventory에 없음)이며, V4-N-05와 같이 DL-009가 먼저 결정돼야 한다.
 현재 동작 재현 Test 전반에 대한 일반 승인 규칙은 아직 문서화돼 있지 않다 (위 표는 각 행의 기존 기록을 모은 것이다).
@@ -160,3 +167,13 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | `service/WorkplaceServiceIntegrationTest.joinWorkplace` | 정상 가입 (DB) | Row 생성, `leftAt` null | — |
 | `controller/WorkplaceControllerTest.rejectDuplicateJoin` | Service가 WPL-002를 던짐 | 409, `code = WPL-002` | — |
 | `repository/WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` | 같은 조합 두 번 저장 | `DataIntegrityViolationException` | 재가입 구현(ML-H2) 시 기대값 변경 대상. 그때 별도 승인 |
+
+## 5. Cross-Domain 정책 카드의 임시 Test ID (S2에서 정식 번호 부여)
+
+아래 카드의 Test는 여러 Domain에 걸쳐 있어 카드 안에 임시 ID로만 적었다. 로컬 Draft가 예약한 신규 번호(V1-N-01~12, V2-N-06~40, V3-N-01~19, V4-N-08~22)와 겹치지 않도록 S2(Draft 이관)에서 Domain별 번호를 부여해 이 Inventory로 옮긴다. 전부 ④ `SPECIFIED` / ⑤ `NOT_RUN`.
+
+| 카드 | 임시 ID | 개수 | 비고 |
+|---|---|---|---|
+| [`G03-D-21`](../decisions/proposals/G03-D-21-unavailable-time.md) §9 | D21-T1~T9, D21-R1~R5 | 9 + 경합 5 | D21-R은 H6 (ML-5 실험) |
+| [`G03-D-22`](../decisions/proposals/G03-D-22-notification-delivery.md) §9 | D22-T1~T12, D22-T4b | 13 | D22-T4b는 D22-T4의 후속 상태(승인 후 인계)를 확인하는 별도 Test. 정식 번호 부여 때 독립 번호를 준다. V5-N(알림) 번호는 아직 없음 |
+| [`G03-D-03`](../decisions/proposals/G03-D-03-error-code.md) §7 | D03-T1~T5 | 5 | D03-T2·T3는 기존 Test 기대값 변경을 포함 (승인 전 변경 금지) |
