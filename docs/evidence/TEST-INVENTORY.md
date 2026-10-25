@@ -8,7 +8,7 @@
 
 | 필드 | 값 / 규칙 |
 |---|---|
-| Test ID | `{V}-T-{nn}` 기존 Test, `{V}-N-{nn}` 신규 제안 |
+| Test ID | `{V}-T-{nn}` 기존 Test, `{V}-N-{nn}` 신규 제안. `{V}`는 Domain 코드 V1~V5, **공통 `global`은 `CM`** (2026-10-26 G-A2에서 도입, 기존 ID 사용 0건 확인. ErrorCode 접두사 `COM-`과 다름) |
 | Domain / Owner | |
 | Policy ID | 계약 C-ID / CB-ID / Decision ID |
 | Class · Method | 실제 Class 이름과 **Method 이름**. 요약은 DisplayName |
@@ -373,7 +373,26 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 
 V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Delivery Sheet 때 붙인다. 기존 V4-N-04(Substitute Event별 알림 Row)는 V4에 두고 V5-N-01~ 와 관련 연결만 한다.
 
-## 7. 변경 이력
+## 7. 공통 `global` (CM) — G-A2 공통 응답 계약
+
+[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **현재 Java 공통 응답의 대표 계약을 고정**한 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (현재 동작 고정), ④ `IMPLEMENTED` (Test PR #15, **Draft, `develop` 미반영**).
+
+| Test ID | Class · Method | 확인하는 현재 Java 동작 | 종류 · 환경 | ⑤ 실행 |
+|---|---|---|---|---|
+| CM-N-01 | `global.dto.ApiResponseJsonContractTest.successResponseSerializesFourFields` | 응답 key가 정확히 `success`·`code`·`message`·`data`, `success` boolean, `code`·`message` 문자열 | SPRINGBOOT (애플리케이션 Jackson Mapper) · MYSQL_TC 설정 | LOCAL_PASSED |
+| CM-N-02 | `…ApiResponseJsonContractTest.successResponseWithoutDataKeepsNullDataField` | data 없는 성공 응답도 `data: null` key 유지 | 같음 | LOCAL_PASSED |
+| CM-N-03 | `…ApiResponseJsonContractTest.errorResponseWithoutDataKeepsNullDataField` | 오류 응답 `success: false` + `data: null` 유지 | 같음 | LOCAL_PASSED |
+| CM-N-04 | `global.exception.ApiResponseHttpContractTest.signupSuccessResponseContract` | `POST /api/v1/auth/signup` → 201, `code "201"`, `data` key 정확히 `id`(number)·`email`·`name` | HTTP (MockMvc, `/api/v1` Context Path, Security Chain·전역 예외 처리기 포함) · MYSQL_TC, `@Transactional` Rollback | LOCAL_PASSED |
+| CM-N-05 | `…ApiResponseHttpContractTest.businessErrorResponseContract` | 가입하지 않은 이메일 로그인 → 401 `AUTH-002`, 메시지 고정, `data: null` | 같음 | LOCAL_PASSED |
+| CM-N-06 | `…ApiResponseHttpContractTest.validationErrorResponseContract` | 값이 빈 회원가입 → 400 `COM-001`, `data.fieldErrors[].{field, message}`, field 집합 {email, password, name} (문구·순서는 고정 안 함) | 같음 | LOCAL_PASSED |
+
+**⑤ 상태의 뜻 (섞지 않는다):**
+- `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 6/6 (EV-013), 전체 400/400 (EV-014). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위 성공**이며 개별 Test 결과 근거가 아니다 (CI는 Test Report를 보관하지 않음).
+- `develop` 미반영: PR #15가 Merge되기 전까지 `develop`에서는 이 Test가 없다.
+- Kotlin Migration 이후: `NOT_RUN` (전환 후 같은 Test를 다시 실행해야 함).
+
+## 8. 변경 이력
 
 | 일자 | 내용 |
 |---|---|
@@ -383,3 +402,4 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S3-A: §5-4 V4-T-26·39·74를 W안으로 갱신 (V4-T-74는 code 그대로·순서만 변경), 알림 읽음 행에 Lock 분리 표시, §5-1에 V4-N-49~54 (API-SB-02)·V5-N-20, §6에 V5-N-19·20 |
 | 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
 | 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
+| 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
