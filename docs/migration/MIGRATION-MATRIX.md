@@ -15,7 +15,7 @@
 | V3 | Schedule / Shift / Unavailable | `domain/shift/**/Schedule*`, `Shift*`, `UnavailableTime*`, `domain/shift/event/**` | 박세민 |
 | V4 | Substitute | `domain/substitute/**` | 최세현 |
 | V5 | Notification / Event | `domain/notification/**` | 백혜승 |
-| 공통 | Global | `global/config`, `global/dto`, `global/entity`, `global/exception`, `global/util`, `standard` | 공통 설정 Owner (미지정) |
+| 공통 | Global | `global/config`, `global/dto`, `global/entity`, `global/exception`, `global/util`, `standard` | 공통 설정 Owner (미지정 → **임시 담당 백혜승**, 재배정 가능, 팀 확인 전 — [DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §5-4) |
 
 주의: Pattern(V2)은 V3와 같은 `domain/shift` Package에 있다. `ScheduleService`(V3)가 `RegularShiftPattern`을 읽는다.
 
@@ -59,7 +59,12 @@ Java 실행 결과 (모든 V 공통): D0-B 조사 당시 Java Snapshot `243f77c`
 | V4 | 93 | 6 | 114 | 상세 TEST-INVENTORY §3-1-1 |
 | V5 | 19 | 4 | 19 | |
 | 공통 | 33 | 7 | 33 | `KotlinEnvironmentTest` 1 포함 |
-| **합계** | **373** | 38 | **394** | `@Test` 366 + `@ParameterizedTest` 3 (8건) + `@RepeatedTest` 4 (20회). 실제 실행: **`NOT_RUN`** (조건부 비활성화·동적 Test·환경 차이로 실제 수는 다를 수 있음) |
+| **합계** | **373** | 38 | **394** | `@Test` 366 + `@ParameterizedTest` 3 (8건) + `@RepeatedTest` 4 (20회). 실제 실행은 아래 S4-E1 |
+
+**Java 기준선 실행 (S4-E1, 2026-10-25, `LOCAL_ONLY`):** `a148a62`에서 **394 실행 / 394 PASS** 2회 (EV-010, EV-011), `check` (Checkstyle) 통과 (EV-012). 환경: macOS + Oracle GraalVM 25 + Testcontainers MySQL 9.7.2 (EV-009). 정적 계산 394 = 실제 실행 394.
+- 이것은 **Java 기준선의 실행 근거**다. Kotlin Migration 완료, 통합 검증 완료, Migration 안전성 증명이 **아니다**. 위 §2 표의 검증 상태 칸(`UNIT_TEST_VERIFIED` 등)은 Kotlin 전환 PR의 근거이므로 채우지 않는다.
+- 최종 Java Baseline(`BL-TBD`)으로 선언할지는 팀이 정한다. CI(ubuntu, Temurin 25) 결과가 아니다.
+- DB 사용 분포: DB 없음 258 Method / MySQL Testcontainers 106 / H2 9. 기존 Test가 보호하는 범위와 공백은 [`TEST-GAP-ANALYSIS`](../evidence/TEST-GAP-ANALYSIS.md).
 
 Kotlin 전환 PR의 최소 PASS 조건 (제안): 해당 V 행의 기존 Test 전부 + 공통 행 + 전체 `./gradlew check` 통과. Test 기대값 변경 0.
 

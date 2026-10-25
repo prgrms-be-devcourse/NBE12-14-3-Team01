@@ -39,12 +39,13 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 |---|---|---|
 | 2차 `243f77c` | `PASSED` (52/52, skipped 0, failures 0) | 작성자 로컬 Test Report `NBE12-wt/develop-243f77c/backend/build/test-results/test/TEST-com.merge.backend.domain.substitute.*.xml` (3차 저장소에 없음, EV-002, 2026-10-22) |
 | 2차 `8da2bec` (= 3차 `main`) | `UNKNOWN` (Suite success만) | 2차 push CI Backend Run `39729371810` success. 개별 결과 미보존 |
+| 3차 `develop` `a148a62` | **`PASSED`** (394/394 × 2회, `LOCAL_ONLY`) | 로컬 macOS·GraalVM 25·Testcontainers MySQL 9.7.2. EV-010·011 (XML 원본은 저장소 밖), check는 EV-012 |
 | 3차 `develop` `cdaaa13` | `UNKNOWN` (Suite success만) | 3차 push CI Backend Run `39748913867` success (EV-008). Gradle 9.3.0 + Kotlin Plugin 환경 |
 
 `243f77c → 8da2bec` 사이 Substitute Production·Test 파일 변경 0. CI는 `./gradlew check --no-daemon`, Test Filter·`@Disabled`·`@Tag` 없음.
 공통: 구분 `BASELINE`, ④ 준비 `IMPLEMENTED`. 실행 명령 `./gradlew test --tests 'com.merge.backend.domain.substitute.*'`.
 
-**PR #5 이후 (S2-5B, 2026-10-25 정적 확인):** PR #5 (`c0427c2` → `31ecaee`)가 기존 Test 본문 다수와 이름 3개를 바꾸고 41개를 추가했다. 위 `243f77c`의 `PASSED`는 **PR #5 이전 본문** 기준이라 현재 본문으로 옮기지 않는다. 3차 `develop` `a148a62` 기준 대타 Test 93개의 ⑤는 이 문서에 개별 실행 근거가 없어 `UNKNOWN`이다.
+**PR #5 이후 (S2-5B, 2026-10-25 정적 확인):** PR #5 (`c0427c2` → `31ecaee`)가 기존 Test 본문 다수와 이름 3개를 바꾸고 41개를 추가했다. 위 `243f77c`의 `PASSED`는 **PR #5 이전 본문** 기준이라 현재 본문으로 옮기지 않는다. 3차 `develop` `a148a62` 기준 대타 Test 93개의 ⑤는 S4-E1 이전에는 `UNKNOWN`이었다. **S4-E1 (2026-10-25): `a148a62`에서 전체 394건 PASS 2회 (EV-010·011, `LOCAL_ONLY`)** → V4-T-01~93 ⑤ = `PASSED @a148a62 (LOCAL_ONLY, EV-010·011)`. 개별 결과는 저장소 밖 XML (`~/lec/Project3/s4-evidence/E1-run1·2/xml/`). CI 결과가 아니며, 새 Test(`SPECIFIED`)는 여전히 `NOT_RUN`이다.
 
 #### 3-1-1. 대타 Test 집계 (정적 확인, Test 실행 아님)
 
@@ -381,3 +382,4 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S3: §3-1-1 "실행 사례"를 정적 계산값으로 표현 정정, §5-1에 통합 시나리오 Test 4개 (V2-N-53·54, V3-N-33, V5-N-19) |
 | 2026-10-25 | S3-A: §5-4 V4-T-26·39·74를 W안으로 갱신 (V4-T-74는 code 그대로·순서만 변경), 알림 읽음 행에 Lock 분리 표시, §5-1에 V4-N-49~54 (API-SB-02)·V5-N-20, §6에 V5-N-19·20 |
 | 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
+| 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
