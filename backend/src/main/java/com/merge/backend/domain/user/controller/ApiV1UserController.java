@@ -42,7 +42,7 @@ public class ApiV1UserController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
         @Valid @RequestBody LoginRequest request) {
-        User user = userService.login(request.email(), request.password());
+        User user = userService.login(request.getEmail(), request.getPassword());
         String accessToken = userService.genAccessToken(user);
         String refreshToken = userService.issueRefreshToken(user);
 
