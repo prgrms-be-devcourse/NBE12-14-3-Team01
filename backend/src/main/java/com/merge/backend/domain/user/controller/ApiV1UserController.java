@@ -30,7 +30,7 @@ public class ApiV1UserController {
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<UserResponse>> signup(
         @Valid @RequestBody SignupRequest request) {
-        User user = userService.join(request.email(), request.password(), request.name());
+        User user = userService.join(request.getEmail(), request.getPassword(), request.getName());
 
         UserResponse response = UserResponse.from(user);
 
