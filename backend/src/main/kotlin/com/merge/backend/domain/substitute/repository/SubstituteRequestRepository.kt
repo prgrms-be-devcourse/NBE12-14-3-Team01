@@ -4,7 +4,6 @@ import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
 import jakarta.persistence.LockModeType
 import java.time.LocalDateTime
-import java.util.Optional
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
@@ -28,7 +27,7 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
         WHERE r.id = :requestId
         """,
     )
-    fun findByIdForUpdate(@Param("requestId") requestId: Long?): Optional<SubstituteRequest>
+    fun findByIdForUpdate(@Param("requestId") requestId: Long?): SubstituteRequest?
 
     // 해당 근무지의 모든 대체근무 요청 조회
     // 근무 시간 순으로 정렬하되, 시간이 같으면 id 기준으로 정렬

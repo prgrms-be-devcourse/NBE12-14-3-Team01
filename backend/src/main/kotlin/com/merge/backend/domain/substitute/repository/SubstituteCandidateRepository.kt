@@ -3,7 +3,6 @@ package com.merge.backend.domain.substitute.repository
 import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import java.time.LocalDateTime
-import java.util.Optional
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -19,7 +18,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         WHERE c.id = :candidateId
         """,
     )
-    fun findRequestIdById(@Param("candidateId") candidateId: Long?): Optional<Long>
+    fun findRequestIdById(@Param("candidateId") candidateId: Long?): Long?
 
     // SUB-01 / SUB-03
     // 이미 수락한 다른 활성 대타 근무와 시간이 겹치는지 확인
@@ -117,7 +116,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
     fun findByRequestIdAndStatus(
         requestId: Long?,
         status: CandidateStatus,
-    ): Optional<SubstituteCandidate>
+    ): SubstituteCandidate?
 
     // 후보자가 다른 대체 요청에서 이미 수락한 활성 대타 약속 중,
     // 동시간대 겹침이 있는지 확인

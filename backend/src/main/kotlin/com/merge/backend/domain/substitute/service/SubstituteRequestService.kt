@@ -208,9 +208,7 @@ class SubstituteRequestService(
     fun approve(requestId: Long?, actorId: Long?): SubstituteRequest {
         // 대체 근무 요청이 존재하는지
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
         // request == ACCEPTED 여부 검사
         if (request.status != RequestStatus.ACCEPTED) {
@@ -238,7 +236,7 @@ class SubstituteRequestService(
 
         val candidate = substituteCandidateRepository
             .findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE) }
+            ?: throw BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE)
 
         // 수락자가 해당 근무지 소속인지
         val acceptedMember = candidate.member
@@ -318,9 +316,7 @@ class SubstituteRequestService(
     fun close(requestId: Long?, actorId: Long?): SubstituteRequest {
         // Request 조회
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
         // findByIdForUpdate를 통과했으므로 requestId는 null이 아님
         val lockedRequestId = requireNotNull(requestId)

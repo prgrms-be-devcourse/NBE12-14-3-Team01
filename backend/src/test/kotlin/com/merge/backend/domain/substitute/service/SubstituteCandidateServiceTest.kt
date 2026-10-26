@@ -307,7 +307,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             given(substituteCandidateRepository.findRequestIdById(CANDIDATE_ID))
-                .willReturn(Optional.empty())
+                .willReturn(null)
 
             // when & then
             assertAcceptFails(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
@@ -320,9 +320,9 @@ class SubstituteCandidateServiceTest {
 
             // given
             given(substituteCandidateRepository.findRequestIdById(CANDIDATE_ID))
-                .willReturn(Optional.of(REQUEST_ID))
+                .willReturn(REQUEST_ID)
             given(substituteRequestRepository.findByIdForUpdate(REQUEST_ID))
-                .willReturn(Optional.empty())
+                .willReturn(null)
 
             // when & then
             assertAcceptFails(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
@@ -642,9 +642,9 @@ class SubstituteCandidateServiceTest {
     // Request Lock → Candidate 조회까지 정상 동작하도록 설정
     private fun givenRespondableCandidate() {
         given(substituteCandidateRepository.findRequestIdById(CANDIDATE_ID))
-            .willReturn(Optional.of(REQUEST_ID))
+            .willReturn(REQUEST_ID)
         given(substituteRequestRepository.findByIdForUpdate(REQUEST_ID))
-            .willReturn(Optional.of(request))
+            .willReturn(request)
         given(substituteCandidateRepository.findById(CANDIDATE_ID))
             .willReturn(Optional.of(candidate))
     }

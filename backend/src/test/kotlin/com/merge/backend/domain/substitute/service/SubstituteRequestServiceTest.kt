@@ -176,10 +176,10 @@ class SubstituteRequestServiceTest {
     private fun setupApprovableRequest() {
         setupValidRequestFullInfo()
         given(substituteRequestRepository.findByIdForUpdate(requestId))
-            .willReturn(Optional.of(request))
+            .willReturn(request)
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace))
         given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
-            .willReturn(Optional.of(candidate))
+            .willReturn(candidate)
     }
 
     // 예외 타입뿐 아니라 "어떤 에러코드"로 실패했는지까지 확인
@@ -232,13 +232,13 @@ class SubstituteRequestServiceTest {
             given(shift.endAt).willReturn(now.plusDays(1).plusHours(8))
 
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             given(workplaceRepository.findById(workplaceId))
                 .willReturn(Optional.of(workplace))
 
             given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate))
+                .willReturn(candidate)
 
             given(shiftRepository.existsConflictingShift(eq(candidateUserId), anyOrNull(), anyOrNull()))
                 .willReturn(false)
@@ -286,7 +286,7 @@ class SubstituteRequestServiceTest {
         fun approve_fail_request_not_found() {
             // given
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.empty())
+                .willReturn(null)
 
             // when & then
             assertBusinessError(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND) {
@@ -302,7 +302,7 @@ class SubstituteRequestServiceTest {
             // given
             given(request.status).willReturn(status)
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             // when & then
             assertApproveFails(SubstituteRequestErrorCode.INVALID_REQUEST)
@@ -318,7 +318,7 @@ class SubstituteRequestServiceTest {
             // given
             setupValidRequestBasicInfo()
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
             given(workplaceMemberService.requireManager(actorId, workplaceId))
                 .willThrow(BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER))
 
@@ -333,7 +333,7 @@ class SubstituteRequestServiceTest {
             // given
             setupValidRequestBasicInfo()
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
             given(workplaceMemberService.requireManager(actorId, workplaceId))
                 .willThrow(BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
 
@@ -349,7 +349,7 @@ class SubstituteRequestServiceTest {
             setupValidRequestBasicInfo()
             given(schedule.status).willReturn(ScheduleStatus.DRAFT)
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             // when & then
             assertApproveFails(ScheduleErrorCode.NOT_PUBLISHED)
@@ -363,7 +363,7 @@ class SubstituteRequestServiceTest {
             given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
             given(shift.status).willReturn(ShiftStatus.CANCELLED)
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             // when & then
             assertApproveFails(ShiftErrorCode.IS_CANCELED_SHIFT)
@@ -385,7 +385,7 @@ class SubstituteRequestServiceTest {
             given(request.requesterMember).willReturn(requesterMember)
 
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             // when & then
             assertApproveFails(SubstituteRequestErrorCode.INVALID_MEMBER)
@@ -397,10 +397,10 @@ class SubstituteRequestServiceTest {
             // given
             setupValidRequestFullInfo()
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace))
             given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.empty())
+                .willReturn(null)
 
             // when & then
             assertApproveFails(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE)
@@ -698,7 +698,7 @@ class SubstituteRequestServiceTest {
 
             // given
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             given(request.shift).willReturn(shift)
             given(shift.schedule).willReturn(schedule)
@@ -785,7 +785,7 @@ class SubstituteRequestServiceTest {
 
             // given
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             given(request.shift).willReturn(shift)
             given(shift.schedule).willReturn(schedule)
@@ -851,7 +851,7 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: 존재하지 않는 요청이면 예외가 발생한다.")
         fun close_RequestNotFound_ThrowsException() {
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.empty())
+                .willReturn(null)
 
             assertBusinessError(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND) {
                 substituteRequestService.close(requestId, actorId)
@@ -945,7 +945,7 @@ class SubstituteRequestServiceTest {
 
             // given
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
 
             given(request.shift).willReturn(shift)
             given(shift.schedule).willReturn(schedule)
@@ -995,7 +995,7 @@ class SubstituteRequestServiceTest {
         // Request → Shift → Schedule → Workplace 경로까지만 설정 (실패 케이스 공통)
         private fun givenClosableRequestPath() {
             given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request))
+                .willReturn(request)
             given(request.shift).willReturn(shift)
             given(shift.schedule).willReturn(schedule)
             given(schedule.workplace).willReturn(workplace)

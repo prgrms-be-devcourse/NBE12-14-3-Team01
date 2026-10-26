@@ -115,12 +115,10 @@ class SubstituteCandidateService(
         userId: Long?, // 현재 로그인한 User ID
     ): SubstituteCandidate {
         val requestId = substituteCandidateRepository.findRequestIdById(candidateId)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND) }
+            ?: throw BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
 
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
         // findRequestIdById를 통과했으므로 candidateId는 null이 아님
         val candidate = substituteCandidateRepository.findByIdOrNull(requireNotNull(candidateId))
