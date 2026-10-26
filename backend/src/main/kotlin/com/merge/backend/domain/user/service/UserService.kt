@@ -36,7 +36,7 @@ class UserService(
     }
 
     fun getById(id: Long?): User {
-        // findById는 null을 받지 않음. Java도 null이면 IllegalArgumentException이라 같은 예외로 맞춤
+        // findById는 null을 받지 않음. 호출하는 곳은 로그인한 사용자 id만 넘겨서 null이 오지 않음
         return userRepository.findById(requireNotNull(id))
             .orElseThrow { BusinessException(UserErrorCode.AUTHENTICATION_REQUIRED) }
     }
