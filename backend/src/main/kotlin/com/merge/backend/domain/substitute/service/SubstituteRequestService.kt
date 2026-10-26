@@ -31,8 +31,10 @@ import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.exception.BusinessException
 import java.time.Clock
 import java.time.LocalDateTime
+import kotlin.jvm.optionals.getOrNull
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -109,8 +111,8 @@ class SubstituteRequestService(
     }
 
     private fun validateSubstituteRequest(shiftId: Long?, actorUserId: Long?): Shift {
-        val shift = shiftRepository.findByIdForUpdate(shiftId)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND) }
+        val shift = shiftRepository.findByIdForUpdate(shiftId).getOrNull()
+            ?: throw BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND)
 
         if (shift.schedule.status != ScheduleStatus.PUBLISHED) {
             throw BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_PUBLISHED)
@@ -142,8 +144,8 @@ class SubstituteRequestService(
 
     @Transactional(readOnly = true)
     fun list(workplaceId: Long?, actorId: Long?): List<SubstituteRequestListResponse> {
-        workplaceRepository.findById(requireNotNull(workplaceId))
-            .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND) }
+        workplaceRepository.findByIdOrNull(requireNotNull(workplaceId))
+            ?: throw BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND)
 
         workplaceMemberService.requireManager(actorId, workplaceId)
 
@@ -231,8 +233,8 @@ class SubstituteRequestService(
         if (request.requesterMember.id != request.shift.member.id) {
             throw BusinessException(SubstituteRequestErrorCode.INVALID_MEMBER)
         }
-        workplaceRepository.findById(workplaceId)
-            .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND) }
+        workplaceRepository.findByIdOrNull(workplaceId)
+            ?: throw BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND)
 
         val candidate = substituteCandidateRepository
             .findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED)

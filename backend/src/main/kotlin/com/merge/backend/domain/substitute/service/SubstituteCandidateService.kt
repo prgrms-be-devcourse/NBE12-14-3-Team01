@@ -22,6 +22,7 @@ import com.merge.backend.global.exception.BusinessException
 import java.time.Clock
 import java.time.LocalDateTime
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -122,8 +123,8 @@ class SubstituteCandidateService(
             }
 
         // findRequestIdById를 통과했으므로 candidateId는 null이 아님
-        val candidate = substituteCandidateRepository.findById(requireNotNull(candidateId))
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND) }
+        val candidate = substituteCandidateRepository.findByIdOrNull(requireNotNull(candidateId))
+            ?: throw BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
 
         val member = candidate.member
 
