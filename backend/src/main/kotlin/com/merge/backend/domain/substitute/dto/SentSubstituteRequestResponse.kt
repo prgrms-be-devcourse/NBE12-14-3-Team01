@@ -30,9 +30,9 @@ data class SentSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             val response = SentSubstituteRequestResponse(
-                requestId = request.persistedId,
-                shiftId = shift.persistedId,
-                workplaceId = workplace.persistedId,
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

@@ -31,10 +31,10 @@ data class AcceptedPendingSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             return AcceptedPendingSubstituteRequestResponse(
-                candidateId = candidate.persistedId,
-                requestId = request.persistedId,
-                shiftId = shift.persistedId,
-                workplaceId = workplace.persistedId,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
                 requesterName = request.requesterMember.user.name,
                 startAt = shift.startAt,

@@ -31,7 +31,7 @@ data class SubstituteRequestListResponse(
 
             fun from(candidate: SubstituteCandidate): AcceptedMemberResponse =
                 AcceptedMemberResponse(
-                    memberId = candidate.member.persistedId,
+                    memberId = requireNotNull(candidate.member.id),
                     name = candidate.member.user.name,
                 )
         }
@@ -56,11 +56,11 @@ data class SubstituteRequestListResponse(
             val workplace = shift.schedule.workplace
 
             return SubstituteRequestListResponse(
-                requestId = request.persistedId,
-                shiftId = shift.persistedId,
-                requesterMemberId = request.requesterMember.persistedId,
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                requesterMemberId = requireNotNull(request.requesterMember.id),
                 requesterName = request.requesterMember.user.name,
-                workplaceId = workplace.persistedId,
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

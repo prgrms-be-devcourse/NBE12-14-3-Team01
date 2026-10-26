@@ -19,8 +19,8 @@ data class SubstituteRequestCloseResponse(
         @JvmStatic
         fun from(request: SubstituteRequest): SubstituteRequestCloseResponse =
             SubstituteRequestCloseResponse(
-                requestId = request.persistedId,
-                shiftId = request.shift.persistedId,
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(request.shift.id),
                 status = request.status,
                 closeReason = request.closeReason,
                 closedAt = request.closedAt,

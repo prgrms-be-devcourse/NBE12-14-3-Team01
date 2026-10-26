@@ -32,12 +32,12 @@ data class ReceivedSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             return ReceivedSubstituteRequestResponse(
-                candidateId = candidate.persistedId,
-                requestId = request.persistedId,
-                shiftId = shift.persistedId,
-                workplaceId = workplace.persistedId,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
-                requesterMemberId = request.requesterMember.persistedId,
+                requesterMemberId = requireNotNull(request.requesterMember.id),
                 requesterName = request.requesterMember.user.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

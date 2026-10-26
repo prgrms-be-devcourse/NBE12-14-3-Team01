@@ -21,8 +21,8 @@ data class SubstituteCandidateRespondResponse(
         @JvmStatic
         fun from(candidate: SubstituteCandidate): SubstituteCandidateRespondResponse =
             SubstituteCandidateRespondResponse(
-                candidateId = candidate.persistedId,
-                requestId = candidate.request.persistedId,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(candidate.request.id),
                 candidateStatus = candidate.status,
                 requestStatus = candidate.request.status,
                 respondedAt = candidate.respondedAt,

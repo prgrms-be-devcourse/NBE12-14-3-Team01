@@ -21,11 +21,11 @@ data class SubstituteRequestResponse(
         @JvmStatic
         fun from(request: SubstituteRequest): SubstituteRequestResponse =
             SubstituteRequestResponse(
-                requestId = request.persistedId,
-                shiftId = request.shift.persistedId,
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(request.shift.id),
                 status = RequestStatus.APPROVED,
-                previousMemberId = request.requesterMember.persistedId,
-                newMemberId = request.shift.member.persistedId,
+                previousMemberId = requireNotNull(request.requesterMember.id),
+                newMemberId = requireNotNull(request.shift.member.id),
                 newMemberName = request.shift.member.user.name,
                 approvedAt = request.approvedAt,
                 closedAt = request.closedAt,
