@@ -115,7 +115,9 @@ class SentSubstituteRequestResponseTest {
         approvedAt: LocalDateTime? = null,
         closedAt: LocalDateTime? = null,
     ): SubstituteRequest {
-        val workplace = Workplace("SWITCH 카페", "INVITE01")
+        val workplace = Workplace("SWITCH 카페", "INVITE01").apply {
+            ReflectionTestUtils.setField(this, "id", WORKPLACE_ID)
+        }
         val schedule = Schedule(workplace, LocalDate.now()).apply {
             publish(LocalDateTime.now())
         }
@@ -145,5 +147,6 @@ class SentSubstituteRequestResponseTest {
         private val SHIFT_END: LocalDateTime = SHIFT_START.plusHours(4)
         private const val REQUEST_ID = 77L
         private const val SHIFT_ID = 10L
+        private const val WORKPLACE_ID = 1L
     }
 }

@@ -7,9 +7,9 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class SentSubstituteRequestResponse(
-    val requestId: Long?,
-    val shiftId: Long?,
-    val workplaceId: Long?,
+    val requestId: Long,
+    val shiftId: Long,
+    val workplaceId: Long,
     val workplaceName: String,
     val startAt: LocalDateTime,
     val endAt: LocalDateTime,
@@ -30,9 +30,9 @@ data class SentSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             val response = SentSubstituteRequestResponse(
-                requestId = request.id,
-                shiftId = shift.id,
-                workplaceId = workplace.id,
+                requestId = request.persistedId,
+                shiftId = shift.persistedId,
+                workplaceId = workplace.persistedId,
                 workplaceName = workplace.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

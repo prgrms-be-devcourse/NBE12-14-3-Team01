@@ -145,7 +145,7 @@ class SubstituteFlowIntegrationTest {
             assertThat(created.status).isEqualTo(RequestStatus.OPEN)
             assertThat(created.candidateCount).isEqualTo(2)
 
-            val requestId = created.requestId
+            val requestId = requireNotNull(created.requestId)
             flushAndClear()
 
             assertThat(candidatesOf(requestId))
@@ -282,7 +282,7 @@ class SubstituteFlowIntegrationTest {
             val requestId = createRequest()
             unavailableTimeRepository.save(
                 UnavailableTime(
-                    userRepository.findById(requireNotNull(candidateA.userId)).orElseThrow(),
+                    userRepository.findById(candidateA.userId).orElseThrow(),
                     shift.startAt.plusHours(1),
                     shift.endAt.plusHours(1),
                 )
@@ -307,7 +307,7 @@ class SubstituteFlowIntegrationTest {
             flushAndClear()
 
             val requestId = createRequest()
-            val otherRequestId = substituteRequestService.create(otherShift.id, otherRequester.userId).requestId
+            val otherRequestId = requireNotNull(substituteRequestService.create(otherShift.id, otherRequester.userId).requestId)
             flushAndClear()
 
             // A가 다른 요청을 먼저 수락
@@ -345,14 +345,14 @@ class SubstituteFlowIntegrationTest {
             assertNotApproved(requestId)
         }
 
-        private fun acceptedRequestByA(): Long? {
+        private fun acceptedRequestByA(): Long {
             val requestId = createRequest()
             substituteCandidateService.acceptCandidate(candidateIdOf(requestId, candidateA), candidateA.userId)
             flushAndClear()
             return requestId
         }
 
-        private fun assertNotApproved(requestId: Long?) {
+        private fun assertNotApproved(requestId: Long) {
             flushAndClear()
             assertThat(findRequest(requestId).status).isEqualTo(RequestStatus.ACCEPTED)
             assertThat(findRequest(requestId).approvedAt).isNull()
@@ -362,14 +362,14 @@ class SubstituteFlowIntegrationTest {
 
     // ===================== 헬퍼 =====================
 
-    private fun createRequest(): Long? {
-        val requestId = substituteRequestService.create(shift.id, requester.userId).requestId
+    private fun createRequest(): Long {
+        val requestId = requireNotNull(substituteRequestService.create(shift.id, requester.userId).requestId)
         flushAndClear()
         return requestId
     }
 
     // 실패한 요청이 Request / Candidate / Shift 어느 것도 바꾸지 않았는지 DB 기준으로 확인
-    private fun assertUntouched(requestId: Long?) {
+    private fun assertUntouched(requestId: Long) {
         flushAndClear()
 
         val request = findRequest(requestId)
@@ -404,22 +404,22 @@ class SubstituteFlowIntegrationTest {
         flushAndClear()
     }
 
-    private fun candidatesOf(requestId: Long?): List<SubstituteCandidate> =
+    private fun candidatesOf(requestId: Long): List<SubstituteCandidate> =
         substituteCandidateRepository.findAll().filter { it.request.id == requestId }
 
-    private fun findCandidate(requestId: Long?, member: WorkplaceMember): SubstituteCandidate =
+    private fun findCandidate(requestId: Long, member: WorkplaceMember): SubstituteCandidate =
         candidatesOf(requestId).first { it.member.id == member.id }
 
-    private fun candidateIdOf(requestId: Long?, member: WorkplaceMember): Long? =
-        findCandidate(requestId, member).id
+    private fun candidateIdOf(requestId: Long, member: WorkplaceMember): Long =
+        requireNotNull(findCandidate(requestId, member).id)
 
-    private fun findRequest(requestId: Long?): SubstituteRequest =
-        substituteRequestRepository.findById(requireNotNull(requestId)).orElseThrow()
+    private fun findRequest(requestId: Long): SubstituteRequest =
+        substituteRequestRepository.findById(requestId).orElseThrow()
 
     private fun findShift(): Shift = shiftRepository.findById(shift.id).orElseThrow()
 
-    private val WorkplaceMember.userId: Long?
-        get() = user.id
+    private val WorkplaceMember.userId: Long
+        get() = requireNotNull(user.id)
 
     private fun flushAndClear() {
         entityManager.flush()

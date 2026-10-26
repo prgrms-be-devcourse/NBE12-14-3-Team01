@@ -418,12 +418,12 @@ class SubstituteRequestConcurrencyTest {
         TransactionTemplate(transactionManager).executeWithoutResult { assertion() }
     }
 
-    private fun findRequest(requestId: Long?): SubstituteRequest =
-        substituteRequestRepository.findById(requireNotNull(requestId)).orElseThrow()
+    private fun findRequest(requestId: Long): SubstituteRequest =
+        substituteRequestRepository.findById(requestId).orElseThrow()
 
-    private fun candidateStatuses(candidateIds: List<Long?>): List<CandidateStatus> =
+    private fun candidateStatuses(candidateIds: List<Long>): List<CandidateStatus> =
         candidateIds
-            .map { substituteCandidateRepository.findById(requireNotNull(it)).orElseThrow() }
+            .map { substituteCandidateRepository.findById(it).orElseThrow() }
             .map { it.status }
 
     private fun countActiveRequests(fixture: ShiftFixture): Long =
@@ -451,7 +451,7 @@ class SubstituteRequestConcurrencyTest {
 
             val shift = saveShift(schedule, requester, shiftStartAt())
 
-            ShiftFixture(requesterUserId = requester.user.id, shiftId = shift.id)
+            ShiftFixture(requesterUserId = requireNotNull(requester.user.id), shiftId = requireNotNull(shift.id))
         }
     )
 
@@ -467,19 +467,19 @@ class SubstituteRequestConcurrencyTest {
 
             val request = substituteRequestRepository.save(SubstituteRequest(shift, requester, RequestStatus.OPEN))
 
-            val candidateIds = mutableListOf<Long?>()
-            val candidateUserIds = mutableListOf<Long?>()
+            val candidateIds = mutableListOf<Long>()
+            val candidateUserIds = mutableListOf<Long>()
 
             repeat(candidateCount) { i ->
                 val member = saveMember(workplace, "candidate$i-$suffix")
 
                 val candidate = substituteCandidateRepository.save(SubstituteCandidate(request, member))
 
-                candidateIds += candidate.id
-                candidateUserIds += member.user.id
+                candidateIds += requireNotNull(candidate.id)
+                candidateUserIds += requireNotNull(member.user.id)
             }
 
-            RequestFixture(request.id, candidateIds, candidateUserIds)
+            RequestFixture(requireNotNull(request.id), candidateIds, candidateUserIds)
         }
     )
 
@@ -492,8 +492,8 @@ class SubstituteRequestConcurrencyTest {
 
             val candidateMember = saveMember(workplace, "candidate-$suffix")
 
-            val requestIds = mutableListOf<Long?>()
-            val candidateIds = mutableListOf<Long?>()
+            val requestIds = mutableListOf<Long>()
+            val candidateIds = mutableListOf<Long>()
 
             repeat(requestCount) { i ->
                 val requester = saveMember(workplace, "requester$i-$suffix")
@@ -505,11 +505,11 @@ class SubstituteRequestConcurrencyTest {
 
                 val candidate = substituteCandidateRepository.save(SubstituteCandidate(request, candidateMember))
 
-                requestIds += request.id
-                candidateIds += candidate.id
+                requestIds += requireNotNull(request.id)
+                candidateIds += requireNotNull(candidate.id)
             }
 
-            SameUserFixture(requestIds, candidateIds, candidateMember.user.id)
+            SameUserFixture(requestIds, candidateIds, requireNotNull(candidateMember.user.id))
         }
     )
 
@@ -542,18 +542,18 @@ class SubstituteRequestConcurrencyTest {
     private fun saveShift(schedule: Schedule, member: WorkplaceMember, startAt: LocalDateTime): Shift =
         shiftRepository.save(Shift(schedule, member, startAt, startAt.plusHours(4), ShiftStatus.SCHEDULED))
 
-    private data class ShiftFixture(val requesterUserId: Long?, val shiftId: Long?)
+    private data class ShiftFixture(val requesterUserId: Long, val shiftId: Long)
 
     private data class RequestFixture(
-        val requestId: Long?,
-        val candidateIds: List<Long?>,
-        val candidateUserIds: List<Long?>,
+        val requestId: Long,
+        val candidateIds: List<Long>,
+        val candidateUserIds: List<Long>,
     )
 
     private data class SameUserFixture(
-        val requestIds: List<Long?>,
-        val candidateIds: List<Long?>,
-        val candidateUserId: Long?,
+        val requestIds: List<Long>,
+        val candidateIds: List<Long>,
+        val candidateUserId: Long,
     )
 
     companion object {

@@ -12,11 +12,11 @@ import org.springframework.data.repository.query.Param
 
 interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
 
-    fun existsByShift_IdAndStatusIn(shiftId: Long?, statuses: Collection<RequestStatus>): Boolean
+    fun existsByShift_IdAndStatusIn(shiftId: Long, statuses: Collection<RequestStatus>): Boolean
 
     @EntityGraph(attributePaths = ["shift.schedule.workplace"])
     fun findAllByRequesterMember_User_IdOrderByCreateDateDesc(
-        userId: Long?,
+        userId: Long,
     ): List<SubstituteRequest>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -27,7 +27,7 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
         WHERE r.id = :requestId
         """,
     )
-    fun findByIdForUpdate(@Param("requestId") requestId: Long?): SubstituteRequest?
+    fun findByIdForUpdate(@Param("requestId") requestId: Long): SubstituteRequest?
 
     // 해당 근무지의 모든 대체근무 요청 조회
     // 근무 시간 순으로 정렬하되, 시간이 같으면 id 기준으로 정렬
@@ -50,7 +50,7 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
         """,
     )
     fun findAllByWorkplaceId(
-        @Param("workplaceId") workplaceId: Long?,
+        @Param("workplaceId") workplaceId: Long,
         @Param("now") now: LocalDateTime,
     ): List<SubstituteRequest>
 }

@@ -1269,13 +1269,22 @@ class SubstituteRequestServiceTest {
             WorkplaceRole.EMPLOYEE,
             now.minusDays(30),
             null,
-        )
+        ).apply {
+            ReflectionTestUtils.setField(this, "id", requesterMemberId)
+        }
 
-        return Shift(scheduleFixture, owner, startAt, startAt.plusHours(4), status)
+        return Shift(scheduleFixture, owner, startAt, startAt.plusHours(4), status).apply {
+            ReflectionTestUtils.setField(this, "id", SHIFT_ID)
+        }
     }
 
-    private fun draftSchedule(): Schedule =
-        Schedule(Workplace("SWITCH 카페", "INVITE01"), LocalDate.now(clock))
+    private fun draftSchedule(): Schedule {
+        val workplace = Workplace("SWITCH 카페", "INVITE01").apply {
+            ReflectionTestUtils.setField(this, "id", workplaceId)
+        }
+
+        return Schedule(workplace, LocalDate.now(clock))
+    }
 
     private fun publishedSchedule(): Schedule =
         draftSchedule().apply { publish(now) }

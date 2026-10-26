@@ -6,11 +6,11 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class SubstituteRequestResponse(
-    val requestId: Long?,
-    val shiftId: Long?,
+    val requestId: Long,
+    val shiftId: Long,
     val status: RequestStatus,
-    val previousMemberId: Long?,
-    val newMemberId: Long?,
+    val previousMemberId: Long,
+    val newMemberId: Long,
     val newMemberName: String,
     val approvedAt: LocalDateTime?,
     val closedAt: LocalDateTime?,
@@ -21,11 +21,11 @@ data class SubstituteRequestResponse(
         @JvmStatic
         fun from(request: SubstituteRequest): SubstituteRequestResponse =
             SubstituteRequestResponse(
-                requestId = request.id,
-                shiftId = request.shift.id,
+                requestId = request.persistedId,
+                shiftId = request.shift.persistedId,
                 status = RequestStatus.APPROVED,
-                previousMemberId = request.requesterMember.id,
-                newMemberId = request.shift.member.id,
+                previousMemberId = request.requesterMember.persistedId,
+                newMemberId = request.shift.member.persistedId,
                 newMemberName = request.shift.member.user.name,
                 approvedAt = request.approvedAt,
                 closedAt = request.closedAt,
