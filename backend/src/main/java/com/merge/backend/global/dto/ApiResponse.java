@@ -1,11 +1,14 @@
 package com.merge.backend.global.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 
+// Jackson 3은 기본으로 필드를 알파벳 순으로 정렬하므로 Contract(CB-COM-02) 순서를 명시한다
+@JsonPropertyOrder({"success", "code", "message", "data"})
 @Getter
 @Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
