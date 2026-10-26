@@ -23,11 +23,13 @@ class Rq(
     @Value("\${custom.cookie.same-site}")
     private var cookieSameSite: String? = null
 
-    fun getActorId(): Long? {
-        val authentication = SecurityContextHolder.getContext().authentication
-        val principal = authentication?.principal as SecurityUser
-        return principal.id
-    }
+    // Kotlin에서는 rq.actorId, Java에서는 rq.getActorId()로 부름
+    val actorId: Long?
+        get() {
+            val authentication = SecurityContextHolder.getContext().authentication
+            val principal = authentication?.principal as SecurityUser
+            return principal.id
+        }
 
     fun getCookieValue(name: String?, defaultValue: String?): String? {
         return request.cookies

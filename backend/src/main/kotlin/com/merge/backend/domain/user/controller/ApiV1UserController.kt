@@ -64,7 +64,7 @@ class ApiV1UserController(
 
     @GetMapping("/me")
     fun me(): ResponseEntity<ApiResponse<UserResponse>> {
-        val user = userService.getById(rq.getActorId())
+        val user = userService.getById(rq.actorId)
         val response = UserResponse.from(user)
 
         return ResponseEntity.ok(ApiResponse.success("200", "현재 사용자 정보를 조회했습니다", response))
