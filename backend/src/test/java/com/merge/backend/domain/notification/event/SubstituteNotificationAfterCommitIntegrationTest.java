@@ -401,6 +401,71 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
     }
 
+    @Test
+    @DisplayName("요청 생성을 실행한 바깥 Transaction이 Rollback되면 Request·Candidate·알림이 남지 않는다")
+    void createInRolledBackTransaction_savesNoRequestCandidateOrNotification() {
+        // given - Fixture는 별도 Transaction에서 Commit한다
+        RequestFixture fixture = createRequestFixture();
+        List<Long> candidateMemberIds = List.of(
+            fixture.firstCandidateMemberId(),
+            fixture.secondCandidateMemberId()
+        );
+        assertThat(requestsOf(fixture.shiftId())).isEmpty();
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            assertThat(entityManager.createQuery(
+                    "select count(c) from SubstituteCandidate c where c.member.id in :memberIds",
+                    Long.class
+                )
+                .setParameter("memberIds", candidateMemberIds)
+                .getSingleResult()).isZero();
+        });
+
+        // when - 실제 create()가 바깥 REQUIRED Transaction에 합류한다
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            SubstituteRequestCreateResponse response = substituteRequestService.create(
+                fixture.shiftId(), fixture.requesterUserId()
+            );
+            assertThat(response.requestCreated()).isTrue();
+            assertThat(response.requestId()).isNotNull();
+            assertThat(response.candidateCount()).isEqualTo(2);
+
+            // SQL 실행 후 1차 캐시를 비워, 생성 결과를 DB에서 다시 확인한다
+            entityManager.flush();
+            entityManager.clear();
+            List<SubstituteRequest> requests = entityManager.createQuery(
+                    "select r from SubstituteRequest r where r.shift.id = :shiftId",
+                    SubstituteRequest.class
+                )
+                .setParameter("shiftId", fixture.shiftId())
+                .getResultList();
+            assertThat(requests).hasSize(1);
+            assertThat(requests.get(0).getId()).isEqualTo(response.requestId());
+            assertThat(requests.get(0).getStatus()).isEqualTo(RequestStatus.OPEN);
+            assertThat(entityManager.createQuery(
+                    "select c.member.id from SubstituteCandidate c"
+                        + " where c.request.id = :requestId",
+                    Long.class
+                )
+                .setParameter("requestId", response.requestId())
+                .getResultList()).containsExactlyInAnyOrderElementsOf(candidateMemberIds);
+            status.setRollbackOnly();
+        });
+
+        // then - 새 Transaction에서 후보를 Request ID와 무관하게 조회한다
+        assertThat(requestsOf(fixture.shiftId())).isEmpty();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            assertThat(entityManager.createQuery(
+                    "select count(c) from SubstituteCandidate c where c.member.id in :memberIds",
+                    Long.class
+                )
+                .setParameter("memberIds", candidateMemberIds)
+                .getSingleResult()).isZero();
+        });
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+    }
+
     // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
     private void assertNotifiedOnly(
         List<Notification> notifications,
