@@ -1,6 +1,7 @@
 package com.merge.backend.domain.notification.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.merge.backend.domain.notification.entity.Notification;
 import com.merge.backend.domain.notification.entity.NotificationType;
@@ -72,6 +73,12 @@ class SubstituteNotificationAfterCommitIntegrationTest {
 
     private static final String ALL_REJECTED_MESSAGE =
         "대체 근무 요청을 받은 모든 수신자가 거절했습니다.";
+
+    private static final String APPROVED_REQUESTER_MESSAGE =
+        "요청한 대체 근무 변경이 최종 승인되었습니다.";
+
+    private static final String APPROVED_ACCEPTED_MESSAGE =
+        "수락한 대체 근무가 공식 근무로 확정되었습니다.";
 
     @Autowired
     private SubstituteRequestService substituteRequestService;
@@ -274,6 +281,45 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
     }
 
+    @Test
+    @DisplayName("MANAGER가 승인하면 Shift 담당자가 수락자로 바뀌고 요청자와 수락자에게 각자의 승인 알림이 저장된다")
+    void approveRequest_movesShiftAndSavesApprovedNotificationsForRequesterAndAccepted() {
+        // given - C1이 수락한 ACCEPTED Request, C2는 PENDING (J3-03 결과와 같은 상태)
+        ManagerActionFixture fixture = createManagerActionFixture(true, false);
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - MANAGER가 실제 Service로 승인한다
+        substituteRequestService.approve(fixture.requestId(), fixture.managerUserId());
+
+        // then - 업무 DB: Request APPROVED, Shift 담당자가 C1으로 바뀐다
+        assertThat(requestOf(fixture.requestId()).getStatus()).isEqualTo(RequestStatus.APPROVED);
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.firstCandidateMemberId());
+
+        // then - 알림 DB: 같은 Type이지만 받는 사람마다 문구가 다르다. MANAGER·C2는 받지 않는다
+        List<Notification> notifications = notificationsOf(fixture.allMemberIds());
+        assertThat(notifications)
+            .extracting(
+                notification -> notification.getRecipientMember().getId(),
+                Notification::getType,
+                Notification::getMessage,
+                Notification::getReadAt
+            )
+            .containsExactlyInAnyOrder(
+                tuple(
+                    fixture.requesterMemberId(),
+                    NotificationType.SUBSTITUTE_APPROVED,
+                    APPROVED_REQUESTER_MESSAGE,
+                    null
+                ),
+                tuple(
+                    fixture.firstCandidateMemberId(),
+                    NotificationType.SUBSTITUTE_APPROVED,
+                    APPROVED_ACCEPTED_MESSAGE,
+                    null
+                )
+            );
+    }
+
     // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
     private void assertNotifiedOnly(
         List<Notification> notifications,
@@ -339,6 +385,12 @@ class SubstituteNotificationAfterCommitIntegrationTest {
     private SubstituteRequest requestOf(Long requestId) {
         return new TransactionTemplate(transactionManager).execute(status ->
             entityManager.find(SubstituteRequest.class, requestId)
+        );
+    }
+
+    private Long shiftMemberIdOf(Long shiftId) {
+        return new TransactionTemplate(transactionManager).execute(status ->
+            entityManager.find(Shift.class, shiftId).getMember().getId()
         );
     }
 
@@ -471,6 +523,61 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         });
     }
 
+    // MANAGER, 요청자, 후보 C1·C2의 OPEN Request에서 MANAGER 처리 직전 상태를 만든다
+    // - acceptFirst: C1 수락 → Request·C1 ACCEPTED, C2 PENDING (J3-03 결과와 같은 상태)
+    // - rejectSecond: C2 거절 → Request OPEN, C1 PENDING (J3-04b 결과와 같은 상태)
+    // Service가 검증 뒤 호출하는 Entity 메서드를 그대로 써서 알림 없이 Commit한다
+    private ManagerActionFixture createManagerActionFixture(
+        boolean acceptFirst,
+        boolean rejectSecond
+    ) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            String suffix = uniqueSuffix();
+            Workplace workplace = saveWorkplace(suffix);
+            Schedule schedule = savePublishedSchedule(workplace);
+
+            WorkplaceMember manager = saveMember(
+                workplace, "manager-" + suffix, WorkplaceRole.MANAGER, null
+            );
+            WorkplaceMember requester = saveMember(
+                workplace, "requester-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            WorkplaceMember firstCandidateMember = saveMember(
+                workplace, "candidate1-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            WorkplaceMember secondCandidateMember = saveMember(
+                workplace, "candidate2-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            Shift shift = saveShift(schedule, requester);
+
+            SubstituteRequest request = substituteRequestRepository.save(
+                new SubstituteRequest(shift, requester, RequestStatus.OPEN)
+            );
+            SubstituteCandidate firstCandidate = substituteCandidateRepository.save(
+                new SubstituteCandidate(request, firstCandidateMember)
+            );
+            SubstituteCandidate secondCandidate = substituteCandidateRepository.save(
+                new SubstituteCandidate(request, secondCandidateMember)
+            );
+            if (acceptFirst) {
+                firstCandidate.acceptRequest(now());
+            }
+            if (rejectSecond) {
+                secondCandidate.reject(now());
+            }
+
+            return new ManagerActionFixture(
+                request.getId(),
+                shift.getId(),
+                manager.getUser().getId(),
+                manager.getId(),
+                requester.getId(),
+                firstCandidateMember.getId(),
+                secondCandidateMember.getId()
+            );
+        });
+    }
+
     private Workplace saveWorkplace(String suffix) {
         return workplaceRepository.save(
             new Workplace("대타 알림 테스트 매장 " + suffix, "SUBN-" + suffix)
@@ -594,6 +701,26 @@ class SubstituteNotificationAfterCommitIntegrationTest {
 
         List<Long> allMemberIds() {
             return List.of(requesterMemberId, activeManagerMemberId, leftManagerMemberId);
+        }
+    }
+
+    private record ManagerActionFixture(
+        Long requestId,
+        Long shiftId,
+        Long managerUserId,
+        Long managerMemberId,
+        Long requesterMemberId,
+        Long firstCandidateMemberId,
+        Long secondCandidateMemberId
+    ) {
+
+        List<Long> allMemberIds() {
+            return List.of(
+                managerMemberId,
+                requesterMemberId,
+                firstCandidateMemberId,
+                secondCandidateMemberId
+            );
         }
     }
 
