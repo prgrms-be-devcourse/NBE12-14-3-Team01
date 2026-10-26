@@ -3,8 +3,9 @@
 > 작성 기준: 2차 `origin/develop` `243f77c`, 2026-10-22 (D0-B). D0-D (2026-10-23)에서 3차 저장소로 이관했고 행 내용은 바꾸지 않았다.
 > `243f77c` → 2차 `8da2bec` (= 3차 `main`) → 3차 `develop` `cdaaa13` 사이 `backend/src/main/java` 변경은 0이다 (`git diff`, 2026-10-23). 행의 Test 수·EV-ID는 `243f77c` 실행 결과다.
 > 상태 축 대응: `AS_IS_OBSERVED` = `docs/STATUS-AXES.md` ① `VERIFIED_AS_IS`. `관련 ID`의 G-03 C-ID·G03-D-ID 원문은 참고 공유본 [`docs/references/G-03-contract-review.md`](../references/G-03-contract-review.md)에 있다 (Original `9858612` 기준 AI 분석. `REVIEW_ACCEPTED`는 승인이 아니며 이 문서의 `APPROVED`로 옮기지 않는다).
-> **현재 `APPROVED` 행: 0건.** 아래 행은 모두 코드에서 확인한 현재 동작(`AS_IS_OBSERVED`) 또는 불일치(`DISCREPANCY`) 기록이며 승인된 계약이 아니다.
-> D1에서 Domain Owner가 행을 채우고 팀이 승인하면 `승인` 칸에 `APPROVED (승인자, 일자, DECISION-LOG ID)`를 적는다. AI는 `APPROVED`를 표시하지 않는다.
+> **기존 AS-IS 행은 소급 승인하지 않는다.** 아래 §1~6은 코드에서 확인한 현재 동작(`AS_IS_OBSERVED`) 또는 불일치(`DISCREPANCY`) 기록이며 승인된 계약이 아니다.
+> D1에서 Domain Owner가 행을 채우고 팀이 승인하면 `승인` 칸에 `APPROVED (승인자, 일자, DECISION-LOG ID)`를 적는다. AI가 독립적으로 APPROVED를 판단하지 않는다. 2026-10-26 사용자 전달 승인 범위는 아래 §7 및 DECISION-LOG §4를 따른다.
+> **V3 Improvement 계약 초안 (③ `DRAFT`, `APPROVED` 아님, 이 문서의 행이 아니다):** API 모양 [`API-CATALOG`](API-CATALOG.md), ErrorCode [`ERROR-CODES`](ERROR-CODES.md), 화면·권한 [`FRONTEND-CONTRACT`](FRONTEND-CONTRACT.md), 알림 Type [`NOTIFICATION-TYPES`](NOTIFICATION-TYPES.md), 사용자 경로 교차 검증 [`USER-PATH-REVIEW`](USER-PATH-REVIEW.md). 팀이 승인한 내용만 이 문서의 `APPROVED` 행으로 옮긴다.
 
 ## 행 작성 규칙
 
@@ -61,3 +62,9 @@
 ## 6. D1에서 채울 영역
 
 V1 Auth (C-01~07), V2 Workplace/Member/Pattern (C-08~17), V3 Schedule/Shift/Unavailable (C-18~39), V4 Substitute (C-40~50), V5 Notification (C-51~56). 각 Domain Owner가 위 형식으로 API별 행을 만들고 2차 명세와 대조한다. 원천 분석은 G-03 (참고 공유본, ID 참조). V 배정은 내용 기준이며 G-03 절과 경계가 다르다: C-18·C-19는 G-03 A-03 절이지만 V3, C-40은 G-03 A-05 절이지만 V4 (`docs/references/README.md` §5). C-40(`CONDITIONAL`)과 C-41(`DECISION_PENDING`)은 `REVIEW_ACCEPTED`가 아니다.
+
+## 7. 채택한 Improvement 정책의 연결 (2026-10-26)
+
+DECISION-LOG §4의 사용자 전달 승인 기록을 원본으로 한다. G03-D-03·05(정책 방향)·11·12·13·14·15·19·21·22·23·26·27의 명시된 결정 문장과 조건은 APPROVED다. 기존 AS-IS 행의 동작/테스트 기대값을 여기서 고쳐 쓰지 않는다. 구현과 검증은 별도 Improvement Task에서 진행한다.
+
+퇴사·재가입·공개 후 변경·알림·로그아웃의 정책 방향은 채택했지만, API-CATALOG의 후보 Field 전체나 G03-D-05 §5-4의 기술 구현 착수 조건, 기존 API의 미정403/404, U2'·ML-5 실험·운영 배포 조건까지 승인된 것으로 확대하지 않는다. 과거 문서의 DRAFT/PROPOSED 머리말보다 Decision Log의 현재 범위가 우선하며, 문서 리뷰/공개 상태는 별도로 유지한다.
