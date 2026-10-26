@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,6 +87,12 @@ class NotificationHttpContractTest {
 
     @Autowired
     private TestClock testClock;
+
+    @BeforeEach
+    void resetClock() {
+        // TestClock은 Context가 공유하는 Bean이다. 앞선 Test가 바꾼 시각이 남지 않도록 매번 되돌린다
+        testClock.setInstant(BASE_INSTANT);
+    }
 
     @Test
     @DisplayName("Token 없이 알림 목록을 조회하면 401 AUTH-004를 돌려준다")
