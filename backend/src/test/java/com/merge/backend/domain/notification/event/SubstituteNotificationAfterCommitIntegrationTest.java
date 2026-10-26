@@ -80,6 +80,8 @@ class SubstituteNotificationAfterCommitIntegrationTest {
     private static final String APPROVED_ACCEPTED_MESSAGE =
         "수락한 대체 근무가 공식 근무로 확정되었습니다.";
 
+    private static final String MANAGER_CLOSED_MESSAGE = "관리자가 대체 근무 요청을 종료했습니다.";
+
     @Autowired
     private SubstituteRequestService substituteRequestService;
 
@@ -318,6 +320,56 @@ class SubstituteNotificationAfterCommitIntegrationTest {
                     null
                 )
             );
+    }
+
+    @Test
+    @DisplayName("OPEN Request를 MANAGER가 종료하면 요청자와 PENDING 후보에게만 종료 알림이 저장되고 담당자는 그대로다")
+    void closeOpenRequest_savesClosedNotificationForRequesterAndPendingCandidates() {
+        // given - C2가 거절했고 C1은 PENDING인 OPEN Request (J3-04b 결과와 같은 상태)
+        ManagerActionFixture fixture = createManagerActionFixture(false, true);
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - MANAGER가 실제 Service로 종료한다
+        substituteRequestService.close(fixture.requestId(), fixture.managerUserId());
+
+        // then - 업무 DB: CLOSED (MANAGER_CLOSED), Shift 담당자는 요청자 그대로
+        SubstituteRequest request = requestOf(fixture.requestId());
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.CLOSED);
+        assertThat(request.getCloseReason()).isEqualTo(RequestCloseReason.MANAGER_CLOSED);
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+
+        // then - 알림 DB: OPEN 종료는 요청자 + PENDING 후보. 이미 거절한 C2와 MANAGER는 받지 않는다
+        assertNotifiedOnly(
+            notificationsOf(fixture.allMemberIds()),
+            List.of(fixture.requesterMemberId(), fixture.firstCandidateMemberId()),
+            NotificationType.SUBSTITUTE_MANAGER_CLOSED,
+            MANAGER_CLOSED_MESSAGE
+        );
+    }
+
+    @Test
+    @DisplayName("ACCEPTED Request를 MANAGER가 종료하면 요청자와 수락자에게만 종료 알림이 저장되고 담당자는 그대로다")
+    void closeAcceptedRequest_savesClosedNotificationForRequesterAndAccepted() {
+        // given - C1이 수락한 ACCEPTED Request, C2는 PENDING (J3-03 결과와 같은 상태)
+        ManagerActionFixture fixture = createManagerActionFixture(true, false);
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - MANAGER가 실제 Service로 종료한다
+        substituteRequestService.close(fixture.requestId(), fixture.managerUserId());
+
+        // then - 업무 DB: CLOSED (MANAGER_CLOSED), Shift 담당자는 요청자 그대로
+        SubstituteRequest request = requestOf(fixture.requestId());
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.CLOSED);
+        assertThat(request.getCloseReason()).isEqualTo(RequestCloseReason.MANAGER_CLOSED);
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+
+        // then - 알림 DB: ACCEPTED 종료는 요청자 + 수락자. PENDING으로 남은 C2와 MANAGER는 받지 않는다
+        assertNotifiedOnly(
+            notificationsOf(fixture.allMemberIds()),
+            List.of(fixture.requesterMemberId(), fixture.firstCandidateMemberId()),
+            NotificationType.SUBSTITUTE_MANAGER_CLOSED,
+            MANAGER_CLOSED_MESSAGE
+        );
     }
 
     // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
