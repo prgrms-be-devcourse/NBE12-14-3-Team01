@@ -438,3 +438,22 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
 | 2026-10-26 | V5-J2: §5-4에 알림 Test 6행 (V5-N-28·29·23 변경 후보, V5-N-27·성공 code·읽음 동시성 연관만)과 구분·운영 규칙, §6-1에 V5-N-21~30 (PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN`) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
+
+## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
+
+이번 변경은 테스트 코드·실행이 아니라 명세다. 기존 D05-T8/V2-N-50와 관련 ML4/ML5 항목에 연결하고, 추가 검증의 정식 숫자 ID는 구현 Task에서 중복 확인 후 배정한다. 아래 이름은 시나리오 식별자이며 정식 Test ID가 아니다.
+
+- PREVIEW-SAME: 대상·효과와 공식 근무 계획 동일 → 권한/충돌 재검증 후 성공, 실제 변경 결과와 응답 일치.
+- PREVIEW-SHRINK: 자동 효과만 부분집합으로 감소 → 남은 대상 처리. 사라진 대상에 재변경/알림 없음.
+- PREVIEW-ADD: 미리보기 뒤 DRAFT 또는 대타 영향 추가 →409 STALE, 이번 업무 변경/발행 알림0.
+- PREVIEW-REPLACE: 건수 동일 또는 감소여도 다른 ID/효과 유입 →STALE, 업무 변경0.
+- PREVIEW-EFFECT: 같은 후보 PENDING→ACCEPTED로 요청 종료 효과 발생 →STALE. 상태가 바뀌어도 효과가 정말 줄었는지는 명시적 효과 집합으로 판정.
+- PREVIEW-PLAN: 공식 근무 ID/담당/상태/시각 변경 →계획 재확인. 자동 대상 감소 규칙으로 우회 불가.
+- PREVIEW-INTEGRITY: 변조·다른 실행자/근무지/재가입 소속·유효하지 않거나 만료된 비교 정보 →거부, 변경0. 구체400/409 분기는 DTO 계약 확정 시 검사.
+- PREVIEW-WAIT: 확정이 Lock을 기다리는 동안 영향 증가 →STALE. 비교 통과 이후 동시 DRAFT/후보 생성도 Guard로 직렬화되거나 거부되어 퇴사 후 부적격 Row가 남지 않음.
+- PREVIEW-ROLLBACK: 처리 중 마지막 단계 실패 →소속·Shift·DRAFT·Request·Candidate·이력 모두 Rollback, AFTER_COMMIT 알림0.
+- PREVIEW-REPLAY: 첫 성공 뒤 동일 요청 반복/두 관리자 동시 확정 →정의된 STATE_CONFLICT 등으로 추가 변경0. 성공 응답 유실은 조회로 확인; 자동 재전송/성공 재생을 가정하지 않음.
+- PREVIEW-QUERY: 미리보기의 여러 조회 사이 경합을 강제해 표시와 비교 원본의 일관성을 확인. CONFIRM_REQUIRED 재요청 중 영향 확대에는 STALE이 우선.
+- NEW-SHIFT-KEY: 신규 추가 첫409 저장0; 동일계획 확인 후생성, 키 변조/대상·시간변경에 이전확인 재사용불가, 동시추가는 기존충돌검사/Lock으로 중복정합성확인. 키 자체의 멱등성은 주장하지 않음.
+
+경합은 실제 MySQL 별도 트랜잭션·Latch/Barrier로 순서를 강제하고 timeout/정리 및 worker 예외 회수를 포함한다. sleep이나 단순 반복 PASS로 동시성 안전을 주장하지 않는다. 완료 판정은 성공/거부 각각의 새 트랜잭션 DB 결과와 부작용을 확인한 실행 SHA·XML·로그로 한다. 운영 DB에서는 실행하지 않는다.

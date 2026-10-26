@@ -22,6 +22,8 @@
 
 ## 2. 진행 상태
 
+> 아래 표는 2026-10-23 `cdaaa13`의 역사적 snapshot이다. 현재 Kotlin 전환0/현재 Blocker로 해석하지 않는다. 2026-10-26 확인된 develop `9959077`에는 Workplace·V4 Kotlin 변경과 mockito-kotlin이 포함되어 있다. J2 PR16/J3 PR21 및 J4 로컬 d9f193b는 각각의 Branch/실행 SHA와 develop 반영 여부를 나누어 기록한다. 이 문서 보정은 미검증 Kotlin 품질/통합 상태를 PASS로 채우지 않는다.
+
 Kotlin 상태 근거 (2026-10-23 확인): 3차 원격 Branch는 `develop`·`main`뿐. `develop` `cdaaa13`의 `.kt`는 환경 검증 파일 2개(`KotlinEnvironmentCheck.kt`, `KotlinEnvironmentTest.kt`, PR #1)이며 **Domain 코드의 Kotlin 전환은 0**. 담당자 보고는 받지 않았다 → 담당자 보고 전까지 `UNKNOWN`으로 표시한다.
 2차 Java 저장소의 Test PR #76·#77·#78은 모두 2026-10-22 병합됐다 (2차 `origin/develop` `8da2bec` = 3차 `main`).
 

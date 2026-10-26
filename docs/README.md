@@ -1,7 +1,7 @@
 # SWITCH 3차 개발 문서 Index
 
 > 작성 기준: D0-B `243f77c` (2026-10-22, 2차 Java 저장소에서 작성) → **D0-D 3차 저장소 이관** (2026-10-23, 3차 `develop` `cdaaa13` 기준).
-> ③ 문서 리뷰: **DRAFT**. 이 문서 체계는 **팀 승인 전 초안**이다. 승인 전까지 이 디렉터리의 어떤 내용도 "승인된 계약"이 아니다.
+> ③ 문서 리뷰: **DRAFT**. 이 문서 체계는 **팀 승인 전 초안**이다. 정책 승인 여부는 `DECISION-LOG`의 현재 결정 범위와 `CONTRACT-BASELINE`을 따른다. 2026-10-26 구두 승인 전달 기록은 `DECISION-LOG` §4에 있다. 문서 DRAFT와 정책 승인 상태를 섞지 않는다.
 
 ## 1. 읽는 순서
 
@@ -19,7 +19,7 @@
 | 10 | [`docs/evidence/TEST-INVENTORY.md`](evidence/TEST-INVENTORY.md), [`docs/evidence/TEST-EVIDENCE.md`](evidence/TEST-EVIDENCE.md). 참고: 검증 원칙 [`TEST-STRATEGY`](evidence/TEST-STRATEGY.md), 공백 분석 [`TEST-GAP-ANALYSIS`](evidence/TEST-GAP-ANALYSIS.md), S4 실험 계획 [`EXPERIMENT-PLAN`](evidence/EXPERIMENT-PLAN.md) | Test를 고르거나 결과를 보고·확인할 때 |
 | 11 | [`docs/references/README.md`](references/README.md) → [`G-03-contract-review.md`](references/G-03-contract-review.md), [`references/ml/`](references/ml/) | C-ID·G03-D-ID의 원문 규칙·근거, ML 과거 제안 원문을 확인할 때 (참고 자료, 승인된 계약 아님) |
 
-> "참고:" 뒤의 문서는 필수 읽기가 아니다. 그 작업에 닿을 때만 연다. 모두 ③ `DRAFT`(팀 승인 전)이며 승인된 기준이 아니다. 각 문서의 상태는 문서 머리말과 §2 표를 따른다.
+> "참고:" 뒤의 문서는 필수 읽기가 아니다. 그 작업에 닿을 때만 연다. ③ 문서 리뷰는 DRAFT 상태이며, ② 정책의 현재 채택 범위는 DECISION-LOG §4를 별도로 따른다. 각 문서의 상태는 문서 머리말과 §2 표를 따른다.
 
 ## 2. 문서 목록과 책임
 
@@ -65,9 +65,9 @@
 | 순위 | 구분 | 무엇을 결정하는가 | 예 |
 |---|---|---|---|
 | 1 | 공식 프로젝트 요구사항 | 제출 **범위** (동작은 결정하지 않음) | 3차 공식 가이드 (저장소에 없음, UNKNOWN) → 팀 계획서 "필수 수행 사항" 요약으로 대체 |
-| 2 | 승인된 정책 결정 | 해당 항목만 아래 순위보다 우선 | `DECISION-LOG.md`의 `APPROVED` 행 (현재 0건) |
-| 3 | 승인된 서비스 계약 | 계약 | `CONTRACT-BASELINE.md`의 `APPROVED` 행 (현재 0건) |
-| 4 | 실행 Test Evidence | Migration 중 **보존할 현재 동작** — 정답이라는 뜻은 아님 | 최종 Java Baseline(`BL-TBD`)의 실행 결과. 현재 개별 결과 기록은 D0-B Snapshot `243f77c`의 266 PASS (EV-002)뿐이며 최종 Baseline이 아님 |
+| 2 | 승인된 정책 결정 | 해당 항목만 아래 순위보다 우선 | `DECISION-LOG.md`의 `APPROVED` 행과 §4의 승인 범위·예외 |
+| 3 | 승인된 서비스 계약 | 계약 | `CONTRACT-BASELINE.md`의 승인된 결정 연결 (기존 AS-IS 행을 소급 승인하지 않음) |
+| 4 | 실행 Test Evidence | Migration 중 **보존할 현재 동작** — 정답이라는 뜻은 아님 | 최종 Java Baseline(`BL-TBD`)의 실행 결과. D0-B Snapshot `243f77c`의 266 PASS(EV-002), `a148a62`의 394 PASS × 2(EV-010·011) 등 SHA별 근거를 구분한다. 기준선 최종 선언과 실행 사실은 별개 |
 | 5 | Java AS-IS 구현 | 현재 사실 | Java Baseline 후보 `8da2bec` (= 3차 `main`), Snapshot `243f77c`, Original `9858612` |
 | 6 | 2차 명세 (계약 후보) | 비교 대상 (`AUDIT_REQUIRED`) | P0 정리본, COMMON Policy, API-* PDF |
 | 7 | AI 분석 보고서 | 제안·근거 색인 | G-01~G-05, A-01~07. G-03은 `docs/references/`에 참고 공유본이 있다. G-03 C-ID는 대부분 ① `REVIEW_ACCEPTED` (팀 승인 아님) |

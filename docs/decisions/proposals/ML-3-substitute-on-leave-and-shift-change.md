@@ -1,5 +1,7 @@
 # ML-3 퇴사·공개 근무 변경과 대타 요청·후보 정합성
 
+> **현재 승인 상태 (2026-10-26):** 사용자 전달 구두 승인과 PR 리뷰에 따른 채택 범위·예외는 [Decision Log](../DECISION-LOG.md) §4를 따른다. 아래 최초 작성 당시 PROPOSED/PENDING 표기는 이력이며 현재 승인 범위를 덮어쓰지 않는다. 구현·실험·배포 및 미결정 사항은 각각 별도 상태다.
+
 | 축 | 상태 |
 |---|---|
 | 결정 단계 | **사용자 잠정 결정** (2026-10-23). 팀 승인 전 |
@@ -159,7 +161,7 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 |---|---|
 | `substitute_requests.close_reason`, `substitute_candidates.status`, `notifications.type`의 운영 Column 형식 (VARCHAR / MySQL ENUM / CHECK 제약) | **UNKNOWN.** Hibernate 기본 동작으로는 MySQL ENUM일 가능성이 있으나 단정하지 않음. 배포 담당 확인 필요 |
 | 값 추가 방법 | VARCHAR면 길이만 확인. ENUM이면 허용 값 변경 DDL. CHECK면 제약 변경 |
-| `ddl-auto: update` | 기존 Column 정의를 바꾸지 않는다고 보고, **안전장치로 쓰지 않음** |
+| `ddl-auto: update` | 일부 스키마 변경을 시도할 수 있지만 제약 제거·Enum/데이터 이행·복구를 보장하지 않는다. **안전장치로 쓰지 않음**. 운영 절차는 [OPS-01](../../delivery/TASK-OPS-01-prod-config-failfast.md) §3·§5 |
 | 배포 순서 후보 | ① DB에 새 값 허용 → ② 새 값을 **읽을 수 있는** 앱 배포 (아직 쓰지 않음) → ③ 새 값을 쓰는 기능 활성화 |
 | Rollback 위험 | 새 값이 저장된 뒤 예전 앱으로 되돌리면 Enum 변환 실패로 조회 500 (원문 B+ §5). ② 단계 이후로만 되돌리거나, 되돌릴 때 값을 바꾸는 절차가 필요 |
 | 함께 묶을 변경 | ML-2 Shift 취소 Column, 배정 이력 Table, §4 연결 Column, 알림 Type |

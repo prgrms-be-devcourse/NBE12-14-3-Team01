@@ -1,5 +1,7 @@
 # API 계약 목록 (V3 Improvement)
 
+> **현재 승인 상태 (2026-10-26):** 사용자 전달 구두 승인과 PR 리뷰에 따른 채택 범위·예외는 [Decision Log](../decisions/DECISION-LOG.md) §4를 따른다. 아래 최초 작성 당시 PROPOSED/PENDING 표기는 이력이며 현재 승인 범위를 덮어쓰지 않는다. 구현·실험·배포 및 미결정 사항은 각각 별도 상태다.
+
 | 축 | 상태 |
 |---|---|
 | ③ 문서 | `DRAFT`. S2-3B — **B1(퇴사·공개 후 근무 변경)**, **B2(소속·조회·인증) 초안 (2026-10-25)** |
@@ -65,6 +67,7 @@
 | Path 변수 | `memberId` = 퇴사 대상의 **현재 WorkplaceMember ID** |
 | 대상 조건 | 같은 근무지, 현재 소속, EMPLOYEE (ML-H2 H2-9). 대상 소속이 없거나 다른 근무지 소속이면 **404** (§1 대상 범위 오류). 같은 근무지의 이미 종료된 소속이면 409 STATE_CONFLICT |
 | 응답 `data` | `member` (ID, 이름, 역할, 가입 시각) / `ongoingShift` (있으면 확정 불가, 종료 시각) / `publishedShifts[]` (근무 ID, 근무표 ID, 시작·종료, 진행 중 대타 유무·상태) / `draftShiftsToDelete[]` (근무 ID, 시작·종료, 근무표 주차) / `candidacies[]` (대상이 다른 사람 근무의 후보로 걸린 요청: 요청 ID, 후보 상태, 퇴사 시 효과) |
+| 비교 정보 (1차 후보) | `previewContext`: 응답의 공식 근무·DRAFT·대타 영향과 실행자/근무지/대상 소속을 묶은 서버 검증 가능 비교 정보. 무결성·기간·재사용 규칙은 G03-D-05 §5-4. 형식은 Command 구현 착수 때 확정 |
 | 넣지 않는 것 | 불가능 시간 충돌 (인계 대상을 고르기 전이라 계산할 수 없음, G03-D-05 §3) |
 | 상태 변경 | 없음 (조회) |
 | 오류 | 403 PERMISSION (`WPL-003`·`WPL-004`) → 404 NOT_FOUND (대상 소속 없음·다른 근무지, 새 code) → 409 STATE_CONFLICT (대상이 MANAGER, 이미 종료된 소속 — 새 WPL code) 순서로 판정 |
@@ -76,13 +79,13 @@
 | 항목 | 내용 |
 |---|---|
 | 권한 | API-LV-01과 같음 |
-| 요청 | `decisions[]`: { `shiftId`, `shiftStartAt`, `shiftEndAt` (G03-D-05 P2 비교용), `action`: `REASSIGN` + `targetMemberId` (**인계 대상의 현재 WorkplaceMember ID**) 또는 `CANCEL` } / `acknowledgedUnavailableConflicts[]` (G03-D-05 §5-1, 처음에는 빈 목록) / `regenerateInviteCode` (기본 `false`, ML-H2 H2-5) |
+| 요청 | `previewContext` (API-LV-01에서 받은 비교 정보, 1차 필드 후보) / `decisions[]`: { `shiftId`, `shiftStartAt`, `shiftEndAt` (G03-D-05 P2 비교용), `action`: `REASSIGN` + `targetMemberId` (**인계 대상의 현재 WorkplaceMember ID**) 또는 `CANCEL` } / `acknowledgedUnavailableConflicts[]` (G03-D-05 §5-1, 처음에는 빈 목록) / `regenerateInviteCode` (기본 `false`, ML-H2 H2-5) |
 | 검사 순서 | ① 권한 → ② 계획 유효성 P1~P5 (G03-D-05 §4-2) → ③ 우회할 수 없는 충돌 (인계 대상의 공식 근무 중복, 다른 근무지, 시작한 근무) → ④ 불가능 시간 확인 범위 (§5-3 겹침 구간 비교) |
 | 성공 응답 | 200. `data`: `leftAt`, `reassignedShifts[]`, `cancelledShifts[]`, `deletedDraftShifts[]`, `closedRequests` (총수와 사유별 수: `SHIFT_CHANGED`, `CANDIDATE_INELIGIBLE`. 세는 규칙은 API-PS-02 `closedSubstituteRequests`와 같다. 한 요청은 사유 하나로만 세므로 사유별 수의 합 = 총수), `ineligibleCandidacies`, `newInviteCode` (재발급했을 때만) |
 | 404 응답 | Path의 대상 소속이 없거나 다른 근무지 (API-LV-01과 같음). 요청 Body의 `targetMemberId`·`shiftId`가 그 근무지에 없거나 다른 근무지 것이어도 같은 404 (존재 여부를 드러내지 않음) |
-| 409 응답 | **CONFIRM_REQUIRED** (`data` = G03-D-05 §5-1 충돌 목록, 겹침 구간만) / **STALE** (계획이 지금과 다름 → 미리보기 다시 조회. 예: 같은 근무지의 인계 대상이 그 사이 퇴사, 근무가 그 사이 인계·취소됨, 퇴사자 담당 DRAFT가 새로 생김) / **STATE_CONFLICT** (진행 중 근무 — `data`에 종료 시각, 이미 종료된 소속, 대상이 MANAGER) / **FORBIDDEN_CONFLICT** (인계 대상의 공식 근무 중복. 기존 SFT·SCH code 재사용 여부는 S2-4) |
+| 409 응답 | **CONFIRM_REQUIRED** (`data` = G03-D-05 §5-1 충돌 목록, 겹침 구간만) / **STALE** (계획이 지금과 다름 → 미리보기 다시 조회. 예: 같은 근무지의 인계 대상이 그 사이 퇴사, 근무가 그 사이 인계·취소됨, 미리보기 이후 DRAFT/대타 자동 대상 추가·교체·처리 효과 확대. 자동 대상이 감소하기만 하면 다른 조건 재검증 후 진행 가능) / **STATE_CONFLICT** (진행 중 근무 — `data`에 종료 시각, 이미 종료된 소속, 대상이 MANAGER) / **FORBIDDEN_CONFLICT** (인계 대상의 공식 근무 중복. 기존 SFT·SCH code 재사용 여부는 S2-4) |
 | 상태 변경 (한 Transaction) | 대상 소속 `leftAt = now` / 인계 근무: `Shift.member = 대상` + 배정 이력 (`MEMBER_LEFT`) / 취소 근무: `CANCELLED` + 취소 사유 `MEMBER_LEFT`·시각·행위자 / DRAFT 삭제 / 퇴사자 근무의 활성 Request → `CLOSED / SHIFT_CHANGED` / 퇴사자가 후보인 Request: PENDING → `INELIGIBLE`, 수락자면 Request `CLOSED / CANDIDATE_INELIGIBLE` / (선택) 초대 코드 재발급. Pattern은 보존하고 자동 적용 제외 |
-| Lock (ML-5 후보, 실험 전) | (재발급 시 Workplace) → 관련 Schedule → 퇴사자 근무 Shift → 관련 Request → 인계 대상 User (ID 오름차순) → 인계 대상 소속 `FOR SHARE` + 퇴사 대상 소속 `FOR UPDATE` → 다시 조회 → 새 영향 Row가 있으면 409 STALE |
+| Lock (ML-5 후보, 실험 전) | (재발급 시 Workplace) → 관련 Schedule → 퇴사자 근무 Shift → 관련 Request → 인계 대상 User (ID 오름차순) → 인계 대상 소속 `FOR SHARE` + 퇴사 대상 소속 `FOR UPDATE` → 다시 조회 → 미리보기와 대상+처리 효과 비교(추가/교체/확대는409 STALE). 검사 후 삽입 경합도 공통 Guard로 검증 |
 | 알림 (Commit 후, 최선 노력) | 인계받은 직원 (근무 배정), 대타 종료 관련자 (요청자·후보, 현재 소속만, ML-3), 퇴사자는 받지 않음. 대체 조회 화면: 예정 근무, 보낸·수락 대타 목록 (G03-D-22) |
 | 데이터 출처 | API-LV-01과 같고, 인계 대상의 불가능 시간(본인 User 기준), 인계 대상의 공식 근무 (User 기준 충돌 검사) |
 | Test | ML-4 V2-N-24~40, ML-2 V3-N-01~08, ML-3 V4-N-08~22 일부, G03-D-05 D05-T1~T9·T11, G03-D-21 D21-T7~T9 |
@@ -93,10 +96,10 @@
 |---|---|
 | 권한 | 그 근무지의 현재 MANAGER |
 | 대상 | PUBLISHED Schedule. 추가하는 근무는 시작 전. Path의 근무표가 없거나 다른 근무지면 404 (§1) |
-| 요청 | `memberId` (현재 WorkplaceMember ID), `startAt`, `endAt`, `acknowledgedUnavailableConflicts[]` (근무 1건 기준 목록) |
+| 요청 | `memberId` (현재 WorkplaceMember ID), `startAt`, `endAt`, `acknowledgedUnavailableConflicts[]`: `{ newShiftKey: { scheduleId, targetMemberId, shiftStartAt, shiftEndAt }, overlaps[] }` (신규 추가는 shiftId 없음, G03-D-05 §5-1) |
 | 기존 DTO와의 관계 | 기존 `ShiftRequest`(`confirmUnavailableConflict: boolean`)를 재사용하지 않고 새 요청 DTO. 기존 DRAFT API 형식은 그대로 |
 | 검사 | 근무 시간 규칙 (같은 날, 주차 범위, 시작 < 종료 — 기존 DRAFT 검사와 같은 규칙), 같은 근무표 안 겹침, 다른 근무지 공식 근무 겹침 (우회 불가), 담당자 현재 소속, 불가능 시간 (확인 범위) |
-| 성공 응답 | 201 + 추가된 근무 |
+| 성공 응답 | 201 + 추가된 근무. 첫409에서는 Shift·배정 이력·알림 저장0; 확인 재요청이 현재 계획과 일치하고 재검증을 통과한 경우에만 생성 |
 | 오류 | 403 (권한) → 404 (근무표·담당 소속 범위) → 409 STATE_CONFLICT (근무표가 PUBLISHED가 아님. 참고: 기존 DRAFT API는 반대 경우를 `SFT-005` 400 "잘못된 상태입니다"로 거부) → 기존 SFT·SCH 계열 code 재사용 후보 (시간 규칙·겹침) → 409 CONFIRM_REQUIRED |
 | 상태 변경 | 새 Shift (SCHEDULED). 배정 이력을 남길지는 ML-2-INV-04 범위(담당자 "변경")와 함께 S2-3B 마무리 때 확인 |
 | Lock (ML-5 후보) | Schedule → 새 담당 User → 새 담당 소속 `FOR SHARE` + `leftAt` 재확인 → INSERT |

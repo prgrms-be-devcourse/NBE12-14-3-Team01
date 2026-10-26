@@ -1,5 +1,7 @@
 # NotificationType 공통 목록
 
+> **현재 승인 상태 (2026-10-26):** 사용자 전달 구두 승인과 PR 리뷰에 따른 채택 범위·예외는 [Decision Log](../decisions/DECISION-LOG.md) §4를 따른다. 아래 최초 작성 당시 PROPOSED/PENDING 표기는 이력이며 현재 승인 범위를 덮어쓰지 않는다. 구현·실험·배포 및 미결정 사항은 각각 별도 상태다.
+
 | 축 | 상태 |
 |---|---|
 | ③ 문서 | `DRAFT` (S2-4B 초안, 2026-10-25) |
@@ -25,7 +27,7 @@
 | 받는 사람 계산 | 관리자 목록은 `findAllByWorkplace_IdAndRoleAndLeftAtIsNull` (현재 관리자만). 요청자·후보 목록은 Request의 소속 ID를 그대로 씀 (**현재 소속인지 거르지 않음**). 저장할 때도 `leftAt`을 다시 보지 않는다 | `SubstituteRequestService` L455-528, `SubstituteCandidateService` L308-364 |
 | 조회·읽음 | 목록과 읽음 모두 "수신 소속의 User = 나 ∧ 수신 소속이 현재 소속" (퇴사자는 자기 알림을 볼 수 없음) | `NotificationRepository` L19, `NotificationService` L310-317 |
 | 재가입 격리 | 알림이 그때의 소속을 가리키므로, 재가입한 새 소속에는 이전 소속의 알림이 보이지 않는다 (이전 소속은 `leftAt`이 있어 목록 조건에서 빠짐) | 위 두 조건 |
-| DB 저장 형식 | 세 가지를 구분한다. ① **JPA 매핑:** `@Enumerated(EnumType.STRING)` — Enum 값을 문자열로 읽고 쓴다는 뜻일 뿐 Column 형식을 정하지 않는다. ② **Hibernate가 만드는 DDL:** Spring Boot 4.1.1(Hibernate 7) + MySQL에서는 `ENUM(...)` Column을 만드는 것으로 **추정**한다 (확인 안 함). ③ **운영 Schema:** Column이 언제 어떤 버전으로 만들어졌는지에 따라 `VARCHAR`일 수도 `ENUM`일 수도 있고 CHECK 제약이 있을 수도 있다. 운영은 `ddl-auto: update`라 기존 Column 정의를 바꾸지 않는다. **운영 형식은 `UNKNOWN`** (운영 접속 금지, 배포 담당 확인). `VARCHAR`이고 제약이 없으면 DDL이 필요 없고, `ENUM`이거나 CHECK가 있으면 DDL이 필요하다. ②는 S4 격리 실험(Testcontainers MySQL)에서 `SHOW CREATE TABLE`로 확인할 수 있다. ML-3의 Enum DDL과 같은 문제 | `build.gradle.kts` L5, `application-prod.yml` L10, ML-3 §9 |
+| DB 저장 형식 | 세 가지를 구분한다. ① **JPA 매핑:** `@Enumerated(EnumType.STRING)` — Enum 값을 문자열로 읽고 쓴다는 뜻일 뿐 Column 형식을 정하지 않는다. ② **Hibernate가 만드는 DDL:** Spring Boot 4.1.1(Hibernate 7) + MySQL에서는 `ENUM(...)` Column을 만드는 것으로 **추정**한다 (확인 안 함). ③ **운영 Schema:** Column이 언제 어떤 버전으로 만들어졌는지에 따라 `VARCHAR`일 수도 `ENUM`일 수도 있고 CHECK 제약이 있을 수도 있다. 운영 `ddl-auto: update`는 일부 스키마 변경을 시도할 수 있으나 검토된 제약 제거·Enum 이행·데이터 복구를 보장하지 않는다. 실행·복구 순서는 [OPS-01](../delivery/TASK-OPS-01-prod-config-failfast.md) §3·§5를 따른다. **운영 형식은 `UNKNOWN`** (운영 접속 금지, 배포 담당 확인). `VARCHAR`이고 제약이 없으면 DDL이 필요 없고, `ENUM`이거나 CHECK가 있으면 DDL이 필요하다. ②는 S4 격리 실험(Testcontainers MySQL)에서 `SHOW CREATE TABLE`로 확인할 수 있다. ML-3의 Enum DDL과 같은 문제 | `build.gradle.kts` L5, `application-prod.yml` L10, ML-3 §9 |
 
 ## 2. 기존 8종 (AS-IS)
 

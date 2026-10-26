@@ -1,10 +1,10 @@
 # Decision Log
 
-> 작성 기준: 2026-10-22 (D0-B), D0-D 이관·사실 갱신 2026-10-23 (3차 `develop` `cdaaa13`). **현재 `APPROVED` 0건.**
+> 작성 기준: 2026-10-22 (D0-B), D0-D 이관·사실 갱신 2026-10-23 (3차 `develop` `cdaaa13`). **현재 정책 방향 채택 13건: §2 및 §4 (2026-10-26 사용자 전달 승인 기록).**
 > D0-D에서 바꾼 것은 "결정" 칸의 **적용 사실·이유·근거** 기록과 DL-014 추가뿐이다. 상태는 모두 `PENDING`으로 유지했다. GitHub PR 리뷰 Approve는 이 Log의 `APPROVED`가 아니다.
 > 상태값의 5축 대응은 `docs/STATUS-AXES.md` (② 정책 승인).
 > 정책 결정의 Source of Truth. 승인된 행만 `CONTRACT-BASELINE`·Test 기대값 변경의 근거가 된다.
-> AI는 `PENDING` / `DISCREPANCY` 행을 추가할 수 있지만 상태를 `APPROVED` / `REJECTED`로 바꾸지 않는다.
+> AI의 독립적인 승인 판단은 금지한다. 이번 §4는 사용자가 구두 승인을 전달하고 기록을 지시한 내용의 대필이며, 승인 범위를 AI가 확대하지 않는다.
 
 ## 기록 규칙
 
@@ -34,38 +34,38 @@
 
 ## 2. G-03 / G-05 결정 후보 (외부 원문은 ID로 참조)
 
-미결정 시 처리는 모두 "현행 보존 (Migration 비차단)"이다. 상태는 모두 `PENDING`.
-G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있다 (승인된 결정 아님). G-05 원문은 저장소에 없다 (DL-005). `D-NOW-01~11`은 G-05 §0.3 "사람이 먼저 정할 것" 목록에서 온 실행 결정 후보다 (`docs/README.md` §5-1). Membership Lifecycle 관련 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 ② `PROPOSED`인 과거 제안이며, 원문을 `docs/references/ml/`에 보존했다 (현행 계약 아님). 지금 검토 중인 정책 카드는 §3에 연결한다. 아래 G03-D-11~16·26·27의 상태를 바꾸지 않는다.
+미결정 시 처리는 "현행 보존 (Migration 비차단)"이다. 현재 승인 범위는 §4, 나머지는 PENDING이다.
+G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있다 (승인된 결정 아님). G-05 원문은 저장소에 없다 (DL-005). `D-NOW-01~11`은 G-05 §0.3 "사람이 먼저 정할 것" 목록에서 온 실행 결정 후보다 (`docs/README.md` §5-1). Membership Lifecycle 관련 구체안(ML-DECISION-01, ML-SUB-STATE-01, ML-CONCURRENCY-01-R)은 ② `PROPOSED`인 과거 제안이며, 원문을 `docs/references/ml/`에 보존했다 (현행 계약 아님). 지금 검토 중인 정책 카드는 §3에 연결한다. 과거 제안 원문 자체의 상태는 바꾸지 않는다. 아래 현재 상태는 §4의 사람 전달 승인 범위를 반영한다.
 
 | ID | 질문 (요약) | 시점 (G-05 제안) | 결정 주체 | 상태 |
 |---|---|---|---|---|
 | G03-D-01 | 성공 응답 `code` 규칙 | DEFER | COMMON | PENDING |
 | G03-D-02 | Pattern 권한 실패 Error Contract | DEFER | COMMON | PENDING |
-| G03-D-03 | ErrorCode Prefix / 400·409 | DEFER | COMMON | PENDING |
+| G03-D-03 | ErrorCode Prefix / 400·409 | DEFER | COMMON | APPROVED (§4) |
 | G03-D-04 | 다른 Workplace / User Resource 접근 시 노출 정책 | DEFER | COMMON | PENDING |
-| G03-D-05 | Warning + confirm 응답 계약 | DEFER | COMMON | PENDING |
+| G03-D-05 | Warning + confirm 응답 계약 | DEFER | COMMON | APPROVED (§4, 정책 방향; 기술 명세 조건 별도) |
 | G03-D-06 | 다른 User Resource 403 / 404 | DEFER | COMMON | PENDING |
 | G03-D-07 | Unavailable ErrorCode 형식 / 메시지 | DEFER | COMMON | PENDING |
 | G03-D-08 | Unavailable Success code / 정렬 / DELETE 응답 | DEFER | COMMON | PENDING |
 | G03-D-09 | Substitute Error Contract | DEFER | COMMON | PENDING |
 | G03-D-10 | 남의 알림 403 / 404, Success code | DEFER | COMMON | PENDING |
-| G03-D-11 | Membership 종료를 3차 Scope로 채택 (H2) | DECIDE_NOW | 팀 | PENDING |
-| G03-D-12 | 종료 채택 시 최소 범위 | D-11 종속 | 팀 | PENDING |
-| G03-D-13 | 재가입 방식 | D-11 종속 | 팀 | PENDING |
-| G03-D-14 | 종료 시 Pattern 처리 | D-11 종속 | 팀 | PENDING |
-| G03-D-15 | Substitute 관련 Membership Lifecycle | D-11 종속 | 팀 | PENDING |
+| G03-D-11 | Membership 종료를 3차 Scope로 채택 (H2) | DECIDE_NOW | 팀 | APPROVED (§4) |
+| G03-D-12 | 종료 채택 시 최소 범위 | D-11 종속 | 팀 | APPROVED (§4) |
+| G03-D-13 | 재가입 방식 | D-11 종속 | 팀 | APPROVED (§4) |
+| G03-D-14 | 종료 시 Pattern 처리 | D-11 종속 | 팀 | APPROVED (§4) |
+| G03-D-15 | Substitute 관련 Membership Lifecycle | D-11 종속 | 팀 | APPROVED (§4) |
 | G03-D-16 | 종료 Membership의 알림 노출 / 수신 | D-11 종속 | 팀 | PENDING |
 | G03-D-17 | Request 종료 상태 / 어휘 | DEFER | 팀 | PENDING |
 | G03-D-18 | 철회 / 관리자 거절 / 재OPEN 흐름과 알림 | DEFER | 팀 | PENDING |
-| G03-D-19 | Expiry | DEFER | 팀 | PENDING |
+| G03-D-19 | Expiry | DEFER | 팀 | APPROVED (§4) |
 | G03-D-20 | Expiry 도입 시 만료 알림 | D-19 종속 | 팀 | PENDING |
-| G03-D-21 | ACCEPT / APPROVE의 Unavailable 충돌 처리 | DECIDE_AFTER_EVIDENCE | 팀 | PENDING |
-| G03-D-22 | 알림 유실 허용 수준과 실패 관측 (H5 연관) | DECIDE_AFTER_EVIDENCE | 팀 | PENDING |
-| G03-D-23 | 서버 Logout 채택 (H1) | DECIDE_NOW | 팀 | PENDING |
+| G03-D-21 | ACCEPT / APPROVE의 Unavailable 충돌 처리 | DECIDE_AFTER_EVIDENCE | 팀 | APPROVED (§4) |
+| G03-D-22 | 알림 유실 허용 수준과 실패 관측 (H5 연관) | DECIDE_AFTER_EVIDENCE | 팀 | APPROVED (§4) |
+| G03-D-23 | 서버 Logout 채택 (H1) | DECIDE_NOW | 팀 | APPROVED (§4) |
 | G03-D-24 | 다중 기기 동시 Refresh | DEFER | 팀 | PENDING |
 | G03-D-25 | Pattern Canonical API Method (현행 PUT) | DECIDE_NOW (문서 기준) | 팀 | PENDING |
-| G03-D-26 | `CANCELLED` 장기 의미 | DEFER | 팀 | PENDING |
-| G03-D-27 | PUBLISHED 이후 정정 범위 | DEFER | 팀 | PENDING |
+| G03-D-26 | `CANCELLED` 장기 의미 | DEFER | 팀 | APPROVED (§4) |
+| G03-D-27 | PUBLISHED 이후 정정 범위 | DEFER | 팀 | APPROVED (§4) |
 | G03-D-28 | 운영 Swagger / API Docs / H2 Console 노출 범위 | DECIDE_NOW (배포 전) | 팀 | PENDING |
 | G03-OQ-01 | `/workplaces/**` 무토큰 결과의 Kotlin 처리 (CB-SEC-01) | DECIDE_AFTER_EVIDENCE (AUTH-EV-01) | 사람 | PENDING |
 | G03-OQ-02 | REVIEW_ACCEPTED를 Kotlin 비교 기준으로 승인 | DECIDE_NOW | 사람 | PENDING |
@@ -109,3 +109,55 @@ G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있
 | [`NOTIFICATION-TYPES`](../contract/NOTIFICATION-TYPES.md) §6 | G03-D-22, **G03-D-16 (연결)**, **G03-D-20 (연결)** | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-16·20 `PENDING` | 종료 알림 사유별 Type, 받는 사람별 합치기 세 조건, `SHIFT_CHANGED`의 PENDING 후보 제외, 실행 관리자는 관리자 수신에서만 제외 (S3-A X-4). 과거 소속 알림 읽음(B-2)은 G03-D-16과 같은 질문, 관리자 만료 조회(API-SB-02)는 만료 알림(G03-D-20) 없이 대체 화면만 제공 |
 | [`IMPLEMENTATION-PRIORITY`](IMPLEMENTATION-PRIORITY.md) 구현 우선순위 원칙 | — | 사용자 잠정 원칙 (2026-10-25) / ③ `DRAFT` | — | P0/P1/P2 기준, 정합성 묶음 A~F·B', 묶음별 추적표. 일정·담당(D-NOW-01) 미정 |
 | [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md)·[`KOTLIN-REVIEW-CHECKLIST`](../migration/KOTLIN-REVIEW-CHECKLIST.md) 검증 전략 | DL-009·010 (연결), IMP-07 (연결) | 사용자 잠정 원칙 (2026-10-25) / ③ `DRAFT` | DL-009·010 `PENDING` | Migration 5단계, Test 호출 문법 수정만 허용, Java 기준선 로컬 실행 + XML (실행은 S4 승인 후), `prod` Profile 실행 승인 안 함, `@JvmRecord`는 DTO별 선택지 |
+
+## 4. 현재 정책 채택 범위 — 사용자 전달 승인 기록 (2026-10-26)
+
+### 4-1. 근거와 기록 방식
+
+사용자는 2026-10-26 이 문서 보정 작업을 지시하면서 **PR #14 Approve와 구두 승인을 받았고, 정책 방향은 유지하되 문서 모순·구현 공백을 보정하면 된다**고 전달했다. 이 기록은 그 사람의 전달 내용을 대필한 것이며 AI가 독립적으로 팀 승인을 추정한 것이 아니다. 기존의 PR Approve만으로는 정책 승인으로 읽지 않는 일반 규칙은 유지하되, 이번에는 사람의 구두 승인 전달을 추가 근거로 사용한다.
+
+- 승인 주체: 팀의 구두 승인 및 PR 리뷰 승인, 사용자 전달. 구두 승인 참석자별 성명·실제 회의 일자는 제공되지 않았으므로 추정하지 않는다.
+- 전달자: 이번 문서 보정을 지시한 사용자. 전달일: 2026-10-26. 기록자: 사용자 지시에 따른 Codex 대필.
+- PR 근거: [PR #14](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/14), Head `0ea4eda`의 woneychl·deokwoo-kim Approve(2026-10-26). 두 사람을 구두 승인 참석자로 간주하지 않는다.
+- 채팅 전달 원문 요지: “approved를 한 것과 구두 승인으로 받았어서”, “대부분 확인하고 괜찮다는 입장”, “모순이나 충돌하는 부분 … 정합성 … 문제점을 파악해서 수정”.
+- 이 전달은 이미 문장으로 선택된 정책 방향의 채택 근거다. 문서에 **미정**으로 남아 있는 선택지에 AI가 답을 만들거나, 기술 실험·운영 검증을 통과한 것으로 기록하는 근거가 아니다.
+
+### 4-2. 채택한 결정 문장
+
+아래 기존12개와 §4-4의 G03-D-05 정책 방향은 **APPROVED**다. 승인 근거·전달자·일자는 §4-1을 공통 적용한다. 정책 구현은 Migration과 분리하며 해당 Task의 구현·회귀·배포 조건을 각각 충족한다.
+
+| Decision | 결정 내용 | 적용 조건·예외 |
+|---|---|---|
+| G03-D-03 | DOMAIN-NNN ErrorCode 체계 유지, 문서의 T1 오류 의미 정정을 별도 Improvement로 진행 | Migration의 기존 code·message·HTTP 기대값은 유지. 새 Command의 미완성 응답 형식은 G03-D-05에서 별도 확정 |
+| G03-D-11 | 퇴사와 재가입을 V3 Improvement 범위에 포함 | Kotlin 변환 PR과 분리 |
+| G03-D-12 | 현재 관리자에 의한 EMPLOYEE 퇴사, 미리보기·근무별 인계/취소·단일 Transaction으로 소속/근무/대타 정리 | STALE은 §4-4의 미리보기 기준. 비교 정보의 기술 구현은 별도 착수 조건. 진행 중 근무 거부 |
+| G03-D-13 | 종료 소속을 재활성화하지 않고 새 Row로 재가입, 현재 소속은 근무지·사용자당 최대1 | U2' 생성 컬럼은 실험 통과 조건부, 실패 시 대안 검토. 운영 Unique 이행·구버전 호환 검증 전 배포하지 않음 |
+| G03-D-14 | 퇴사자의 DRAFT 근무 정리, Pattern 보존·자동 적용 제외 | 퇴사와 편집 경합의 불변식은 별도 MySQL 실험/회귀로 확인 |
+| G03-D-15 | 근무 변경 시 활성 요청 SHIFT_CHANGED 종료, 수락 후보 퇴사 시 CANDIDATE_INELIGIBLE 종료, 닫힌 요청 재오픈 없음 | 이력 보존. 활성 요청2개 이상 비정상 데이터 처리 방식은 미결정 |
+| G03-D-19 | 시작 시각이 지난 OPEN/ACCEPTED를 응답에서 CLOSED/EXPIRED, 자동 만료의 closedAt=startAt | DB 상태를 조회에서 바꾸지 않음. 기존 Test 기대값 정정은 별도 Improvement에서 수행 |
+| G03-D-21 | 관리자 직접 배정은 불가능 시간 경고 후 확인, 대타 수락·승인은 거부 | 공식 근무 중복·권한·소속·시작한 근무는 확인으로 우회 불가 |
+| G03-D-22 | 알림 최선 노력, 실패해도 업무 Commit 유지, 업무 결과는 대체 화면으로 확인 | 새 알림6종·상세 수신자/합치기 규칙. SHIFT_CHANGED의 PENDING 후보 제외; 실행자는 관리자 수신자 집합에서만 제외, 요청자 역할 알림은 유지. 필요한 대체 화면이 해당 기능 묶음에서 구현·검증되어야 완료 |
+| G03-D-23 | AUTH-1의 Refresh 조건부 무효화 방식 서버 로그아웃 | Access 즉시 무효화·다중 기기·Rotation은 자동 포함하지 않음. 로그인별 jti·Origin·Cookie 계약은 별도 구현/회귀 확인 |
+| G03-D-26 | CANCELLED는 시작 전 공식 근무 배정 종료의 끝 상태, 사유·시각·행위자 기록 | 인력 수요 자체가 사라졌다는 의미로 쓰지 않음 |
+| G03-D-27 | 공개 후 추가·취소·담당자 변경을 별도 Command로 제공하고 담당자 변경 이력 보존 | 시간 변경·원자적 교체는 범위 밖. 기존 DRAFT API의 제한은 보존 |
+
+### 4-3. 이번 승인으로 답을 만들지 않은 항목
+
+- G03-D-05: 정책 방향과 STALE 미리보기 기준은 §4-4로 확정했다. 신규 추가의 newShiftKey 및 미리보기 비교 정보의 구체 형식·무결성 방식은 구현 착수 시 확정하고 검증한다. 기술 선택을 과거 구두 승인에 소급 포함하지 않는다.
+- G03-D-04·10·16: 기존 API의 범위 밖/종료 소속 접근 응답 예외는 원문의 미정 상태를 유지한다. 특히 알림 읽음을 403에서404로 임의 전환하지 않는다. 새 API의 명시된404 원칙을 기존 API 전체로 확대하지 않는다.
+- ML-5: 전역 순서·소속 Guard·Lock 후 재검증 원칙의 방향을 유지하되 구체 순서·RC/RR·교착/timeout 매핑은 실험 결과와 별도 Task로 확정한다. DL-002·009·010의 기술 상태를 자동 승인하지 않는다.
+- 운영 Schema·DDL·키 교체·Healthcheck·복구, 담당자 지정·일정·공식 Baseline 선언은 별도 확인 대상이다. 새 Enum 값 저장 후 구버전 읽기와 재가입 이력 후 옛 Unique 복구가 가능한지 반드시 검증한다.
+
+§1의 과거 기술 결정과 §3의 카드 연결표는 기존 작성 이력이다. 현재 정책 상태는 §2와 이 §4가 우선한다. 과거 카드 머리말의 PROPOSED/PENDING 표기만 읽어 이미 채택한 위 정책 방향13개을 다시 미승인으로 되돌리지 않는다. 승인 범위를 넘는 Field·ErrorCode 번호·배포 절차까지 모두 확정됐다는 뜻도 아니다.
+
+### 4-4. 퇴사 미리보기 기준 확정 (2026-10-26)
+
+사용자가 이 대화의 선택 질문에 **“미리보기 기준: 이후 자동 대상이 늘면 다시 미리보기, 줄면 진행”**을 선택했다. 이 결정은 G03-D-05의 정책 방향을 APPROVED로 기록하는 직접 근거다. 전달된 기존 구두 승인과 구분하며, 아래 비교 정보의 기술 구현까지 승인/검증됐다고 쓰지 않는다.
+
+1. 공식 근무: 미리보기에서 확인한 대상·담당자·상태·시간과 확정 계획이 일치해야 한다. 대상 추가/삭제/변경은 재확인 대상이다. 인계 대상은 선택 이후 현재 소속인지 다시 검사한다.
+2. 자동 처리: 현재 영향이 미리보기 영향의 부분집합인 경우만 진행 가능하다. ID와 건수만 비교하지 않고 대상별 삭제·후보자격변경·요청종료 등 처리 효과를 비교한다. 새로운 대상, 같은 건수의 대상 교체, 새 처리 효과·이력 영향이 생기면 409 STALE이다. 영향 감소 여부가 불명확하면 STALE로 처리한다.
+3. STALE/CONFIRM_REQUIRED 및 그 밖의 확정 실패 시 이번 퇴사 요청의 업무 변경은0이다. 이미 다른 요청이 Commit한 변경은 되돌리지 않는다. 확정 성공은 소속·근무·대타·배정 이력 등을 단일 업무 Transaction으로 Commit한다.
+4. 미리보기와 확정 사이뿐 아니라 Lock 대기 중 변경도 서버가 재검사한다. 검사를 통과한 뒤 새 근무/후보가 끼어들지 않도록 경쟁 Command의 소속 Guard·Lock 규약을 함께 검증한다.
+5. 화면은 STALE이면 미리보기와 비교 정보를 함께 새로 받는다. 여전히 유효한 인계·취소 선택만 복구하고 바뀐 영향을 다시 보여 준다. 변경 요청을 자동 재전송하지 않는다.
+
+**문서 1차본의 경계:** 정책 방향은 이 절로 확정한다. API의 `previewContext`와 신규 추가의 `newShiftKey`는 구현을 위한 1차 계약 후보이며 필드·무결성 방식·유효기간은 해당 Command의 구현 착수 시 V2/공통/Frontend가 확정한다. 서버가 미리보기의 원본 범위를 검증할 수 없으면 그 Command 구현을 완료로 처리하지 않는다. 이 기술 착수 조건은 J4 제출이나 AS-IS Kotlin Migration 전체의 차단 조건이 아니다. 상세 보장과 검증 항목은 G03-D-05 §5-4 및 DOMAIN-DEVELOPMENT-GUIDE §7-4를 따른다.

@@ -1,5 +1,7 @@
 # G03-D-22 알림 전달 수준과 상태 확인 보장
 
+> **현재 승인 상태 (2026-10-26):** 사용자 전달 구두 승인과 PR 리뷰에 따른 채택 범위·예외는 [Decision Log](../DECISION-LOG.md) §4를 따른다. 아래 최초 작성 당시 PROPOSED/PENDING 표기는 이력이며 현재 승인 범위를 덮어쓰지 않는다. 구현·실험·배포 및 미결정 사항은 각각 별도 상태다.
+
 | 축 | 상태 |
 |---|---|
 | 결정 단계 | **사용자 잠정 결정** (2026-10-25, D22-1~6, S22-a·b·c) |
@@ -119,7 +121,7 @@
 | 전원 거절, 관리자 종료, 승인 | SUB-05 (요청자). **수락했던 후보: D22-4 화면** | 요청자 있음. 후보는 D22-4 구현 후 |
 | (예정) 근무 취소·인계 | 빠진 근무 (ML-4) | Draft |
 | (예정) 새 배정 | 예정 근무 | 있음 |
-| (예정) 대타 종료 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` | SUB-05 (label 추가), D22-4 화면. PENDING 후보·실행한 관리자는 받지 않음 ([NOTIFICATION-TYPES](../../contract/NOTIFICATION-TYPES.md) §6-3) | Draft |
+| (예정) 대타 종료 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` | SUB-05 (label 추가), D22-4 화면. `SHIFT_CHANGED`의 PENDING 후보 제외, 실행자는 관리자 수신자 집합에서만 제외하며 요청자 역할 알림은 유지 ([NOTIFICATION-TYPES](../../contract/NOTIFICATION-TYPES.md) §6-3) | Draft |
 | (예정) 가입·재가입 | 관리자 구성원 목록 | 있음 |
 | (예정) 퇴사 결과 | 마이페이지 "내 소속 이력" (ML-4). 알림 자체는 퇴사자에게 보이지 않음 (§2) | Draft |
 
