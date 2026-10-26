@@ -372,6 +372,35 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         );
     }
 
+    @Test
+    @DisplayName("승인을 실행한 바깥 Transaction이 Rollback되면 Request·Shift는 그대로이고 승인 알림도 저장되지 않는다")
+    void approveInRolledBackTransaction_keepsRequestAndShiftAndSavesNoNotification() {
+        // given - C1이 수락한 ACCEPTED Request, C2는 PENDING, Shift 담당자는 요청자 (별도 Commit)
+        ManagerActionFixture fixture = createManagerActionFixture(true, false);
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - approve()는 @Transactional(REQUIRED)이라 바깥 Transaction에 합류한다.
+        // 승인과 Event 발행까지 끝난 뒤 바깥 Transaction을 Rollback한다
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            SubstituteRequest approved = substituteRequestService.approve(
+                fixture.requestId(),
+                fixture.managerUserId()
+            );
+            // Event는 approveRequest() 직후 발행되므로, 여기까지 오면 발행된 상태다
+            assertThat(approved.getStatus()).isEqualTo(RequestStatus.APPROVED);
+            status.setRollbackOnly();
+        });
+
+        // then - 업무 DB (새 Transaction): 승인 전 상태 그대로
+        SubstituteRequest request = requestOf(fixture.requestId());
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.ACCEPTED);
+        assertThat(request.getApprovedAt()).isNull();
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+
+        // then - 알림 DB: Commit이 없었으므로 AFTER_COMMIT Listener가 저장한 Row가 없다
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+    }
+
     // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
     private void assertNotifiedOnly(
         List<Notification> notifications,
