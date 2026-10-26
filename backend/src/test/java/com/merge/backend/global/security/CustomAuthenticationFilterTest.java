@@ -1,6 +1,7 @@
 package com.merge.backend.global.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,5 +46,24 @@ class CustomAuthenticationFilterTest {
                 .header("Authorization", "Bearer invalid-token"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-006"));
+    }
+
+    @Test
+    @DisplayName("재발급 요청은 Authorization 헤더가 Bearer 형식이 아니어도 401과 AUTH-003을 반환한다")
+    void test4() throws Exception {
+        // 재발급은 필터가 검사하지 않는 주소라서 헤더 대신 쿠키 없음(AUTH-003)으로 응답
+        mvc.perform(post("/api/v1/auth/refresh").contextPath("/api/v1")
+                .header("Authorization", "Basic abc123"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-003"));
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더에 Bearer만 있고 토큰이 없으면 401과 AUTH-005를 반환한다")
+    void test5() throws Exception {
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-005"));
     }
 }
