@@ -81,6 +81,28 @@
 
 이 문서 작업(D0-D)에서는 Gradle·Kotlin Version을 바꾸지 않는다.
 
+## 1-C. `mockito-kotlin` 추가 — 사실 / 이유 / MockK 미채택 / 근거 / 승인 상태
+
+| 구분 | 내용 | 상태 |
+|---|---|---|
+| 적용 사실 | `backend/build.gradle.kts`에 `testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")` 1줄 추가 (Branch `chore/mockito-kotlin`, 기준 `develop` `a148a62`). Spring Boot BOM 관리 대상이 아니라 Version을 적는다 (AI-RULES §4). Production Source·`application*.yml`·다른 Library Version 변경 없음 | `BUILD` |
+| 추가 이유 | Java Test를 Kotlin으로 옮길 때 Mockito를 Kotlin에서 그대로 쓰면 `any()`·`eq()`·`ArgumentCaptor.capture()`가 `null`을 반환해 Kotlin non-null 파라미터에서 NPE가 난다. 이 제약 때문에 V4 Production 코드가 id 파라미터를 `Long?`, Repository 반환을 `Optional`로 유지하고 있다. `mockito-kotlin`은 Mockito 위의 얇은 Kotlin API(`any()`, `anyOrNull()`, `argumentCaptor<T>()`, `mock<T>()`, `given`/`whenever`)라서 Test를 Kotlin답게 쓰면서 **Mock 동작은 Mockito와 같다** | 사용자(V4 Owner) 요청 (2026-10-26) |
+| MockK를 추가하지 않은 이유 | MockK도 Kotlin 전용 Mock Library지만 Mockito와 다른 구현이다. 기존 Java Test의 `given`/`verify` 호출(V4만 316곳)을 `every {}`/`verify {}`로 **모두 다시 써야** 하고, 기본 동작(stub 없는 호출 시 예외, relaxed mock, matcher 규칙)이 달라 "Test 의도를 유지했는가"를 리뷰로 확인하기 어렵다. Java Test와 Kotlin Test가 섞이는 Migration 기간에 두 Mock Library를 함께 쓰게 되는 것도 피한다. TS-13 (D0-B 판정 `NOT_NEEDED (M0), D2에서 재검토`)은 바꾸지 않는다 | 미채택 |
+| 변환 시 주의 | Java `any()`는 `null`도 매칭하지만 `mockito-kotlin`의 `any()`는 `null`을 매칭하지 않는다 (Mockito `any(Class)`와 같음). Java `any()` → `anyOrNull()`, Java `any(Foo.class)` → `any<Foo>()`로 옮겨야 Test 의도가 유지된다 (로컬 Probe Test 2건으로 확인, 저장소에 포함하지 않음) | `LOCAL` |
+| 호환성 근거 | `mockito-kotlin` 6.4.0 (Maven Central, 2026-09-23 배포)의 POM 의존성: `mockito-core` **5.23.0** (Boot BOM이 관리하는 현재 값과 같음), `kotlin-reflect` 2.1.20 runtime (현재 2.3.21로 해석됨) | `DOC` (Maven Central POM) |
+| `dependencies` 전후 | `runtimeClasspath`: 차이 없음. `testRuntimeClasspath`: 아래 3줄만 추가 | `LOCAL` |
+| Test 근거 | 변경 전 `a148a62` / 변경 후 같은 SHA + 위 1줄, 각각 `./gradlew clean check --no-daemon` (로컬 Windows 10, Gradle 9.3.0, Java Toolchain 25, Docker 29.6.2 Testcontainers MySQL): **BUILD SUCCESSFUL, 394 실행 / 394 PASS / 0 FAIL / 0 SKIP**, 전후 Test 이름 394개 동일, `checkstyleMain`·`checkstyleTest` 통과 | `LOCAL` |
+| 승인 상태 | `DECISION-LOG` DL-015 `PENDING`. 공통 설정 Owner 미지정 (D-NOW-01) | ② `PENDING` |
+
+```text
+testRuntimeClasspath 추가분
++--- org.mockito.kotlin:mockito-kotlin:6.4.0
+|    +--- org.mockito:mockito-core:5.23.0 (*)
+|    \--- org.jetbrains.kotlin:kotlin-reflect:2.1.20 -> 2.3.21 (*)
+```
+
+로컬 Build 주의: IntelliJ "Build project automatically"(`MAKE_PROJECT_ON_SAVE`)가 켜져 있으면 IDE 빌드가 Kotlin 출력물을 `build/classes/java/main`에 써서 Gradle `jar`가 `Entry META-INF/backend.kotlin_module is a duplicate`로 실패한다 (2026-10-26 로컬 재현). `build.gradle.kts`를 바꾸지 말고 이 설정을 끈 뒤 `./gradlew clean`부터 다시 실행한다.
+
 ## 2. 현재 코드의 Kotlin 전환 관련 특성 (develop `243f77c`, main)
 
 | 항목 | 수 | Kotlin 전환에서의 의미 |
@@ -118,6 +140,7 @@
 | TS-15 | `io.freefair.lombok` | — | Lombok Gradle 설정 | — | 예 (기존 설정) | 아니오 | — | BUILD | — | NOT_NEEDED |
 | TS-16 | ktlint / detekt | — | Kotlin 컨벤션 검사 (공식 MUST "컨벤션") | `.kt` 전체 | 아니오 (Checkstyle은 Java만) | 별도 판단 | `check`에 넣으면 CI 실패 조건이 늘어남 | — | — | CONDITIONAL (M0 이후 별도 PR) |
 | TS-17 | Spring Boot / Dependency Management / Gradle / Toolchain Version 변경 | 현행 유지 | — | — | 예 | 아니오 | — | DOC (Boot 4.1.1: Java 17~26, Gradle 9.x) | — | NOT_NEEDED |
+| TS-18 | `org.mockito.kotlin:mockito-kotlin` (2026-10-26 추가 행) | 6.4.0 (BOM 관리 아님) | Kotlin Test에서 Mockito matcher·captor의 `null` 반환 문제 해결 | Kotlin으로 옮긴 Test | 아니오 | 예 | Java `any()`(null 매칭) ↔ `mockito-kotlin` `any()`(null 미매칭) 차이 → `anyOrNull()` 사용 | DOC (POM: `mockito-core` 5.23.0) | 전후 `clean check` 394/394 (§1-C) | 적용 제안, DL-015 `PENDING` |
 
 D0-D 주: 위 표의 "판정" 칸은 D0-B 조사 당시 값이며 바꾸지 않았다. 3차 `cdaaa13` 실제 적용과의 차이는 §1-A, 유지 여부는 DL-014.
 
@@ -188,6 +211,7 @@ M0 완료 후: M0 검증 Test를 남길지 (회귀 보호용) 삭제할지 Owner
 5. Kotlin 컨벤션 도구 (ktlint/detekt) 채택 여부와 시점.
 6. M0 검증 Test 유지 여부.
 7. M0 기준 Commit: 3차 Repository의 최종 Java Baseline(`BL-TBD`) Import Commit (DL-013).
+8. Kotlin Test Mock Library: `mockito-kotlin` 6.4.0 추가, MockK 미채택 (§1-C, DL-015).
 
 ## 7. Blocker와 시작 조건
 
