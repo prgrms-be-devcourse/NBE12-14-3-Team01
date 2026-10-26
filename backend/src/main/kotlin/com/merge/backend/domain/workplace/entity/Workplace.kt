@@ -6,15 +6,15 @@ import jakarta.persistence.Entity
 
 @Entity
 class Workplace(
-    name: String?,
-    inviteCode: String?
+    name: String,
+    inviteCode: String
 ) : BaseEntity() {
 
     @field:Column(nullable = false)
-    var name: String? = name
+    var name: String = name
         protected set
 
     @field:Column(nullable = false, unique = true)
-    var inviteCode: String? = inviteCode
+    var inviteCode: String = inviteCode
         protected set
 }

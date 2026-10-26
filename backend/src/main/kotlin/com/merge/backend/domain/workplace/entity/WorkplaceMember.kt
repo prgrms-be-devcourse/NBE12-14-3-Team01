@@ -19,47 +19,32 @@ import java.time.LocalDateTime
         UniqueConstraint(columnNames = ["workplace_id", "user_id"])
     ]
 )
-class WorkplaceMember() : BaseEntity() {
+class WorkplaceMember @JvmOverloads constructor(
+    workplace: Workplace,
+    user: User,
+    role: WorkplaceRole,
+    joinedAt: LocalDateTime,
+    leftAt: LocalDateTime? = null
+) : BaseEntity() {
     @field:ManyToOne(fetch = FetchType.LAZY)
     @field:JoinColumn(name = "workplace_id", nullable = false)
-    var workplace: Workplace? = null
+    var workplace: Workplace = workplace
         protected set
 
     @field:ManyToOne(fetch = FetchType.LAZY)
     @field:JoinColumn(name = "user_id", nullable = false)
-    var user: User? = null
+    var user: User = user
         protected set
 
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false)
-    var role: WorkplaceRole? = null
+    var role: WorkplaceRole = role
         protected set
 
     @field:Column(nullable = false)
-    var joinedAt: LocalDateTime? = null
+    var joinedAt: LocalDateTime = joinedAt
         protected set
 
-    var leftAt: LocalDateTime? = null
+    var leftAt: LocalDateTime? = leftAt
         protected set
-
-    constructor(
-        workplace: Workplace?,
-        user: User?,
-        role: WorkplaceRole?,
-        joinedAt: LocalDateTime?
-    ) : this(workplace, user, role, joinedAt, null)
-
-    constructor(
-        workplace: Workplace?,
-        user: User?,
-        role: WorkplaceRole?,
-        joinedAt: LocalDateTime?,
-        leftAt: LocalDateTime?
-    ) : this() {
-        this.workplace = workplace
-        this.user = user
-        this.role = role
-        this.joinedAt = joinedAt
-        this.leftAt = leftAt
-    }
 }
