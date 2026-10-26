@@ -5,6 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.merge.backend.domain.shift.dto.ManagerScheduleResponse;
@@ -15,6 +17,7 @@ import com.merge.backend.domain.shift.dto.SchedulePublishResponse;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.service.ScheduleService;
 import com.merge.backend.global.dto.ApiResponse;
+import com.merge.backend.global.exception.GlobalExceptionHandler;
 import com.merge.backend.global.rq.Rq;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -345,8 +348,14 @@ class ScheduleControllerTest {
     @Test
     void 공개_확인값이_누락되면_400을_반환한다() throws Exception {
 
+        MockMvc validationMockMvc =
+            MockMvcBuilders
+                .standaloneSetup(scheduleController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
         // when & then
-        mockMvc.perform(
+        validationMockMvc.perform(
                 patch(
                     "/workplaces/{workplaceId}/schedules/{scheduleId}/publish",
                     10L,
@@ -355,8 +364,45 @@ class ScheduleControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
             )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
             .andExpect(
-                status().isBadRequest()
+                jsonPath("$.data.fieldErrors[0].field")
+                    .value("confirmUnavailableConflict")
+            )
+            .andExpect(
+                jsonPath("$.data.fieldErrors[0].message")
+                    .value("근무 불가능 일정 충돌 확인 여부는 필수입니다.")
+            );
+
+        verifyNoInteractions(
+            rq,
+            scheduleService
+        );
+    }
+
+    @Test
+    void 주_시작일이_누락되면_COM_001_필드_오류를_반환한다() throws Exception {
+
+        MockMvc validationMockMvc =
+            MockMvcBuilders
+                .standaloneSetup(scheduleController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        validationMockMvc.perform(
+                post("/workplaces/{workplaceId}/schedules", 10L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("weekStartDate"))
+            .andExpect(
+                jsonPath("$.data.fieldErrors[0].message")
+                    .value("주 시작일은 필수입니다.")
             );
 
         verifyNoInteractions(
