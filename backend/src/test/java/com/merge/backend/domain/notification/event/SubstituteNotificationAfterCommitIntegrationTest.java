@@ -1,10 +1,16 @@
 package com.merge.backend.domain.notification.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.merge.backend.domain.notification.entity.Notification;
 import com.merge.backend.domain.notification.entity.NotificationType;
+import com.merge.backend.domain.notification.repository.NotificationRepository;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
@@ -36,7 +42,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
+import org.hibernate.Session;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,8 +53,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 대타 Event의 Commit 후 알림 생성을 실제 MySQL Row로 확인한다 (V5-J3, 현재 Java 동작 고정).
@@ -81,6 +92,9 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         "수락한 대체 근무가 공식 근무로 확정되었습니다.";
 
     private static final String MANAGER_CLOSED_MESSAGE = "관리자가 대체 근무 요청을 종료했습니다.";
+
+    @MockitoSpyBean
+    private NotificationRepository notificationRepository;
 
     @Autowired
     private SubstituteRequestService substituteRequestService;
@@ -464,6 +478,83 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         });
         assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
         assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+    }
+
+    @Test
+    @DisplayName("승인 Commit 후 알림 저장이 실패해도 업무는 유지되고 알림은 모두 Rollback된다")
+    void approveWithNotificationSaveFailure_keepsBusinessCommitAndRollsBackNotifications() {
+        ManagerActionFixture fixture = createManagerActionFixture(true, false);
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+        assertThat(requestOf(fixture.requestId()).getStatus()).isEqualTo(RequestStatus.ACCEPTED);
+        assertThat(shiftMemberIdOf(fixture.shiftId())).isEqualTo(fixture.requesterMemberId());
+        List<Long> insertedIds = new ArrayList<>();
+        List<Long> failedRecipients = new ArrayList<>();
+        List<String> transactionNames = new ArrayList<>();
+
+        doAnswer(invocation -> {
+            Notification notification = invocation.getArgument(0);
+            failedRecipients.add(notification.getRecipientMember().getId());
+            transactionNames.add(
+                TransactionSynchronizationManager
+                    .getCurrentTransactionName()
+            );
+            assertThat(TransactionSynchronizationManager
+                .isActualTransactionActive()).isTrue();
+            // IDENTITY의 선행 INSERT를 JDBC로 직접 조회한다. flush/JPA Query는 추가하지 않는다
+            Long insertedId = entityManager.unwrap(Session.class).doReturningWork(connection -> {
+                try (var statement = connection.prepareStatement(
+                    "select id from notification where recipient_member_id = ? and type = ?"
+                )) {
+                    statement.setLong(1, fixture.requesterMemberId());
+                    statement.setString(2, NotificationType.SUBSTITUTE_APPROVED.name());
+                    try (var rows = statement.executeQuery()) {
+                        assertThat(rows.next()).isTrue();
+                        long id = rows.getLong(1);
+                        assertThat(rows.next()).isFalse();
+                        return id;
+                    }
+                }
+            });
+            insertedIds.add(insertedId);
+            throw new IllegalStateException("J3-09 injected recipient failure");
+        }).when(notificationRepository).save(argThat((Notification notification) ->
+            notification != null && notification.getRecipientMember() != null
+                && fixture.firstCandidateMemberId()
+                    .equals(notification.getRecipientMember().getId())
+                && notification.getType() == NotificationType.SUBSTITUTE_APPROVED
+        ));
+
+        // 바깥 Test Transaction 없이 실제 승인·Commit·Listener 전체 경로를 실행한다
+        assertThatCode(() -> substituteRequestService.approve(
+            fixture.requestId(), fixture.managerUserId()
+        )).doesNotThrowAnyException();
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues())
+            .extracting(notification -> notification.getRecipientMember().getId())
+            .containsExactly(fixture.requesterMemberId(), fixture.firstCandidateMemberId());
+        assertThat(saved.getAllValues()).allSatisfy(notification ->
+            assertThat(notification.getType()).isEqualTo(NotificationType.SUBSTITUTE_APPROVED));
+        assertThat(failedRecipients).containsExactly(fixture.firstCandidateMemberId());
+        assertThat(insertedIds).hasSize(1).doesNotContainNull();
+        assertThat(saved.getAllValues().get(0).getId()).isEqualTo(insertedIds.get(0));
+        assertThat(transactionNames).hasSize(1).doesNotContainNull();
+        assertThat(transactionNames.get(0))
+            .endsWith("NotificationService.createSubstituteApprovedNotifications");
+
+        // 새 Transaction의 DB 상태: 업무 Commit은 유지되고 첫 알림도 남지 않는다
+        SubstituteRequest request = requestOf(fixture.requestId());
+        assertThat(request.getStatus()).isEqualTo(RequestStatus.APPROVED);
+        assertThat(request.getApprovedAt()).isNotNull();
+        assertThat(shiftMemberIdOf(fixture.shiftId()))
+            .isEqualTo(fixture.firstCandidateMemberId());
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+            assertThat(entityManager.find(Notification.class, insertedIds.get(0))).isNull()
+        );
+        System.out.println("J3-09 business=APPROVED, shift=accepted, injected=1, first INSERT ID="
+            + insertedIds.get(0) + ", remaining notifications=0");
     }
 
     // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
