@@ -9,29 +9,31 @@ import jakarta.persistence.Table
 @Table(name = "users")
 class User() : BaseEntity() {
 
+    // DB NOT NULL이라 null 불가. Java Test가 빈 생성자(new User())를 쓰므로 lateinit
     @Column(nullable = false, unique = true)
-    var email: String? = null
+    lateinit var email: String
         protected set
 
     @Column(nullable = false)
-    var passwordHash: String? = null
+    lateinit var passwordHash: String
         protected set
 
     @Column(nullable = false)
-    var name: String? = null
+    lateinit var name: String
         protected set
 
     @Column
     var refreshToken: String? = null
         protected set
 
-    constructor(email: String?, passwordHash: String?, name: String?) : this() {
+    constructor(email: String, passwordHash: String, name: String) : this() {
         this.email = email
         this.passwordHash = passwordHash
         this.name = name
     }
 
-    constructor(id: Long?, email: String?, name: String?) : this() {
+    // passwordHash는 받지 않음 (Java 원본과 같음)
+    constructor(id: Long?, email: String, name: String) : this() {
         setId(id)
         this.email = email
         this.name = name

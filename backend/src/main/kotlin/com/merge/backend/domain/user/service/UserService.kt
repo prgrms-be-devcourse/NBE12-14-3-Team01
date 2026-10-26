@@ -20,7 +20,8 @@ class UserService(
             throw BusinessException(UserErrorCode.DUPLICATE_EMAIL)
         }
         val passwordHash = passwordEncoder.encode(password)
-        val newUser = User(email, passwordHash, name)
+        // 요청 검증(@NotBlank)을 통과한 값이라 null이 오지 않음
+        val newUser = User(requireNotNull(email), requireNotNull(passwordHash), requireNotNull(name))
         return userRepository.save(newUser)
     }
 

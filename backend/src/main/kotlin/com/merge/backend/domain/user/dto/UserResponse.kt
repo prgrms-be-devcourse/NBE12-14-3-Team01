@@ -12,11 +12,11 @@ data class UserResponse(
         // Java 컨트롤러가 UserResponse.from(user)로 부르므로 static으로 노출
         @JvmStatic
         fun from(user: User): UserResponse {
-            // 저장된 User만 들어옴 (id는 저장 후 생성, email·name은 DB NOT NULL)
+            // 저장된 User만 들어옴 (id는 저장 후 생성)
             return UserResponse(
                 requireNotNull(user.id),
-                requireNotNull(user.email),
-                requireNotNull(user.name),
+                user.email,
+                user.name,
             )
         }
     }
