@@ -6,16 +6,21 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.nullValue;
 
 import com.merge.backend.domain.shift.dto.ManagerScheduleResponse;
 import com.merge.backend.domain.shift.dto.ScheduleCreateRequest;
 import com.merge.backend.domain.shift.dto.ScheduleCreateResponse;
 import com.merge.backend.domain.shift.dto.SchedulePublishRequest;
 import com.merge.backend.domain.shift.dto.SchedulePublishResponse;
+import com.merge.backend.domain.shift.dto.ScheduleShiftResponse;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
+import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.service.ScheduleService;
+import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.exception.GlobalExceptionHandler;
 import com.merge.backend.global.rq.Rq;
@@ -380,6 +385,237 @@ class ScheduleControllerTest {
             rq,
             scheduleService
         );
+    }
+
+    @Test
+    void 생성_요청_JSON을_역직렬화하고_성공_응답_JSON을_직렬화한다() throws Exception {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
+
+        ScheduleCreateResponse serviceResponse =
+            new ScheduleCreateResponse(
+                20L,
+                workplaceId,
+                weekStartDate,
+                ScheduleStatus.DRAFT,
+                3
+            );
+
+        when(rq.getActorId())
+            .thenReturn(actorUserId);
+
+        when(
+            scheduleService.createDraftSchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            )
+        ).thenReturn(serviceResponse);
+
+        // when & then
+        mockMvc.perform(
+                post("/workplaces/{workplaceId}/schedules", workplaceId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"weekStartDate\":\"2026-09-21\"}")
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.code").value("201"))
+            .andExpect(jsonPath("$.message").value("주간 근무표 초안이 생성되었습니다."))
+            .andExpect(jsonPath("$.data.scheduleId").value(20L))
+            .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
+            .andExpect(jsonPath("$.data.weekStartDate").value("2026-09-21"))
+            .andExpect(jsonPath("$.data.status").value("DRAFT"))
+            .andExpect(jsonPath("$.data.shiftCount").value(3));
+
+        verify(scheduleService)
+            .createDraftSchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            );
+    }
+
+    @Test
+    void 공개_요청_JSON을_역직렬화하고_성공_응답_JSON을_직렬화한다() throws Exception {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        Long scheduleId = 20L;
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
+        LocalDateTime publishedAt = LocalDateTime.of(2026, 9, 19, 18, 30);
+
+        SchedulePublishResponse serviceResponse =
+            new SchedulePublishResponse(
+                scheduleId,
+                workplaceId,
+                weekStartDate,
+                ScheduleStatus.PUBLISHED,
+                publishedAt
+            );
+
+        when(rq.getActorId())
+            .thenReturn(actorUserId);
+
+        when(
+            scheduleService.publishSchedule(
+                actorUserId,
+                workplaceId,
+                scheduleId,
+                false
+            )
+        ).thenReturn(serviceResponse);
+
+        // when & then
+        mockMvc.perform(
+                patch(
+                    "/workplaces/{workplaceId}/schedules/{scheduleId}/publish",
+                    workplaceId,
+                    scheduleId
+                )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"confirmUnavailableConflict\":false}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.code").value("200"))
+            .andExpect(jsonPath("$.message").value("근무표가 공개되었습니다."))
+            .andExpect(jsonPath("$.data.scheduleId").value(scheduleId))
+            .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
+            .andExpect(jsonPath("$.data.weekStartDate").value("2026-09-21"))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+            .andExpect(jsonPath("$.data.publishedAt").value("2026-09-19T18:30:00"));
+
+        verify(scheduleService)
+            .publishSchedule(
+                actorUserId,
+                workplaceId,
+                scheduleId,
+                false
+            );
+    }
+
+    @Test
+    void DRAFT_Schedule은_null_공개일시와_빈_Shift_배열을_JSON으로_반환한다() throws Exception {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
+
+        ManagerScheduleResponse serviceResponse =
+            new ManagerScheduleResponse(
+                20L,
+                workplaceId,
+                weekStartDate,
+                ScheduleStatus.DRAFT,
+                null,
+                List.of()
+            );
+
+        when(rq.getActorId())
+            .thenReturn(actorUserId);
+
+        when(
+            scheduleService.getWeeklySchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            )
+        ).thenReturn(serviceResponse);
+
+        // when & then
+        mockMvc.perform(
+                get("/workplaces/{workplaceId}/schedules", workplaceId)
+                    .queryParam("weekStartDate", "2026-09-21")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.code").value("200"))
+            .andExpect(jsonPath("$.message").value("주간 근무표를 조회했습니다."))
+            .andExpect(jsonPath("$.data.scheduleId").value(20L))
+            .andExpect(jsonPath("$.data.workplaceId").value(workplaceId))
+            .andExpect(jsonPath("$.data.weekStartDate").value("2026-09-21"))
+            .andExpect(jsonPath("$.data.status").value("DRAFT"))
+            .andExpect(jsonPath("$.data.publishedAt").value(nullValue()))
+            .andExpect(jsonPath("$.data.shifts").isArray())
+            .andExpect(jsonPath("$.data.shifts").isEmpty());
+
+        verify(scheduleService)
+            .getWeeklySchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            );
+    }
+
+    @Test
+    void Shift가_있는_Schedule은_중첩_Shift_DTO의_모든_필드를_JSON으로_반환한다() throws Exception {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
+        LocalDateTime startAt = LocalDateTime.of(2026, 9, 21, 9, 0);
+        LocalDateTime endAt = LocalDateTime.of(2026, 9, 21, 14, 0);
+
+        ManagerScheduleResponse serviceResponse =
+            new ManagerScheduleResponse(
+                20L,
+                workplaceId,
+                weekStartDate,
+                ScheduleStatus.DRAFT,
+                null,
+                List.of(
+                    new ScheduleShiftResponse(
+                        101L,
+                        30L,
+                        "김민수",
+                        WorkplaceRole.EMPLOYEE,
+                        startAt,
+                        endAt,
+                        ShiftStatus.SCHEDULED
+                    )
+                )
+            );
+
+        when(rq.getActorId())
+            .thenReturn(actorUserId);
+
+        when(
+            scheduleService.getWeeklySchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            )
+        ).thenReturn(serviceResponse);
+
+        // when & then
+        mockMvc.perform(
+                get("/workplaces/{workplaceId}/schedules", workplaceId)
+                    .queryParam("weekStartDate", "2026-09-21")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.shifts").isArray())
+            .andExpect(jsonPath("$.data.shifts.length()").value(1))
+            .andExpect(jsonPath("$.data.shifts[0].shiftId").value(101L))
+            .andExpect(jsonPath("$.data.shifts[0].memberId").value(30L))
+            .andExpect(jsonPath("$.data.shifts[0].memberName").value("김민수"))
+            .andExpect(jsonPath("$.data.shifts[0].role").value("EMPLOYEE"))
+            .andExpect(jsonPath("$.data.shifts[0].startAt").value("2026-09-21T09:00:00"))
+            .andExpect(jsonPath("$.data.shifts[0].endAt").value("2026-09-21T14:00:00"))
+            .andExpect(jsonPath("$.data.shifts[0].status").value("SCHEDULED"));
+
+        verify(scheduleService)
+            .getWeeklySchedule(
+                actorUserId,
+                workplaceId,
+                weekStartDate
+            );
     }
 
     @Test
