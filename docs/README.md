@@ -11,13 +11,15 @@
 | 2 | 이 문서 | 문서 위치·우선순위 확인 |
 | 3 | [`docs/ai/AI-RULES.md`](ai/AI-RULES.md) | 모든 작업 전 |
 | 4 | [`docs/STATUS-AXES.md`](STATUS-AXES.md) | 상태값을 읽거나 쓰기 전 |
-| 5 | Task Card (Delivery Board) + `docs/delivery/<Domain>.md` ([템플릿](delivery/TEMPLATE.md), [V4 Substitute 시범](delivery/V4-substitute.md)) | 이번 작업의 범위 확인 |
-| 6 | [`docs/migration/MIGRATION-MATRIX.md`](migration/MIGRATION-MATRIX.md) | Domain 작업 전 |
-| 7 | [`docs/contract/CONTRACT-BASELINE.md`](contract/CONTRACT-BASELINE.md) | API / Error / Enum / Transaction에 닿는 작업 전 |
-| 8 | [`docs/decisions/DECISION-LOG.md`](decisions/DECISION-LOG.md), [`PROCESS-CHARTER`](decisions/PROCESS-CHARTER.md), 정책 카드 [`decisions/proposals/`](decisions/proposals/) | 정책이 걸린 작업 전. 정책 카드를 만들거나 결정할 때 |
+| 5 | Task Card (Delivery Board) + `docs/delivery/<Domain>.md` ([템플릿](delivery/TEMPLATE.md), [V4 Substitute 시범](delivery/V4-substitute.md)). 참고: 개발 순서·Test 규칙 제안 [`DOMAIN-DEVELOPMENT-GUIDE`](delivery/DOMAIN-DEVELOPMENT-GUIDE.md), Task Card 초안 [`TASK-OPS-01`](delivery/TASK-OPS-01-prod-config-failfast.md) | 이번 작업의 범위 확인 |
+| 6 | [`docs/migration/MIGRATION-MATRIX.md`](migration/MIGRATION-MATRIX.md). 참고: Kotlin 전환 PR 리뷰 항목 [`KOTLIN-REVIEW-CHECKLIST`](migration/KOTLIN-REVIEW-CHECKLIST.md) | Domain 작업 전 |
+| 7 | [`docs/contract/CONTRACT-BASELINE.md`](contract/CONTRACT-BASELINE.md). 참고: V3 Improvement 계약 초안 (③ `DRAFT`, `APPROVED` 아님) [`API-CATALOG`](contract/API-CATALOG.md), [`ERROR-CODES`](contract/ERROR-CODES.md), [`FRONTEND-CONTRACT`](contract/FRONTEND-CONTRACT.md), [`NOTIFICATION-TYPES`](contract/NOTIFICATION-TYPES.md), [`USER-PATH-REVIEW`](contract/USER-PATH-REVIEW.md) | API / Error / Enum / Transaction에 닿는 작업 전 |
+| 8 | [`docs/decisions/DECISION-LOG.md`](decisions/DECISION-LOG.md), [`PROCESS-CHARTER`](decisions/PROCESS-CHARTER.md), 정책 카드 [`decisions/proposals/`](decisions/proposals/). 참고: 정책 요약 [`POLICY-SUMMARY`](decisions/POLICY-SUMMARY.md), 구현 우선순위 원칙 [`IMPLEMENTATION-PRIORITY`](decisions/IMPLEMENTATION-PRIORITY.md) | 정책이 걸린 작업 전. 정책 카드를 만들거나 결정할 때 |
 | 9 | [`docs/migration/TECH-STACK-DECISIONS.md`](migration/TECH-STACK-DECISIONS.md) | Gradle / Plugin / Version / Kotlin 환경 작업 전 |
-| 10 | [`docs/evidence/TEST-INVENTORY.md`](evidence/TEST-INVENTORY.md), [`docs/evidence/TEST-EVIDENCE.md`](evidence/TEST-EVIDENCE.md) | Test를 고르거나 결과를 보고·확인할 때 |
+| 10 | [`docs/evidence/TEST-INVENTORY.md`](evidence/TEST-INVENTORY.md), [`docs/evidence/TEST-EVIDENCE.md`](evidence/TEST-EVIDENCE.md). 참고: 검증 원칙 [`TEST-STRATEGY`](evidence/TEST-STRATEGY.md), 공백 분석 [`TEST-GAP-ANALYSIS`](evidence/TEST-GAP-ANALYSIS.md), S4 실험 계획 [`EXPERIMENT-PLAN`](evidence/EXPERIMENT-PLAN.md) | Test를 고르거나 결과를 보고·확인할 때 |
 | 11 | [`docs/references/README.md`](references/README.md) → [`G-03-contract-review.md`](references/G-03-contract-review.md), [`references/ml/`](references/ml/) | C-ID·G03-D-ID의 원문 규칙·근거, ML 과거 제안 원문을 확인할 때 (참고 자료, 승인된 계약 아님) |
+
+> "참고:" 뒤의 문서는 필수 읽기가 아니다. 그 작업에 닿을 때만 연다. 모두 ③ `DRAFT`(팀 승인 전)이며 승인된 기준이 아니다. 각 문서의 상태는 문서 머리말과 §2 표를 따른다.
 
 ## 2. 문서 목록과 책임
 
@@ -29,15 +31,28 @@
 | `docs/ai/AI-RULES.md` | AI·팀원 변경 제한 규칙 | 팀 승인 (초안: H6 총괄) | 작업 규칙 | 팀 승인 시에만 | **읽기 전용** (D0-D 최초 이관 때만 사실·경로·상태 규칙 정정 허용, 사용자 지시 2026-10-23) |
 | `docs/STATUS-AXES.md` | 상태 5개 축 정의 | 공통 설정 Owner | 상태값 의미 | 팀 승인 시 | 읽기 전용 |
 | `docs/contract/CONTRACT-BASELINE.md` | 승인된 서비스 계약 + 공통 규약 | Domain Owner 작성 → 팀 승인 | `APPROVED` 행만 | D1, Decision 승인 시 | 초안 행 작성 가능, `APPROVED` 표시 금지 |
+| `docs/contract/API-CATALOG.md` | V3 Improvement API 모양 (받는 값·돌려주는 값) 초안 | 해당 Domain Owner 리뷰 → 팀 승인 | 없음 (③ `DRAFT`. 왜 그렇게 정했는지는 정책 카드) | 정책 카드 변경 시 | 초안 작성 가능, `APPROVED` 표시 금지 |
+| `docs/contract/ERROR-CODES.md` | ErrorCode 공통 목록 (현재 코드 + 후보) 초안 | 공통 설정 Owner → 팀 승인 | 없음 (③ `DRAFT`. 현재 행은 코드 확인 사실 기록) | ErrorCode 추가·결정 시 | 초안 작성 가능, `APPROVED` 표시 금지 |
+| `docs/contract/FRONTEND-CONTRACT.md` | 화면 → API → 오류 대응 → 권한 연결 초안 (Frontend 담당 리뷰 대상) | Frontend 담당 리뷰 → 팀 승인 | 없음 (③ `DRAFT`. API 모양은 API-CATALOG) | API·정책 변경 시 | 초안 작성 가능, `APPROVED` 표시 금지 |
+| `docs/contract/NOTIFICATION-TYPES.md` | NotificationType 공통 목록 (현재 코드 + 후보) 초안 | V5 Owner 리뷰 → 팀 승인 | 없음 (③ `DRAFT`. 현재 행은 코드 확인 사실 기록) | Type·받는 사람 규칙 변경 시 | 초안 작성 가능, `APPROVED` 표시 금지 |
+| `docs/contract/USER-PATH-REVIEW.md` | 정책·API·화면·ErrorCode·알림·Test의 사용자 경로 교차 검증 | 작성자 → 팀 리뷰 | 없음 (③ `DRAFT`, 검토 기록) | 계약 초안 변경 시 | 작성 가능 |
 | `docs/migration/MIGRATION-MATRIX.md` | Domain 범위, 필수 Test, 검증 상태, 선행조건 | 각 V Owner | 기술 진행 상태 | 각 PR과 함께 | 요청 시 수정 (Evidence 링크 필수) |
 | `docs/migration/TECH-STACK-DECISIONS.md` | 기술 의존성·Version 결정, M0 계획 | 공통 설정 Owner | 기술 환경 결정 | 의존성 변경 승인 시 | 조사 결과·적용 사실 추가 가능, 결정 표시 금지 |
+| `docs/migration/KOTLIN-REVIEW-CHECKLIST.md` | Kotlin 전환 PR 리뷰 확인 항목·판단 기준 | 공통 설정 Owner | 없음 (③ `DRAFT`. 구현 규칙 원본은 AI-RULES §5) | AI-RULES·TEST-STRATEGY 변경 시 | 요청 시 수정 |
 | `docs/decisions/DECISION-LOG.md` | 정책 결정·불일치 기록 | 결정자 (팀) | 정책 결정 | 회의·승인 직후 | `PENDING` / `DISCREPANCY` 행 추가와 사실 기록만 가능 |
 | `docs/decisions/PROCESS-CHARTER.md` | 정책 카드 작성·결정 절차, Test 기대값 변경 절차 (팀 승인 전 초안) | 팀 승인 | 결정 절차 | 팀 승인 시 | 초안 작성. 승인 표시 금지 |
 | `docs/decisions/proposals/*.md` | 검토 중인 정책 카드 (② `PROPOSED`) | 카드 작성자 → 해당 Domain Owner 리뷰 | 없음 (결정은 `DECISION-LOG`) | 카드 진행 시 | 작성 가능. 사용자 확인 문장만 "사용자 잠정 결정"으로 기록 |
+| `docs/decisions/POLICY-SUMMARY.md` | 정책 카드 요약 (팀 공유용) | 카드 작성자 | 없음 (② `PROPOSED` 요약. 원본은 정책 카드·`DECISION-LOG`) | 정책 카드 변경 시 | 작성 가능. 승인 표시 금지 |
+| `docs/decisions/IMPLEMENTATION-PRIORITY.md` | Improvement 구현 우선순위 원칙 (제안) | 팀 승인 | 없음 (③ `DRAFT`, 팀 합의 전) | 팀 합의 시 | 초안 작성. 승인 표시 금지 |
 | `docs/delivery/TEMPLATE.md` | Domain Delivery Sheet 템플릿 | 공통 설정 Owner | 양식 | 양식 변경 승인 시 | 읽기 전용 |
 | `docs/delivery/V4-substitute.md` | V4 Substitute Delivery Sheet (시범) | V4 Owner | Domain 현황 요약 (계약·결정은 ID 참조만) | Domain PR과 함께 | 요청 시 수정 (근거 위치 필수) |
+| `docs/delivery/DOMAIN-DEVELOPMENT-GUIDE.md` | Domain별 개발 순서·Test 규칙·증거 형식 (팀 제안) | 팀 합의 | 없음 (③ `DRAFT`, 팀 합의 전. 팀원에게 강제하지 않음) | 팀 합의 시 | 초안 작성. 강제·승인 표시 금지 |
+| `docs/delivery/TASK-OPS-01-prod-config-failfast.md` | Task Card 초안 (운영 설정 fail-fast) | 담당자 지정 전 | 없음 (초안) | Task 진행 시 | 작성 가능 |
 | `docs/evidence/TEST-INVENTORY.md` | Test 목록·준비·실행 상태 | 각 V Owner | Test 목록 | Test 추가·실행 시 | 요청 시 수정. 실행 결과는 EV-ID로만 연결 |
 | `docs/evidence/TEST-EVIDENCE.md` | 실행 근거 | 실행한 사람 | 실행 결과 | 실행할 때마다 (append-only) | 실제 실행한 결과만 추가 |
+| `docs/evidence/TEST-STRATEGY.md` | 무엇을·언제·어떤 기준으로 검증하는가 (원칙) | 팀 승인 | 없음 (③ `DRAFT`, 팀 합의 전) | 팀 합의 시 | 초안 작성. 승인 표시 금지 |
+| `docs/evidence/TEST-GAP-ANALYSIS.md` | 기존 Test의 사용자 경로·불변식 보호 범위와 공백 분석 | 각 V Owner | 없음 (③ `DRAFT`, 분석 기록) | Test 추가·분석 시 | 요청 시 수정 |
+| `docs/evidence/EXPERIMENT-PLAN.md` | S4 실험 계획 (무엇을·어떤 순서·격리 조건) | 실행 담당 | 없음 (③ `DRAFT`, 계획) | 실험 계획 변경 시 | 요청 시 수정 |
 | `docs/images/*` | ERD, Architecture, Deployment 그림 (2차 종료 시점) | — | 참고 | — | 읽기 전용 |
 | `docs/references/README.md` | 선별 공유한 참고 자료 목록·차이·용어 대응 | 공통 설정 Owner | 참고 자료 범위 | 참고 자료 추가·제외 시 | 요청 시 수정 |
 | `docs/references/G-03-contract-review.md` | G-03 분석 원문 공유본 (Original `9858612` 기준) | — (스냅샷) | 없음 (참고 자료, 7순위) | 원본이 바뀌어도 자동 갱신하지 않음 | 읽기 전용 |

@@ -5,6 +5,7 @@
 > 상태 축 대응: `AS_IS_OBSERVED` = `docs/STATUS-AXES.md` ① `VERIFIED_AS_IS`. `관련 ID`의 G-03 C-ID·G03-D-ID 원문은 참고 공유본 [`docs/references/G-03-contract-review.md`](../references/G-03-contract-review.md)에 있다 (Original `9858612` 기준 AI 분석. `REVIEW_ACCEPTED`는 승인이 아니며 이 문서의 `APPROVED`로 옮기지 않는다).
 > **현재 `APPROVED` 행: 0건.** 아래 행은 모두 코드에서 확인한 현재 동작(`AS_IS_OBSERVED`) 또는 불일치(`DISCREPANCY`) 기록이며 승인된 계약이 아니다.
 > D1에서 Domain Owner가 행을 채우고 팀이 승인하면 `승인` 칸에 `APPROVED (승인자, 일자, DECISION-LOG ID)`를 적는다. AI는 `APPROVED`를 표시하지 않는다.
+> **V3 Improvement 계약 초안 (③ `DRAFT`, `APPROVED` 아님, 이 문서의 행이 아니다):** API 모양 [`API-CATALOG`](API-CATALOG.md), ErrorCode [`ERROR-CODES`](ERROR-CODES.md), 화면·권한 [`FRONTEND-CONTRACT`](FRONTEND-CONTRACT.md), 알림 Type [`NOTIFICATION-TYPES`](NOTIFICATION-TYPES.md), 사용자 경로 교차 검증 [`USER-PATH-REVIEW`](USER-PATH-REVIEW.md). 팀이 승인한 내용만 이 문서의 `APPROVED` 행으로 옮긴다.
 
 ## 행 작성 규칙
 
