@@ -31,8 +31,10 @@ import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.exception.BusinessException
 import java.time.Clock
 import java.time.LocalDateTime
+import kotlin.jvm.optionals.getOrNull
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -52,7 +54,7 @@ class SubstituteRequestService(
 ) {
 
     @Transactional
-    fun create(shiftId: Long?, actorUserId: Long?): SubstituteRequestCreateResponse {
+    fun create(shiftId: Long, actorUserId: Long): SubstituteRequestCreateResponse {
         val shift = validateSubstituteRequest(shiftId, actorUserId)
 
         // 조건에 맞는 대타 후보들을 먼저 찾음
@@ -97,7 +99,7 @@ class SubstituteRequestService(
     }
 
     @Transactional(readOnly = true)
-    fun getSentRequests(actorUserId: Long?): List<SentSubstituteRequestResponse> {
+    fun getSentRequests(actorUserId: Long): List<SentSubstituteRequestResponse> {
         val now = LocalDateTime.now(clock)
 
         val requests =
@@ -108,9 +110,9 @@ class SubstituteRequestService(
         return requests.map { request -> SentSubstituteRequestResponse.from(request, now) }
     }
 
-    private fun validateSubstituteRequest(shiftId: Long?, actorUserId: Long?): Shift {
-        val shift = shiftRepository.findByIdForUpdate(shiftId)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND) }
+    private fun validateSubstituteRequest(shiftId: Long, actorUserId: Long): Shift {
+        val shift = shiftRepository.findByIdForUpdate(shiftId).getOrNull()
+            ?: throw BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND)
 
         if (shift.schedule.status != ScheduleStatus.PUBLISHED) {
             throw BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_PUBLISHED)
@@ -141,9 +143,9 @@ class SubstituteRequestService(
     }
 
     @Transactional(readOnly = true)
-    fun list(workplaceId: Long?, actorId: Long?): List<SubstituteRequestListResponse> {
-        workplaceRepository.findById(requireNotNull(workplaceId))
-            .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND) }
+    fun list(workplaceId: Long, actorId: Long): List<SubstituteRequestListResponse> {
+        workplaceRepository.findByIdOrNull(workplaceId)
+            ?: throw BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND)
 
         workplaceMemberService.requireManager(actorId, workplaceId)
 
@@ -203,12 +205,10 @@ class SubstituteRequestService(
     }
 
     @Transactional
-    fun approve(requestId: Long?, actorId: Long?): SubstituteRequest {
+    fun approve(requestId: Long, actorId: Long): SubstituteRequest {
         // 대체 근무 요청이 존재하는지
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
         // request == ACCEPTED 여부 검사
         if (request.status != RequestStatus.ACCEPTED) {
@@ -231,12 +231,12 @@ class SubstituteRequestService(
         if (request.requesterMember.id != request.shift.member.id) {
             throw BusinessException(SubstituteRequestErrorCode.INVALID_MEMBER)
         }
-        workplaceRepository.findById(workplaceId)
-            .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND) }
+        workplaceRepository.findByIdOrNull(workplaceId)
+            ?: throw BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND)
 
         val candidate = substituteCandidateRepository
             .findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE) }
+            ?: throw BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE)
 
         // 수락자가 해당 근무지 소속인지
         val acceptedMember = candidate.member
@@ -313,15 +313,10 @@ class SubstituteRequestService(
     }
 
     @Transactional
-    fun close(requestId: Long?, actorId: Long?): SubstituteRequest {
+    fun close(requestId: Long, actorId: Long): SubstituteRequest {
         // Request 조회
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
-
-        // findByIdForUpdate를 통과했으므로 requestId는 null이 아님
-        val lockedRequestId = requireNotNull(requestId)
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
         val shift = request.shift
         val schedule = shift.schedule
@@ -354,7 +349,7 @@ class SubstituteRequestService(
         val requesterMemberId = request.requesterMember.id
 
         val recipientMemberIds = findManagerClosedRecipientMemberIds(
-            lockedRequestId,
+            requestId,
             requesterMemberId,
             statusBeforeClose,
         )
@@ -362,7 +357,7 @@ class SubstituteRequestService(
         // Request 종료 처리 (Shift.member, Candidate 상태는 변경하지 않음)
         request.closeByManager(now)
 
-        publishSubstituteRequestManagerClosedEvent(lockedRequestId, recipientMemberIds)
+        publishSubstituteRequestManagerClosedEvent(requestId, recipientMemberIds)
 
         return request
     }
