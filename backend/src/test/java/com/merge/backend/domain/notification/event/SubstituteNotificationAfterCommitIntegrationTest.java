@@ -10,8 +10,13 @@ import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
+import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
+import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
+import com.merge.backend.domain.substitute.service.SubstituteCandidateService;
 import com.merge.backend.domain.substitute.service.SubstituteRequestService;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
@@ -59,8 +64,22 @@ class SubstituteNotificationAfterCommitIntegrationTest {
 
     private static final String REQUEST_RECEIVED_MESSAGE = "새로운 대타 요청이 도착했습니다.";
 
+    private static final String NO_CANDIDATE_MESSAGE = "대체 근무 가능한 후보가 없습니다.";
+
+    private static final String ACCEPTED_MESSAGE =
+        "대체 근무 수락자가 생겼습니다. 최종 승인이 필요합니다.";
+
     @Autowired
     private SubstituteRequestService substituteRequestService;
+
+    @Autowired
+    private SubstituteCandidateService substituteCandidateService;
+
+    @Autowired
+    private SubstituteRequestRepository substituteRequestRepository;
+
+    @Autowired
+    private SubstituteCandidateRepository substituteCandidateRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -137,6 +156,81 @@ class SubstituteNotificationAfterCommitIntegrationTest {
             });
     }
 
+    @Test
+    @DisplayName("후보가 없으면 Request 없이 Commit되고 현재 MANAGER에게만 후보 없음 알림이 1건 저장된다")
+    void createRequestWithoutCandidate_savesNoCandidateNotificationOnlyForActiveManagers() {
+        // given - 요청자 외에 직원이 없다 (MANAGER는 후보 대상이 아니다)
+        NoCandidateFixture fixture = createNoCandidateFixture();
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - 현재 Java는 예외 없이 requestCreated=false를 돌려준다
+        SubstituteRequestCreateResponse response =
+            substituteRequestService.create(fixture.shiftId(), fixture.requesterUserId());
+
+        // then - 응답
+        assertThat(response.requestCreated()).isFalse();
+        assertThat(response.requestId()).isNull();
+        assertThat(response.candidateCount()).isZero();
+
+        // then - 업무 DB: Request를 저장하지 않는다
+        assertThat(requestsOf(fixture.shiftId())).isEmpty();
+
+        // then - 알림 DB: 업무 쓰기가 없어도 Commit 후 Listener가 실행된다
+        assertNotifiedOnly(
+            notificationsOf(fixture.allMemberIds()),
+            List.of(fixture.activeManagerMemberId()),
+            NotificationType.SUBSTITUTE_NO_CANDIDATE,
+            NO_CANDIDATE_MESSAGE
+        );
+    }
+
+    @Test
+    @DisplayName("후보가 수락하면 Commit 후 현재 MANAGER 전원에게만 수락 알림이 1건씩 저장된다")
+    void acceptCandidate_savesAcceptedNotificationOnlyForActiveManagersAfterCommit() {
+        // given - Service가 만드는 것과 같은 OPEN Request와 PENDING 후보 2명 (알림 없이 Commit)
+        OpenRequestFixture fixture = createOpenRequestFixture();
+        assertThat(notificationsOf(fixture.allMemberIds())).isEmpty();
+
+        // when - 후보 C1이 실제 Service로 수락한다
+        substituteCandidateService.acceptCandidate(
+            fixture.firstCandidateId(),
+            fixture.firstCandidateUserId()
+        );
+
+        // then - 업무 DB: Request·C1 ACCEPTED, C2는 PENDING 그대로
+        assertThat(requestStatusOf(fixture.requestId())).isEqualTo(RequestStatus.ACCEPTED);
+        assertThat(candidateStatusOf(fixture.firstCandidateId()))
+            .isEqualTo(CandidateStatus.ACCEPTED);
+        assertThat(candidateStatusOf(fixture.secondCandidateId()))
+            .isEqualTo(CandidateStatus.PENDING);
+
+        // then - 알림 DB: 수락한 후보·요청자·다른 후보·퇴사한 MANAGER는 받지 않는다
+        assertNotifiedOnly(
+            notificationsOf(fixture.allMemberIds()),
+            List.of(fixture.firstManagerMemberId(), fixture.secondManagerMemberId()),
+            NotificationType.SUBSTITUTE_ACCEPTED,
+            ACCEPTED_MESSAGE
+        );
+    }
+
+    // 받는 사람마다 정확히 1건이고, 나머지 조회 대상은 0건이다
+    private void assertNotifiedOnly(
+        List<Notification> notifications,
+        List<Long> expectedRecipientMemberIds,
+        NotificationType expectedType,
+        String expectedMessage
+    ) {
+        assertThat(notifications)
+            .extracting(notification -> notification.getRecipientMember().getId())
+            .containsExactlyInAnyOrderElementsOf(expectedRecipientMemberIds);
+        assertThat(notifications)
+            .allSatisfy(notification -> {
+                assertThat(notification.getType()).isEqualTo(expectedType);
+                assertThat(notification.getMessage()).isEqualTo(expectedMessage);
+                assertThat(notification.getReadAt()).isNull();
+            });
+    }
+
     // ===================== 조회 (새 Transaction) =====================
 
     // 목록 Query(findAllByUserId)는 현재 소속만 돌려주므로 생성 검증에 쓰지 않는다
@@ -175,7 +269,114 @@ class SubstituteNotificationAfterCommitIntegrationTest {
         );
     }
 
+    private RequestStatus requestStatusOf(Long requestId) {
+        return new TransactionTemplate(transactionManager).execute(status ->
+            entityManager.find(SubstituteRequest.class, requestId).getStatus()
+        );
+    }
+
+    private CandidateStatus candidateStatusOf(Long candidateId) {
+        return new TransactionTemplate(transactionManager).execute(status ->
+            entityManager.find(SubstituteCandidate.class, candidateId).getStatus()
+        );
+    }
+
     // ===================== Fixture (Commit) =====================
+
+    // 현재 MANAGER 1, 퇴사한 MANAGER 1, 요청자 1 + 요청자의 미래 Shift. 다른 직원은 없다
+    private NoCandidateFixture createNoCandidateFixture() {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            String suffix = uniqueSuffix();
+            Workplace workplace = saveWorkplace(suffix);
+            Schedule schedule = savePublishedSchedule(workplace);
+
+            WorkplaceMember activeManager = saveMember(
+                workplace, "manager-" + suffix, WorkplaceRole.MANAGER, null
+            );
+            WorkplaceMember leftManager = saveMember(
+                workplace, "left-manager-" + suffix, WorkplaceRole.MANAGER, now().minusDays(1)
+            );
+            WorkplaceMember requester = saveMember(
+                workplace, "requester-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            Shift shift = saveShift(schedule, requester);
+
+            return new NoCandidateFixture(
+                shift.getId(),
+                requester.getUser().getId(),
+                requester.getId(),
+                activeManager.getId(),
+                leftManager.getId()
+            );
+        });
+    }
+
+    // MANAGER 2 + 퇴사한 MANAGER 1, 요청자, OPEN Request와 PENDING 후보 C1·C2
+    // create()가 저장하는 것과 같은 상태를 Repository로 만든다 (Service를 거치지 않아 알림이 없다)
+    private OpenRequestFixture createOpenRequestFixture() {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            String suffix = uniqueSuffix();
+            Workplace workplace = saveWorkplace(suffix);
+            Schedule schedule = savePublishedSchedule(workplace);
+
+            WorkplaceMember firstManager = saveMember(
+                workplace, "manager1-" + suffix, WorkplaceRole.MANAGER, null
+            );
+            WorkplaceMember secondManager = saveMember(
+                workplace, "manager2-" + suffix, WorkplaceRole.MANAGER, null
+            );
+            WorkplaceMember leftManager = saveMember(
+                workplace, "left-manager-" + suffix, WorkplaceRole.MANAGER, now().minusDays(1)
+            );
+            WorkplaceMember requester = saveMember(
+                workplace, "requester-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            WorkplaceMember firstCandidateMember = saveMember(
+                workplace, "candidate1-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            WorkplaceMember secondCandidateMember = saveMember(
+                workplace, "candidate2-" + suffix, WorkplaceRole.EMPLOYEE, null
+            );
+            Shift shift = saveShift(schedule, requester);
+
+            SubstituteRequest request = substituteRequestRepository.save(
+                new SubstituteRequest(shift, requester, RequestStatus.OPEN)
+            );
+            SubstituteCandidate firstCandidate = substituteCandidateRepository.save(
+                new SubstituteCandidate(request, firstCandidateMember)
+            );
+            SubstituteCandidate secondCandidate = substituteCandidateRepository.save(
+                new SubstituteCandidate(request, secondCandidateMember)
+            );
+
+            return new OpenRequestFixture(
+                request.getId(),
+                firstCandidate.getId(),
+                secondCandidate.getId(),
+                firstCandidateMember.getUser().getId(),
+                requester.getId(),
+                firstManager.getId(),
+                secondManager.getId(),
+                leftManager.getId(),
+                firstCandidateMember.getId(),
+                secondCandidateMember.getId()
+            );
+        });
+    }
+
+    private Workplace saveWorkplace(String suffix) {
+        return workplaceRepository.save(
+            new Workplace("대타 알림 테스트 매장 " + suffix, "SUBN-" + suffix)
+        );
+    }
+
+    // 일주일 뒤 10:00~14:00
+    private Shift saveShift(Schedule schedule, WorkplaceMember member) {
+        LocalDateTime startAt = shiftStartAt();
+        return shiftRepository.save(
+            new Shift(schedule, member, startAt, startAt.plusHours(4), ShiftStatus.SCHEDULED)
+        );
+    }
 
     // MANAGER 1, 요청자 1, 후보 2, 퇴사한 직원 1 + 요청자의 미래 Shift (공개된 근무표)
     private RequestFixture createRequestFixture() {
@@ -272,6 +473,44 @@ class SubstituteNotificationAfterCommitIntegrationTest {
                 firstCandidateMemberId,
                 secondCandidateMemberId,
                 leftEmployeeMemberId
+            );
+        }
+    }
+
+    private record NoCandidateFixture(
+        Long shiftId,
+        Long requesterUserId,
+        Long requesterMemberId,
+        Long activeManagerMemberId,
+        Long leftManagerMemberId
+    ) {
+
+        List<Long> allMemberIds() {
+            return List.of(requesterMemberId, activeManagerMemberId, leftManagerMemberId);
+        }
+    }
+
+    private record OpenRequestFixture(
+        Long requestId,
+        Long firstCandidateId,
+        Long secondCandidateId,
+        Long firstCandidateUserId,
+        Long requesterMemberId,
+        Long firstManagerMemberId,
+        Long secondManagerMemberId,
+        Long leftManagerMemberId,
+        Long firstCandidateMemberId,
+        Long secondCandidateMemberId
+    ) {
+
+        List<Long> allMemberIds() {
+            return List.of(
+                requesterMemberId,
+                firstManagerMemberId,
+                secondManagerMemberId,
+                leftManagerMemberId,
+                firstCandidateMemberId,
+                secondCandidateMemberId
             );
         }
     }
