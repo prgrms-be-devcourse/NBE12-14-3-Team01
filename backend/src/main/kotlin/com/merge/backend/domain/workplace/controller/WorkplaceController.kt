@@ -34,7 +34,7 @@ class WorkplaceController(
     ): ResponseEntity<ApiResponse<WorkplaceCreateResponse>> {
         val userId = rq.actorId
         val user = userService.getById(userId)
-        val member = workplaceService.createWorkplace(request.name(), user)
+        val member = workplaceService.createWorkplace(request.name, user)
         val response = WorkplaceCreateResponse.from(member)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             ApiResponse.success("201", "Workplace가 생성되었습니다.", response)
@@ -47,7 +47,7 @@ class WorkplaceController(
     ): ResponseEntity<ApiResponse<WorkplaceJoinResponse>> {
         val userId = rq.actorId
         val user = userService.getById(userId)
-        val member = workplaceService.joinWorkplace(request.inviteCode(), user)
+        val member = workplaceService.joinWorkplace(request.inviteCode, user)
         val response = WorkplaceJoinResponse.from(member)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             ApiResponse.success("201", "Workplace 참여가 완료되었습니다.", response)
