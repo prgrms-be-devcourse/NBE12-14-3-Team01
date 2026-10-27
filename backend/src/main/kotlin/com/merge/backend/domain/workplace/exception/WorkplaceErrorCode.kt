@@ -32,6 +32,16 @@ enum class WorkplaceErrorCode(
         HttpStatus.NOT_FOUND,
         "WPL-005",
         "존재하지 않는 근무지입니다."
+    ),
+    MANAGER_CANNOT_LEAVE(
+        HttpStatus.CONFLICT,
+        "WPL-007",
+        "관리자 소속은 퇴사 처리할 수 없습니다."
+    ),
+    MEMBERSHIP_ALREADY_ENDED(
+        HttpStatus.CONFLICT,
+        "WPL-008",
+        "이미 종료된 소속입니다."
     );
 
     override fun getHttpStatus(): HttpStatus = httpStatus

@@ -1,7 +1,9 @@
 package com.merge.backend.domain.workplace.entity
 
 import com.merge.backend.domain.user.entity.User
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.global.entity.BaseEntity
+import com.merge.backend.global.exception.BusinessException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -53,12 +55,15 @@ class WorkplaceMember @JvmOverloads constructor(
     /**
      * 소속 Row만 종료한다. 근무·대타 정리와 Lock 후 재검증을 마친 퇴사 Command가
      * 같은 업무 Transaction 안에서 호출해야 하며, 단독 퇴사 처리로 사용하지 않는다.
-     * check는 내부 상태 안전장치다. Command는 이미 종료된 소속·관리자 대상 요청을
-     * 호출 전에 업무 오류로 처리해야 한다. 해당 ErrorCode는 아직 구현되지 않았다.
+     * 이미 종료된 소속과 관리자 소속의 퇴사 요청은 BusinessException으로 거부한다.
      */
     fun leave(now: LocalDateTime) {
-        check(isCurrent()) { "이미 종료된 소속입니다." }
-        check(role == WorkplaceRole.EMPLOYEE) { "관리자 소속은 퇴사 처리할 수 없습니다." }
+        if (!isCurrent()) {
+            throw BusinessException(WorkplaceErrorCode.MEMBERSHIP_ALREADY_ENDED)
+        }
+        if (role != WorkplaceRole.EMPLOYEE) {
+            throw BusinessException(WorkplaceErrorCode.MANAGER_CANNOT_LEAVE)
+        }
 
         leftAt = now
     }
