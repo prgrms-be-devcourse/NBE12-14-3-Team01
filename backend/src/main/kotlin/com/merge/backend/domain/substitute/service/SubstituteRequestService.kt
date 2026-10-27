@@ -59,8 +59,8 @@ class SubstituteRequestService(
 
         // 조건에 맞는 대타 후보들을 먼저 찾음
         val candidates = substituteCandidateService.findCandidates(
-            shift.schedule.workplace.id, // 대상 근무지 ID
-            shift.member.id, // 대타를 요청한 멤버 ID
+            requireNotNull(shift.schedule.workplace.id), // 대상 근무지 ID
+            requireNotNull(shift.member.id), // 대타를 요청한 멤버 ID
             shift, // 대타가 필요한 Shift
         )
 
@@ -156,7 +156,7 @@ class SubstituteRequestService(
         // ACCEPTED 상태들 선별
         val acceptedRequestIds = requests
             .filter { request -> request.status == RequestStatus.ACCEPTED }
-            .map { request -> request.id }
+            .map { request -> requireNotNull(request.id) }
 
         val acceptedCandidateMap = getAcceptedCandidates(acceptedRequestIds)
 
@@ -175,7 +175,7 @@ class SubstituteRequestService(
             .findByRequestIdInAndStatus(requestIds, CandidateStatus.ACCEPTED)
 
         // 그룹화로 수락자가 2명인 경우도 감안
-        val grouped = candidates.groupBy { candidate -> candidate.request.id }
+        val grouped = candidates.groupBy { candidate -> requireNotNull(candidate.request.id) }
 
         // 수락자가 다수 있을 시 예외
         grouped.forEach { (requestId, matchedCandidates) ->
@@ -215,7 +215,7 @@ class SubstituteRequestService(
             throw BusinessException(SubstituteRequestErrorCode.INVALID_REQUEST)
         }
         // 근무지 ID 뽑아오기
-        val workplaceId = request.shift.schedule.workplace.id
+        val workplaceId = requireNotNull(request.shift.schedule.workplace.id)
         // 매니저 인가 확인
         workplaceMemberService.requireManager(actorId, workplaceId)
 
@@ -249,7 +249,7 @@ class SubstituteRequestService(
             throw BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE)
         }
 
-        val candidateUserId = acceptedMember.user.id
+        val candidateUserId = requireNotNull(acceptedMember.user.id)
 
         userService.getByIdForUpdate(candidateUserId)
 
@@ -294,14 +294,14 @@ class SubstituteRequestService(
         val approvedAt = LocalDateTime.now(clock)
         validateNotStarted(request.shift, approvedAt)
 
-        val requesterMemberId = request.requesterMember.id
+        val requesterMemberId = requireNotNull(request.requesterMember.id)
 
-        val acceptedMemberId = acceptedMember.id
+        val acceptedMemberId = requireNotNull(acceptedMember.id)
 
         // 최종 승인 시작
         request.approveRequest(acceptedMember, approvedAt)
 
-        publishSubstituteRequestApprovedEvent(request.id, requesterMemberId, acceptedMemberId)
+        publishSubstituteRequestApprovedEvent(requireNotNull(request.id), requesterMemberId, acceptedMemberId)
 
         return request
     }
@@ -346,7 +346,7 @@ class SubstituteRequestService(
             throw BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED_NOT_CLOSE)
         }
 
-        val requesterMemberId = request.requesterMember.id
+        val requesterMemberId = requireNotNull(request.requesterMember.id)
 
         val recipientMemberIds = findManagerClosedRecipientMemberIds(
             requestId,
@@ -366,11 +366,11 @@ class SubstituteRequestService(
         request: SubstituteRequest,
         createdCandidates: List<SubstituteCandidate>,
     ) {
-        val candidateMemberIds = createdCandidates.map { candidate -> candidate.member.id }
+        val candidateMemberIds = createdCandidates.map { candidate -> requireNotNull(candidate.member.id) }
 
         applicationEventPublisher.publishEvent(
             SubstituteRequestCreatedEvent(
-                requestId = request.id,
+                requestId = requireNotNull(request.id),
                 candidateMemberIds = candidateMemberIds,
             ),
         )
@@ -381,11 +381,11 @@ class SubstituteRequestService(
 
         val managerMemberIds = workplaceMemberRepository
             .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(workplaceId, WorkplaceRole.MANAGER)
-            .map { member -> member.id }
+            .map { member -> requireNotNull(member.id) }
 
         applicationEventPublisher.publishEvent(
             SubstituteNoCandidateEvent(
-                shiftId = shift.id,
+                shiftId = requireNotNull(shift.id),
                 managerMemberIds = managerMemberIds,
             ),
         )
@@ -414,13 +414,13 @@ class SubstituteRequestService(
             if (statusBeforeClose == RequestStatus.OPEN) {
                 substituteCandidateRepository
                     .findByRequestIdInAndStatus(listOf(requestId), CandidateStatus.PENDING)
-                    .map { candidate -> candidate.member.id }
+                    .map { candidate -> requireNotNull(candidate.member.id) }
             } else {
                 // getAcceptedCandidates가 수락자 누락 시 예외를 던지므로 항상 존재함
                 val acceptedCandidate =
                     getAcceptedCandidates(listOf(requestId)).getValue(requestId)
 
-                listOf(acceptedCandidate.member.id)
+                listOf(requireNotNull(acceptedCandidate.member.id))
             }
 
         return (listOf(requesterMemberId) + candidateMemberIds).distinct()
