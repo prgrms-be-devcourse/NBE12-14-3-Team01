@@ -388,6 +388,42 @@ class ScheduleControllerTest {
     }
 
     @Test
+    void 공개_확인값이_null이면_COM_001_필드_오류를_반환한다() throws Exception {
+
+        MockMvc validationMockMvc =
+            MockMvcBuilders
+                .standaloneSetup(scheduleController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        validationMockMvc.perform(
+                patch(
+                    "/workplaces/{workplaceId}/schedules/{scheduleId}/publish",
+                    10L,
+                    20L
+                )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"confirmUnavailableConflict\":null}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+            .andExpect(
+                jsonPath("$.data.fieldErrors[0].field")
+                    .value("confirmUnavailableConflict")
+            )
+            .andExpect(
+                jsonPath("$.data.fieldErrors[0].message")
+                    .value("근무 불가능 일정 충돌 확인 여부는 필수입니다.")
+            );
+
+        verifyNoInteractions(
+            rq,
+            scheduleService
+        );
+    }
+
+    @Test
     void 생성_요청_JSON을_역직렬화하고_성공_응답_JSON을_직렬화한다() throws Exception {
 
         // given
@@ -631,6 +667,35 @@ class ScheduleControllerTest {
                 post("/workplaces/{workplaceId}/schedules", 10L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("weekStartDate"))
+            .andExpect(
+                jsonPath("$.data.fieldErrors[0].message")
+                    .value("주 시작일은 필수입니다.")
+            );
+
+        verifyNoInteractions(
+            rq,
+            scheduleService
+        );
+    }
+
+    @Test
+    void 주_시작일이_null이면_COM_001_필드_오류를_반환한다() throws Exception {
+
+        MockMvc validationMockMvc =
+            MockMvcBuilders
+                .standaloneSetup(scheduleController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        validationMockMvc.perform(
+                post("/workplaces/{workplaceId}/schedules", 10L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"weekStartDate\":null}")
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("COM-001"))

@@ -34,10 +34,11 @@ class ScheduleController(
         @Valid @RequestBody request: ScheduleCreateRequest
     ): ResponseEntity<ApiResponse<ScheduleCreateResponse>> {
         val actorUserId = rq.actorId
+        val weekStartDate = checkNotNull(request.weekStartDate)
         val response = scheduleService.createDraftSchedule(
             actorUserId,
             workplaceId,
-            request.weekStartDate!!
+            weekStartDate
         )
 
         return ResponseEntity
@@ -89,11 +90,13 @@ class ScheduleController(
         @Valid @RequestBody request: SchedulePublishRequest
     ): ResponseEntity<ApiResponse<SchedulePublishResponse>> {
         val actorUserId = rq.actorId
+        val confirmUnavailableConflict =
+            checkNotNull(request.confirmUnavailableConflict)
         val response = scheduleService.publishSchedule(
             actorUserId,
             workplaceId,
             scheduleId,
-            request.confirmUnavailableConflict!!
+            confirmUnavailableConflict
         )
 
         return ResponseEntity.ok(
