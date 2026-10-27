@@ -3,7 +3,6 @@ package com.merge.backend.domain.substitute.repository
 import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import java.time.LocalDateTime
-import java.util.Optional
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -19,7 +18,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         WHERE c.id = :candidateId
         """,
     )
-    fun findRequestIdById(@Param("candidateId") candidateId: Long?): Optional<Long>
+    fun findRequestIdById(@Param("candidateId") candidateId: Long): Long?
 
     // SUB-01 / SUB-03
     // 이미 수락한 다른 활성 대타 근무와 시간이 겹치는지 확인
@@ -36,7 +35,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         """,
     )
     fun existsOverlappingAcceptedSubstitute(
-        @Param("userId") userId: Long?,
+        @Param("userId") userId: Long,
         @Param("startAt") startAt: LocalDateTime,
         @Param("endAt") endAt: LocalDateTime,
         @Param("now") now: LocalDateTime,
@@ -70,7 +69,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         """,
     )
     fun findReceivedRequests(
-        @Param("userId") userId: Long?,
+        @Param("userId") userId: Long,
         @Param("now") now: LocalDateTime,
     ): List<SubstituteCandidate>
 
@@ -101,23 +100,23 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         """,
     )
     fun findAcceptedPendingRequests(
-        @Param("userId") userId: Long?,
+        @Param("userId") userId: Long,
         @Param("now") now: LocalDateTime,
     ): List<SubstituteCandidate>
 
     // SUB-03
     // 현재 Candidate를 제외하고 다른 PENDING Candidate가 남아 있는지 확인
     fun existsByRequest_IdAndStatusAndIdNot(
-        requestId: Long?,
+        requestId: Long,
         status: CandidateStatus,
-        candidateId: Long?,
+        candidateId: Long,
     ): Boolean
 
     // 특정 Request에 대해 상태가 ACCEPTED인 Candidate 단건 조회
     fun findByRequestIdAndStatus(
-        requestId: Long?,
+        requestId: Long,
         status: CandidateStatus,
-    ): Optional<SubstituteCandidate>
+    ): SubstituteCandidate?
 
     // 후보자가 다른 대체 요청에서 이미 수락한 활성 대타 약속 중,
     // 동시간대 겹침이 있는지 확인
@@ -135,8 +134,8 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         """,
     )
     fun existsConflictingActiveSubstitute(
-        @Param("userId") userId: Long?,
-        @Param("requestId") requestId: Long?,
+        @Param("userId") userId: Long,
+        @Param("requestId") requestId: Long,
         @Param("startAt") startAt: LocalDateTime,
         @Param("endAt") endAt: LocalDateTime,
         @Param("now") now: LocalDateTime,

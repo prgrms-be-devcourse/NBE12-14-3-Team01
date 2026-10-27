@@ -126,6 +126,8 @@
 
 ## D. 기존 테스트 현황 (요약, 행 단위는 `docs/evidence/TEST-INVENTORY.md` §3)
 
+> **S2-6A 정정 (2026-10-25, 정적 확인):** 아래 표는 PR #5 이전(`243f77c`) 52개 기준이다. PR #5(`31ecaee`) 이후 `a148a62` 기준은 **Test Method 93개, 정적 계산 실행 사례 114회**(Parameterized·Repeated를 펼친 예상값, 실제 실행 아님 — S3 표현 정정)다 (`SubstituteRequestServiceTest` 43, `SubstituteCandidateServiceTest` 26, `SubstituteRequestConcurrencyTest` 8, `SubstituteFlowIntegrationTest` 6 (신규), `SentSubstituteRequestResponseTest` 6, `SubstituteCandidateRepositoryTest` 4). 93개의 ⑤는 이 저장소에 개별 실행 근거가 없어 `UNKNOWN`이다. 상세: TEST-INVENTORY §3-1-1·§3-2-1 (V4-T-53~93). Controller / HTTP Test는 여전히 0, 알림 Row Integration도 0.
+
 | Test Class | 종류 · 환경 (근거) | 수 | ⑤ 실행 근거 | 검증하지 못하는 조건 |
 |---|---|---|---|---|
 | `SentSubstituteRequestResponseTest` | UNIT · NONE | 6 | `PASSED` @`243f77c` (로컬 Test Report XML, skipped 0) | — |
@@ -148,7 +150,7 @@ Improvement(B+, Guard Lock, Membership Lifecycle)는 이 DoD에 포함하지 않
 
 | DoD | V4에서 확인할 것 | 완료 근거 |
 |---|---|---|
-| 1. 기존 Test | D절 52개 | Kotlin SHA에서 ⑤ `PASSED` (Test Report 보관) + 기대값 변경 0 |
+| 1. 기존 Test | D절 93개 (정적 계산 실행 사례 114회, S2-6A 정정. 이전 표기 52개는 PR #5 이전) | Java SHA와 Kotlin SHA 양쪽에서 ⑤ `PASSED` (Test Report 보관, Test 이름 목록·실행 횟수 일치) + 기대값 변경 0 |
 | 2. HTTP · JSON 동등성 | SUB-01 201/200 분기, 8개 응답 Field 이름·null 출력, 성공 `code` 문자열 | V4-N-01 (현재 Test 없음 → 전환 **전에** Java로 먼저 작성) |
 | 3. Validation | `SubstituteCandidateRespondRequest` 누락·null → COM-001 (nullable + `@field:NotNull`, TECH-STACK M0-6) | V4-N-01 |
 | 4. Entity · Proxy · Nullable | `closeReason`, `approvedAt`, `closedAt`, `respondedAt` nullable. Lazy 연관 (`shift`, `requesterMember`, `request`, `member`). `id` `Long?`, `!!` 0 | V4-N-02, V4-N-03 |
@@ -156,7 +158,7 @@ Improvement(B+, Guard Lock, Membership Lifecycle)는 이 DoD에 포함하지 않
 | 6. Query · Lock | `findByIdForUpdate`, Candidate Query 문자열 그대로 | Diff 검토 + V4-N-03 (MySQL) |
 | 7. Event 시점 | 6개 Event 발행 위치, `AFTER_COMMIT` | V4-N-04 |
 | 8. Schema 동등성 | `substitute_request`·`substitute_candidate` Column·Unique·FK·ENUM 값 (Table 이름은 실제 Schema 확인) | 전환 전후 Schema 비교 기록 |
-| 9. 통합 Flow | H절 1~7단계 | Flow Integration 1개 (V4-N-02 확장 가능) |
+| 9. 통합 Flow | H절 1~7단계 | Flow Integration 1개 (V4-N-02 확장 가능). PR #5의 `SubstituteFlowIntegrationTest` (V4-T-88~93)가 일부를 다룬다 — 충족 여부는 실행 근거 확인 후 판단 |
 | 10. 신규 동작 | 0 | PR Diff |
 
 ## F. Improvement (② 상태별)
