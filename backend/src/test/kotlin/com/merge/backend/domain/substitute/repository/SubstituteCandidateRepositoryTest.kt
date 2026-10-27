@@ -182,7 +182,7 @@ class SubstituteCandidateRepositoryTest @Autowired constructor(
 
         // when
         val result = substituteCandidateRepository.findReceivedRequests(
-            candidateUser.id, // 이 사용자에게 온 요청 조회
+            requireNotNull(candidateUser.id), // 이 사용자에게 온 요청 조회
             now,              // 현재 시간 기준
         )
 
@@ -192,7 +192,7 @@ class SubstituteCandidateRepositoryTest @Autowired constructor(
             .containsExactly(earlierCandidate.id, validCandidate.id)
 
         // 다른 사용자 입장에서는 본인 요청만 보여야 한다
-        assertThat(substituteCandidateRepository.findReceivedRequests(otherMember.user.id, now))
+        assertThat(substituteCandidateRepository.findReceivedRequests(requireNotNull(otherMember.user.id), now))
             .extracting<Long> { it.member.id }
             .containsOnly(otherMember.id)
     }
@@ -321,7 +321,7 @@ class SubstituteCandidateRepositoryTest @Autowired constructor(
 
         // when
         val result = substituteCandidateRepository.findAcceptedPendingRequests(
-            candidateUser.id, // 현재 로그인 User
+            requireNotNull(candidateUser.id), // 현재 로그인 User
             now,              // 현재 시간
         )
 
@@ -342,8 +342,8 @@ class SubstituteCandidateRepositoryTest @Autowired constructor(
 
         val fixture = createConflictFixture(now, startAt, "overlap")
 
-        val candidateUserId = fixture.candidateMember.user.id
-        val otherUserId = fixture.otherMember.user.id
+        val candidateUserId = requireNotNull(fixture.candidateMember.user.id)
+        val otherUserId = requireNotNull(fixture.otherMember.user.id)
 
         // then - 같은 사용자 + 겹치는 시간 → 충돌
         assertThat(
@@ -395,9 +395,9 @@ class SubstituteCandidateRepositoryTest @Autowired constructor(
 
         val fixture = createConflictFixture(now, startAt, "conflict")
 
-        val candidateUserId = fixture.candidateMember.user.id
-        val otherUserId = fixture.otherMember.user.id
-        val acceptedRequestId = fixture.acceptedCandidate.request.id
+        val candidateUserId = requireNotNull(fixture.candidateMember.user.id)
+        val otherUserId = requireNotNull(fixture.otherMember.user.id)
+        val acceptedRequestId = requireNotNull(fixture.acceptedCandidate.request.id)
 
         // then - 승인하려는 Request 자기 자신은 충돌로 보지 않는다
         assertThat(

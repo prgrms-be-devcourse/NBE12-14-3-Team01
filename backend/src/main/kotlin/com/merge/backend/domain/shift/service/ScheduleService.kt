@@ -387,9 +387,9 @@ class ScheduleService(
                 val second = shifts[j]
 
                 if (first.getMember()
-                        .getId()
+                        .id
                     != second.getMember()
-                        .getId()
+                        .id
                 ) {
                     continue
                 }
@@ -559,8 +559,10 @@ class ScheduleService(
     ): List<Long> =
         shifts.stream()
             .map { shift ->
-                shift.getMember()
-                    .getId()
+                requireNotNull(
+                    shift.getMember()
+                        .id
+                )
             }
             .distinct()
             .sorted()
