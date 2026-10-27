@@ -139,7 +139,7 @@ class SubstituteFlowIntegrationTest {
         fun requestAcceptApprove_ChangesShiftMember() {
 
             // 1. 요청 생성 - MANAGER와 요청자를 제외한 2명이 후보가 된다
-            val created = substituteRequestService.create(shift.id, requester.userId)
+            val created = substituteRequestService.create(requireNotNull(shift.id), requester.userId)
 
             assertThat(created.requestCreated).isTrue()
             assertThat(created.status).isEqualTo(RequestStatus.OPEN)
@@ -175,7 +175,7 @@ class SubstituteFlowIntegrationTest {
                 .isEmpty()
 
             // 4. MANAGER 목록 조회 - 수락자 정보가 함께 내려온다
-            val list = substituteRequestService.list(workplace.id, manager.userId)
+            val list = substituteRequestService.list(requireNotNull(workplace.id), manager.userId)
 
             assertThat(list).singleElement().satisfies(
                 ThrowingConsumer<SubstituteRequestListResponse> { response ->
@@ -206,7 +206,7 @@ class SubstituteFlowIntegrationTest {
 
             // 이제 이 Shift는 A의 근무이므로 원래 요청자는 다시 요청할 수 없다
             assertBusinessError(SubstituteRequestErrorCode.NOT_OWN_SHIFT) {
-                substituteRequestService.create(shift.id, requester.userId)
+                substituteRequestService.create(requireNotNull(shift.id), requester.userId)
             }
         }
 
@@ -237,7 +237,7 @@ class SubstituteFlowIntegrationTest {
             assertThat(findShift().member.id).isEqualTo(requester.id)
 
             // 활성 요청이 없으므로 다시 요청 가능
-            val retried = substituteRequestService.create(shift.id, requester.userId)
+            val retried = substituteRequestService.create(requireNotNull(shift.id), requester.userId)
 
             assertThat(retried.requestCreated).isTrue()
             assertThat(retried.requestId).isNotEqualTo(requestId)
@@ -307,7 +307,7 @@ class SubstituteFlowIntegrationTest {
             flushAndClear()
 
             val requestId = createRequest()
-            val otherRequestId = requireNotNull(substituteRequestService.create(otherShift.id, otherRequester.userId).requestId)
+            val otherRequestId = requireNotNull(substituteRequestService.create(requireNotNull(otherShift.id), otherRequester.userId).requestId)
             flushAndClear()
 
             // A가 다른 요청을 먼저 수락
@@ -363,7 +363,7 @@ class SubstituteFlowIntegrationTest {
     // ===================== 헬퍼 =====================
 
     private fun createRequest(): Long {
-        val requestId = requireNotNull(substituteRequestService.create(shift.id, requester.userId).requestId)
+        val requestId = requireNotNull(substituteRequestService.create(requireNotNull(shift.id), requester.userId).requestId)
         flushAndClear()
         return requestId
     }
@@ -399,7 +399,7 @@ class SubstituteFlowIntegrationTest {
         // 프록시에 setField 하면 실제 엔티티가 바뀌지 않으므로 먼저 비운다
         flushAndClear()
 
-        val managed = workplaceMemberRepository.findById(member.id).orElseThrow()
+        val managed = workplaceMemberRepository.findById(requireNotNull(member.id)).orElseThrow()
         ReflectionTestUtils.setField(managed, "leftAt", now.minusHours(1))
         flushAndClear()
     }
@@ -416,7 +416,7 @@ class SubstituteFlowIntegrationTest {
     private fun findRequest(requestId: Long): SubstituteRequest =
         substituteRequestRepository.findById(requestId).orElseThrow()
 
-    private fun findShift(): Shift = shiftRepository.findById(shift.id).orElseThrow()
+    private fun findShift(): Shift = shiftRepository.findById(requireNotNull(shift.id)).orElseThrow()
 
     private val WorkplaceMember.userId: Long
         get() = requireNotNull(user.id)
