@@ -96,12 +96,12 @@ class NotificationQueryIntegrationTest {
         List<NotificationResponse> result = notificationService.getNotifications(fixture.userId());
 
         // then - 순서 계약은 J2에서 보호한다. 여기서는 정확한 합집합과 매핑을 확인한다
-        assertThat(result).extracting(NotificationResponse::notificationId)
+        assertThat(result).extracting(NotificationResponse::getNotificationId)
             .containsExactlyInAnyOrder(fixture.axId(), fixture.ayId());
         assertThat(result).extracting(
-                NotificationResponse::notificationId,
-                NotificationResponse::workplaceId,
-                NotificationResponse::workplaceName
+                NotificationResponse::getNotificationId,
+                NotificationResponse::getWorkplaceId,
+                NotificationResponse::getWorkplaceName
             )
             .containsExactlyInAnyOrder(
                 tuple(fixture.axId(), fixture.xId(), fixture.xName()),
