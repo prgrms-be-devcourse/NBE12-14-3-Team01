@@ -559,8 +559,10 @@ class ScheduleService(
     ): List<Long> =
         shifts.stream()
             .map { shift ->
-                shift.member
-                    .id
+                requireNotNull(
+                    shift.member
+                        .id
+                )
             }
             .distinct()
             .sorted()

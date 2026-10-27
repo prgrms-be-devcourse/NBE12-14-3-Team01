@@ -85,11 +85,11 @@ class CustomAuthenticationFilter(
 
     //공통 예외 처리 범위 밖이라서 직접 응답
     private fun writeErrorResponse(response: HttpServletResponse, errorCode: ErrorCode) {
-        response.status = errorCode.httpStatus.value()
+        response.status = errorCode.getHttpStatus().value()
         response.contentType = "application/json; charset=UTF-8"
         response.writer.write(
             objectMapper.writeValueAsString(
-                ApiResponse.error(errorCode.code, errorCode.message),
+                ApiResponse.error(errorCode.getCode(), errorCode.getMessage()),
             ),
         )
     }

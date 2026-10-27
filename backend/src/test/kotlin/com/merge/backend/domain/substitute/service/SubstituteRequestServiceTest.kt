@@ -1028,8 +1028,8 @@ class SubstituteRequestServiceTest {
 
             given(
                 substituteCandidateService.findCandidates(
-                    newShift.schedule.workplace.id,
-                    newShift.member.id,
+                    requireNotNull(newShift.schedule.workplace.id),
+                    requireNotNull(newShift.member.id),
                     newShift,
                 )
             ).willReturn(listOf(newCandidateMember))
@@ -1096,8 +1096,8 @@ class SubstituteRequestServiceTest {
             // Candidate 없음
             given(
                 substituteCandidateService.findCandidates(
-                    newShift.schedule.workplace.id,
-                    newShift.member.id,
+                    requireNotNull(newShift.schedule.workplace.id),
+                    requireNotNull(newShift.member.id),
                     newShift,
                 )
             ).willReturn(listOf())
