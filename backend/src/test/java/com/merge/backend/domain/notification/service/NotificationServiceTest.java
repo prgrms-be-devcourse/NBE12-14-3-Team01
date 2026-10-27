@@ -142,7 +142,7 @@ class NotificationServiceTest {
         assertThat(notification.getReadAt())
             .isEqualTo(expectedReadAt);
 
-        assertThat(result.readAt())
+        assertThat(result.getReadAt())
             .isEqualTo(expectedReadAt);
 
         verify(notificationRepository)
@@ -366,29 +366,29 @@ class NotificationServiceTest {
         NotificationResponse response =
             result.get(0);
 
-        assertThat(response.notificationId())
+        assertThat(response.getNotificationId())
             .isEqualTo(100L);
 
-        assertThat(response.workplaceId())
+        assertThat(response.getWorkplaceId())
             .isEqualTo(10L);
 
-        assertThat(response.workplaceName())
+        assertThat(response.getWorkplaceName())
             .isEqualTo("SWITCH 카페");
 
-        assertThat(response.type())
+        assertThat(response.getType())
             .isEqualTo(
                 NotificationType.SCHEDULE_PUBLISHED
             );
 
-        assertThat(response.message())
+        assertThat(response.getMessage())
             .isEqualTo(
                 "새로운 주간 근무표가 공개되었습니다."
             );
 
-        assertThat(response.createdAt())
+        assertThat(response.getCreatedAt())
             .isEqualTo(createdAt);
 
-        assertThat(response.readAt())
+        assertThat(response.getReadAt())
             .isNull();
 
         verify(notificationRepository)
@@ -509,16 +509,16 @@ class NotificationServiceTest {
 
         assertThat(result).hasSize(2);
 
-        assertThat(result.get(0).notificationId())
+        assertThat(result.get(0).getNotificationId())
             .isEqualTo(101L);
 
-        assertThat(result.get(0).readAt())
+        assertThat(result.get(0).getReadAt())
             .isNull();
 
-        assertThat(result.get(1).notificationId())
+        assertThat(result.get(1).getNotificationId())
             .isEqualTo(100L);
 
-        assertThat(result.get(1).readAt())
+        assertThat(result.get(1).getReadAt())
             .isEqualTo(readAt);
     }
 

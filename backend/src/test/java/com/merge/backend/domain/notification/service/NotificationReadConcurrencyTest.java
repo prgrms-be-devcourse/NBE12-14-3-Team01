@@ -267,7 +267,7 @@ class NotificationReadConcurrencyTest {
              * 첫 번째 요청은 최초 읽음이므로
              * 10:00을 반환해야 한다.
              */
-            assertThat(firstResult.readAt())
+            assertThat(firstResult.getReadAt())
                 .isEqualTo(expectedReadAt);
 
             /*
@@ -278,16 +278,16 @@ class NotificationReadConcurrencyTest {
              * 10:05로 덮어쓰지 않고
              * 최초 10:00을 반환해야 한다.
              */
-            assertThat(secondResult.readAt())
+            assertThat(secondResult.getReadAt())
                 .isEqualTo(expectedReadAt);
 
             /*
              * 두 응답 모두 같은 Notification에 대한 결과인지도 확인한다.
              */
-            assertThat(firstResult.notificationId())
+            assertThat(firstResult.getNotificationId())
                 .isEqualTo(fixture.notificationId());
 
-            assertThat(secondResult.notificationId())
+            assertThat(secondResult.getNotificationId())
                 .isEqualTo(fixture.notificationId());
 
             /*
