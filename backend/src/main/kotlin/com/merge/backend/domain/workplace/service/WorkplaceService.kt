@@ -13,7 +13,6 @@ import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 import org.springframework.stereotype.Service
-import org.springframework.dao.InvalidDataAccessApiUsageException
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -27,14 +26,14 @@ class WorkplaceService(
     @Transactional
     fun createWorkplace(name: String?, user: User?): WorkplaceMember {
         val inviteCode = createInviteCode()
-        val workplace = Workplace(name ?: throw NullPointerException("name"), inviteCode)
+        val workplace = Workplace(requireNotNull(name), inviteCode)
 
         workplaceRepository.save(workplace)
 
         val joinedAt = LocalDateTime.now(clock)
         val member = WorkplaceMember(
             workplace,
-            user ?: throw NullPointerException("user"),
+            requireNotNull(user),
             WorkplaceRole.MANAGER,
             joinedAt
         )
@@ -64,7 +63,7 @@ class WorkplaceService(
         val joinedAt = LocalDateTime.now(clock)
         val member = WorkplaceMember(
             workplace,
-            user ?: throw NullPointerException("user"),
+            requireNotNull(user),
             WorkplaceRole.EMPLOYEE,
             joinedAt
         )
@@ -90,12 +89,7 @@ class WorkplaceService(
     }
 
     private fun getWorkplace(workplaceId: Long?): Workplace {
-        // Preserve Spring Data's translated exception for Java callers passing a null ID.
-        val id = workplaceId ?: throw InvalidDataAccessApiUsageException(
-            "The given id must not be null",
-            IllegalArgumentException("The given id must not be null")
-        )
-        return workplaceRepository.findById(id)
+        return workplaceRepository.findById(requireNotNull(workplaceId))
             .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND) }
     }
 
