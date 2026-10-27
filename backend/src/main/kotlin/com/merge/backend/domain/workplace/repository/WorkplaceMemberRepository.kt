@@ -19,6 +19,11 @@ interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
     @EntityGraph(attributePaths = ["workplace"])
     fun findAllByUser_IdAndLeftAtIsNull(userId: Long?): List<WorkplaceMember>
 
+    @EntityGraph(attributePaths = ["workplace"])
+    fun findAllByUser_IdAndLeftAtIsNotNullOrderByLeftAtDescIdDesc(
+        userId: Long
+    ): List<WorkplaceMember>
+
     @EntityGraph(attributePaths = ["user"])
     fun findAllByWorkplace_IdAndLeftAtIsNull(workplaceId: Long?): List<WorkplaceMember>
 

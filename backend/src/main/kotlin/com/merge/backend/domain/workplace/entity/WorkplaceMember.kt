@@ -47,4 +47,17 @@ class WorkplaceMember @JvmOverloads constructor(
 
     var leftAt: LocalDateTime? = leftAt
         protected set
+
+    fun isCurrent(): Boolean = leftAt == null
+
+    /**
+     * 소속 Row만 종료한다. 근무·대타 정리와 Lock 후 재검증을 마친 퇴사 Command가
+     * 같은 업무 Transaction 안에서 호출해야 하며, 단독 퇴사 처리로 사용하지 않는다.
+     */
+    fun leave(now: LocalDateTime) {
+        check(isCurrent()) { "이미 종료된 소속입니다." }
+        check(role == WorkplaceRole.EMPLOYEE) { "관리자 소속은 퇴사 처리할 수 없습니다." }
+
+        leftAt = now
+    }
 }

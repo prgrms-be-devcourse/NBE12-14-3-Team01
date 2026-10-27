@@ -11,12 +11,16 @@ import org.springframework.stereotype.Service
 class WorkplaceMemberService(
     private val workplaceMemberRepository: WorkplaceMemberRepository
 ) {
-    fun requireManager(actorUserId: Long?, workplaceId: Long?): WorkplaceMember {
-        val member = workplaceMemberRepository
+    fun requireCurrentMember(actorUserId: Long?, workplaceId: Long?): WorkplaceMember {
+        return workplaceMemberRepository
             .findByWorkplace_IdAndUser_IdAndLeftAtIsNull(workplaceId, actorUserId)
             .orElseThrow {
                 BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER)
             }
+    }
+
+    fun requireManager(actorUserId: Long?, workplaceId: Long?): WorkplaceMember {
+        val member = requireCurrentMember(actorUserId, workplaceId)
 
         if (member.role != WorkplaceRole.MANAGER) {
             throw BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED)
