@@ -299,13 +299,14 @@ public class NotificationService {
         Long actorUserId,
         Long notificationId
     ) {
-        Notification notification = notificationRepository
-            .findByIdForUpdate(notificationId)
-                .orElseThrow(() ->
-                    new BusinessException(
-                        NotificationErrorCode.NOT_FOUND_NOTIFICATION
-                    )
-                );
+        Notification notification =
+            notificationRepository.findByIdForUpdate(notificationId);
+
+        if (notification == null) {
+            throw new BusinessException(
+                NotificationErrorCode.NOT_FOUND_NOTIFICATION
+            );
+        }
 
         WorkplaceMember recipientMember = notification.getRecipientMember();
 
