@@ -35,7 +35,7 @@ class Notification(
     var readAt: LocalDateTime? = null
         protected set
 
-    fun markAsRead(readAt: LocalDateTime?) {
+    fun markAsRead(readAt: LocalDateTime) {
         if (this.readAt == null) {
             this.readAt = readAt
         }

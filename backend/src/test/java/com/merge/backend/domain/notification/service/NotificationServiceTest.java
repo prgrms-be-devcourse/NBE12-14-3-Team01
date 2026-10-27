@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -121,7 +120,7 @@ class NotificationServiceTest {
                 notificationId
             )
         ).thenReturn(
-            Optional.of(notification)
+            notification
         );
 
         NotificationReadResponse result =
@@ -162,7 +161,7 @@ class NotificationServiceTest {
                 notificationId
             )
         ).thenReturn(
-            Optional.empty()
+            null
         );
 
         assertThatThrownBy(() ->
@@ -213,7 +212,7 @@ class NotificationServiceTest {
                 notificationId
             )
         ).thenReturn(
-            Optional.of(notification)
+            notification
         );
 
         assertThatThrownBy(() ->
@@ -276,7 +275,7 @@ class NotificationServiceTest {
                 notificationId
             )
         ).thenReturn(
-            Optional.of(notification)
+            notification
         );
 
         assertThatThrownBy(() ->

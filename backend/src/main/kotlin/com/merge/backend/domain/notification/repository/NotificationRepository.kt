@@ -2,7 +2,6 @@ package com.merge.backend.domain.notification.repository
 
 import com.merge.backend.domain.notification.entity.Notification
 import jakarta.persistence.LockModeType
-import java.util.Optional
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -18,7 +17,7 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
             "where rm.user.id = :userId and rm.leftAt is null\n" +
             "order by n.createDate desc, n.id desc\n"
     )
-    fun findAllByUserId(@Param("userId") userId: Long?): List<Notification>
+    fun findAllByUserId(@Param("userId") userId: Long): List<Notification>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
@@ -27,6 +26,6 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
             "where n.id = :notificationId\n"
     )
     fun findByIdForUpdate(
-        @Param("notificationId") notificationId: Long?
-    ): Optional<Notification>
+        @Param("notificationId") notificationId: Long
+    ): Notification?
 }

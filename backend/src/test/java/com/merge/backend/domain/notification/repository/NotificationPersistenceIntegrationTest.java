@@ -77,12 +77,17 @@ class NotificationPersistenceIntegrationTest {
     void repositoryAcquiresPessimisticWriteLock() {
         Long id = persistFixture();
 
-        Notification locked = notificationRepository.findByIdForUpdate(id)
-            .orElseThrow();
+        Notification locked = notificationRepository.findByIdForUpdate(id);
 
+        assertThat(locked).isNotNull();
         assertThat(entityManager.getLockMode(locked))
             .isEqualTo(LockModeType.PESSIMISTIC_WRITE);
         assertThat(locked.getId()).isEqualTo(id);
+    }
+
+    @Test
+    void missingNotificationReturnsNull() {
+        assertThat(notificationRepository.findByIdForUpdate(Long.MIN_VALUE)).isNull();
     }
 
     private Long persistFixture() {

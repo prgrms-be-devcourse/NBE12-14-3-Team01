@@ -1,6 +1,7 @@
 package com.merge.backend.domain.notification.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
@@ -64,6 +65,26 @@ class NotificationTest {
         notification.markAsRead(secondReadAt);
 
         assertThat(notification.getReadAt()).isEqualTo(firstReadAt);
+    }
+
+    @Test
+    void markAsReadRejectsNullBeforeAndAfterRead() {
+        Notification notification = new Notification(
+            mock(WorkplaceMember.class),
+            NotificationType.SCHEDULE_PUBLISHED,
+            "null input boundary"
+        );
+
+        assertThatThrownBy(() -> notification.markAsRead(null))
+            .isInstanceOf(NullPointerException.class);
+        assertThat(notification.getReadAt()).isNull();
+
+        LocalDateTime first = LocalDateTime.of(2026, 9, 23, 10, 0);
+        notification.markAsRead(first);
+
+        assertThatThrownBy(() -> notification.markAsRead(null))
+            .isInstanceOf(NullPointerException.class);
+        assertThat(notification.getReadAt()).isEqualTo(first);
     }
 
 }
