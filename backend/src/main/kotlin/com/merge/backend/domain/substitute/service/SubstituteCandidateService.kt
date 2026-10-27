@@ -22,6 +22,7 @@ import com.merge.backend.global.exception.BusinessException
 import java.time.Clock
 import java.time.LocalDateTime
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -39,8 +40,8 @@ class SubstituteCandidateService(
 
     @Transactional(readOnly = true)
     fun findCandidates(
-        workplaceId: Long?,
-        requestMemberId: Long?,
+        workplaceId: Long,
+        requestMemberId: Long,
         targetShift: Shift,
     ): List<WorkplaceMember> {
         val now = LocalDateTime.now(clock)
@@ -87,7 +88,7 @@ class SubstituteCandidateService(
 
     @Transactional(readOnly = true)
     fun findReceivedRequests(
-        userId: Long?, // 현재 로그인한 User의 ID
+        userId: Long, // 현재 로그인한 User의 ID
     ): List<SubstituteCandidate> {
         val now = LocalDateTime.now(clock) // 현재 서버 시간
 
@@ -99,7 +100,7 @@ class SubstituteCandidateService(
 
     @Transactional(readOnly = true)
     fun findAcceptedPendingRequests(
-        userId: Long?, // 현재 로그인한 User의 ID
+        userId: Long, // 현재 로그인한 User의 ID
     ): List<SubstituteCandidate> {
         val now = LocalDateTime.now(clock) // 현재 서버 시간
 
@@ -110,20 +111,17 @@ class SubstituteCandidateService(
     }
 
     private fun validateRespondableCandidate(
-        candidateId: Long?, // 응답하려는 대타 후보 ID
-        userId: Long?, // 현재 로그인한 User ID
+        candidateId: Long, // 응답하려는 대타 후보 ID
+        userId: Long, // 현재 로그인한 User ID
     ): SubstituteCandidate {
         val requestId = substituteCandidateRepository.findRequestIdById(candidateId)
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND) }
+            ?: throw BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
 
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
-            .orElseThrow {
-                BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
-            }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
 
-        // findRequestIdById를 통과했으므로 candidateId는 null이 아님
-        val candidate = substituteCandidateRepository.findById(requireNotNull(candidateId))
-            .orElseThrow { BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND) }
+        val candidate = substituteCandidateRepository.findByIdOrNull(candidateId)
+            ?: throw BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
 
         val member = candidate.member
 
@@ -170,8 +168,8 @@ class SubstituteCandidateService(
 
     @Transactional
     fun acceptCandidate(
-        candidateId: Long?, // 수락할 Candidate ID
-        userId: Long?, // 현재 로그인한 User ID
+        candidateId: Long, // 수락할 Candidate ID
+        userId: Long, // 현재 로그인한 User ID
     ): SubstituteCandidate {
         // Request Lock을 획득하고
         // Candidate / Request의 기본 응답 가능 상태 확인
@@ -235,8 +233,8 @@ class SubstituteCandidateService(
 
     @Transactional
     fun rejectCandidate(
-        candidateId: Long?, // 거절할 Candidate ID
-        userId: Long?, // 현재 로그인한 User ID
+        candidateId: Long, // 거절할 Candidate ID
+        userId: Long, // 현재 로그인한 User ID
     ): SubstituteCandidate {
         // 수락/거절 공통 조건 확인
         val candidate = validateRespondableCandidate(candidateId, userId)

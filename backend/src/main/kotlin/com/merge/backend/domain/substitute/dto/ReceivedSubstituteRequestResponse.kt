@@ -7,12 +7,12 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class ReceivedSubstituteRequestResponse(
-    val candidateId: Long?, // 내 Candidate ID → SUB-03에서 수락/거절할 때 사용
-    val requestId: Long?, // 대타 요청 ID
-    val shiftId: Long?, // 대타가 필요한 근무 ID
-    val workplaceId: Long?, // 어느 근무지인지
+    val candidateId: Long, // 내 Candidate ID → SUB-03에서 수락/거절할 때 사용
+    val requestId: Long, // 대타 요청 ID
+    val shiftId: Long, // 대타가 필요한 근무 ID
+    val workplaceId: Long, // 어느 근무지인지
     val workplaceName: String, // 화면에 보여줄 근무지 이름
-    val requesterMemberId: Long?, // 대타를 요청한 직원의 Member ID
+    val requesterMemberId: Long, // 대타를 요청한 직원의 Member ID
     val requesterName: String, // 대타 요청자 이름
     val startAt: LocalDateTime, // 대타 근무 시작 시간
     val endAt: LocalDateTime, // 대타 근무 종료 시간
@@ -32,12 +32,12 @@ data class ReceivedSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             return ReceivedSubstituteRequestResponse(
-                candidateId = candidate.id,
-                requestId = request.id,
-                shiftId = shift.id,
-                workplaceId = workplace.id,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
-                requesterMemberId = request.requesterMember.id,
+                requesterMemberId = requireNotNull(request.requesterMember.id),
                 requesterName = request.requesterMember.user.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

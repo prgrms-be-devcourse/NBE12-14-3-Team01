@@ -12,6 +12,7 @@ import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
 import com.merge.backend.standard.Ut;
 import jakarta.servlet.http.Cookie;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -175,5 +177,175 @@ class ApiV1UserControllerTest {
                 .header("Authorization", "Bearer " + forgedToken))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-006"));
+    }
+
+    @Test
+    @DisplayName("회원가입 요청에 email이 없으면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test7() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"password": "%s", "name": "유저2"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
+
+    @Test
+    @DisplayName("회원가입하면 비밀번호 원문이 아니라 BCrypt 해시가 DB에 저장된다")
+    void test8() {
+        String passwordHash = userRepository.findByEmail(EMAIL).orElseThrow().getPasswordHash();
+
+        assertThat(passwordHash).isNotEqualTo(PASSWORD);
+        // 서버 설정과 별개로 새 BCrypt로 확인해야 암호화를 빼먹은 경우도 잡음
+        assertThat(new BCryptPasswordEncoder().matches(PASSWORD, passwordHash)).isTrue();
+    }
+
+    @Test
+    @DisplayName("로그인 요청에 email이 없으면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test9() throws Exception {
+        mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"password": "%s"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
+
+    @Test
+    @DisplayName("로그인 요청에 password가 없으면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test10() throws Exception {
+        mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s"}
+                    """.formatted(EMAIL)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("password"));
+    }
+
+    @Test
+    @DisplayName("회원가입 요청의 email 형식이 틀리면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test11() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "bad", "password": "%s", "name": "유저2"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
+
+    @Test
+    @DisplayName("로그인 요청의 email 형식이 틀리면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test12() throws Exception {
+        mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "bad", "password": "%s"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
+
+    @Test
+    @DisplayName("로그인 응답 data는 user 다음에 accessToken 순서로 내려간다")
+    void test13() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andReturn();
+        String body = result.getResponse().getContentAsString();
+
+        int userIndex = body.indexOf("\"user\"");
+        int accessTokenIndex = body.indexOf("\"accessToken\"");
+        assertThat(userIndex).isNotNegative();
+        assertThat(userIndex).isLessThan(accessTokenIndex);
+    }
+
+    @Test
+    @DisplayName("로그인에서 받은 accessToken의 유효 시간은 10분이다")
+    void test14() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andReturn();
+        String accessToken = JsonPath.read(
+            result.getResponse().getContentAsString(), "$.data.accessToken");
+
+        // 서명 확인 없이 토큰 가운데 부분(내용)만 읽음
+        String payload = new String(Base64.getUrlDecoder().decode(accessToken.split("\\.")[1]));
+        Number issuedAt = JsonPath.read(payload, "$.iat");
+        Number expiresAt = JsonPath.read(payload, "$.exp");
+
+        assertThat(expiresAt.longValue() - issuedAt.longValue()).isEqualTo(60L * 10);
+    }
+
+    @Test
+    @DisplayName("로그인·재발급·내 정보 조회에 성공하면 각각 정해진 메시지를 반환한다")
+    void test15() throws Exception {
+        MvcResult loginResult = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("로그인에 성공했습니다"))
+            .andReturn();
+        String accessToken = JsonPath.read(
+            loginResult.getResponse().getContentAsString(), "$.data.accessToken");
+        Cookie refreshCookie = loginResult.getResponse().getCookie("refreshToken");
+
+        mvc.perform(post("/api/v1/auth/refresh").contextPath("/api/v1")
+                .cookie(refreshCookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Access Token이 재발급되었습니다"));
+
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("현재 사용자 정보를 조회했습니다"));
+    }
+
+    @Test
+    @DisplayName("이메일 중복, 재발급 실패, 헤더 형식 오류, 잘못된 토큰은 각각 정해진 메시지를 반환한다")
+    void test16() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s", "name": "유저1"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("AUTH-001"))
+            .andExpect(jsonPath("$.message").value("이미 사용중인 이메일입니다"));
+
+        mvc.perform(post("/api/v1/auth/refresh").contextPath("/api/v1"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-003"))
+            .andExpect(jsonPath("$.message").value("유효하지 않은 인증 정보입니다"));
+
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Basic abc123"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-005"))
+            .andExpect(jsonPath("$.message").value("Authorization 헤더가 Bearer 형식이 아닙니다."));
+
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer invalid-token"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-006"))
+            .andExpect(jsonPath("$.message").value("Access Token이 유효하지 않습니다."));
     }
 }

@@ -8,8 +8,8 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class SubstituteCandidateRespondResponse(
-    val candidateId: Long?, // 응답한 Candidate ID
-    val requestId: Long?, // 연결된 대타 요청 ID
+    val candidateId: Long, // 응답한 Candidate ID
+    val requestId: Long, // 연결된 대타 요청 ID
     val candidateStatus: CandidateStatus, // ACCEPTED 또는 REJECTED
     val requestStatus: RequestStatus, // 처리 후 Request 상태
     val respondedAt: LocalDateTime?, // 수락/거절한 시간
@@ -21,8 +21,8 @@ data class SubstituteCandidateRespondResponse(
         @JvmStatic
         fun from(candidate: SubstituteCandidate): SubstituteCandidateRespondResponse =
             SubstituteCandidateRespondResponse(
-                candidateId = candidate.id,
-                requestId = candidate.request.id,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(candidate.request.id),
                 candidateStatus = candidate.status,
                 requestStatus = candidate.request.status,
                 respondedAt = candidate.respondedAt,

@@ -7,10 +7,10 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class AcceptedPendingSubstituteRequestResponse(
-    val candidateId: Long?,
-    val requestId: Long?,
-    val shiftId: Long?,
-    val workplaceId: Long?,
+    val candidateId: Long,
+    val requestId: Long,
+    val shiftId: Long,
+    val workplaceId: Long,
     val workplaceName: String,
     val requesterName: String,
     val startAt: LocalDateTime,
@@ -31,10 +31,10 @@ data class AcceptedPendingSubstituteRequestResponse(
             val workplace = shift.schedule.workplace
 
             return AcceptedPendingSubstituteRequestResponse(
-                candidateId = candidate.id,
-                requestId = request.id,
-                shiftId = shift.id,
-                workplaceId = workplace.id,
+                candidateId = requireNotNull(candidate.id),
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
                 requesterName = request.requesterMember.user.name,
                 startAt = shift.startAt,
