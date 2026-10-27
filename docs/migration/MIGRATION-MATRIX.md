@@ -4,6 +4,7 @@
 > Domain별 상세(API, 정책, Test, DoD)는 `docs/delivery/<Domain>.md`, Test 행 단위는 `docs/evidence/TEST-INVENTORY.md`.
 > 이 문서는 기술 진행 상태의 Source of Truth다. 일정·담당은 Notion Delivery Board가 SoT이고, Board 행은 이 문서의 행 ID로 연결한다.
 > 검증 상태 칸은 **통과한 Run 링크가 있을 때만** 채운다. Test가 존재한다는 것만으로는 채우지 않는다.
+> 2026-10-27 (V1): §2 V1 행을 develop `6ae2727` 기준으로 갱신했다 (근거 TEST-EVIDENCE EV-024~029). 다른 행과 아래 snapshot 설명은 그대로 둔다.
 > 2026-10-26 (V5-J2): §3 V5 보강 칸, §4 공통 행 R1 분리, §4 아래에 Kotlin 전환 관문 문서 위치를 적었다.
 > S2-6B (2026-10-25): §3에 `a148a62` 정적 집계와 PASS 조건 보완을 추가했다. §2 상태 칸과 Migration 단계의 대응은 [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md) §2.
 
@@ -30,7 +31,7 @@ Kotlin 상태 근거 (2026-10-23 확인): 3차 원격 Branch는 `develop`·`main
 | V | Branch / PR | Kotlin (Git) | Kotlin (담당자 보고) | MIGRATION_CODE_COMPLETE | KOTLIN_QUALITY_REVIEWED | UNIT_TEST_VERIFIED | INTEGRATION_TEST_VERIFIED | CONTRACT_REGRESSION_VERIFIED | CROSS_DOMAIN_INTEGRATED | API_DOC_UPDATED | Blocker |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 공통 (M0) | 3차 PR #1 `chore/kotlin-setup` (MERGED → `cdaaa13`) | 환경 검증 파일 2개 | UNKNOWN | — | — | — | — | — | — | — | Owner 미지정 (D-NOW-01), DL-003·004·014 승인 기록, M0-FOLLOWUP-01~03 (`TECH-STACK-DECISIONS` §5-A) |
-| V1 | 2차 PR #76 `test/auth-tests` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
+| V1 | 3차 PR #19 `refactor/v1-auth-kotlin`, #26 `fix/rq-actor-id-non-null`, #22 `test/v1-auth-hardening` (모두 MERGED). 이전: 2차 PR #76 `test/auth-tests` | V1 Production 16개 전부 `.kt` (`domain/user/**`, `global/security/**`, `global/rq/**`, develop `6ae2727`) | 전환 완료 (2026-10-27) | ✅ EV-024·EV-026, develop Run `40431452631` | — (Step 4 전) | ✅ develop Run `40431452631` (Suite), 로컬 개별 438 PASS (EV-029) | ✅ develop Run `40431452631` (Suite), 로컬 개별 438 PASS (EV-029) | — (로컬 비교 EV-025·EV-027만, CI Run 없음) | — | — | 없음. 남은 것: Step 3·4, AUTH-1 (G03-D-23 승인 후) |
 | V2 | 2차 PR #78 `test/workplace-tests` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
 | V3 | 2차 PR #77 `test/schedule-state-consistency` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
 | V4 | 없음 (Delivery Sheet 시범: `docs/delivery/V4-substitute.md`) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
