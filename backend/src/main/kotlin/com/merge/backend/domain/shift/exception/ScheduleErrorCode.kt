@@ -1,14 +1,13 @@
-package com.merge.backend.domain.shift.exception;
+package com.merge.backend.domain.shift.exception
 
-import com.merge.backend.global.exception.ErrorCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import com.merge.backend.global.exception.ErrorCode
+import org.springframework.http.HttpStatus
 
-@Getter
-@RequiredArgsConstructor
-public enum ScheduleErrorCode implements ErrorCode {
-
+enum class ScheduleErrorCode(
+    private val status: HttpStatus,
+    private val errorCode: String,
+    private val errorMessage: String
+) : ErrorCode {
     INVALID_WEEK_START_DATE(
         HttpStatus.BAD_REQUEST,
         "SCH-001",
@@ -74,13 +73,16 @@ public enum ScheduleErrorCode implements ErrorCode {
         "SCH-011",
         "다른 공식 근무와 시간이 겹쳐 근무표를 공개할 수 없습니다."
     ),
+
     NOT_PUBLISHED(
         HttpStatus.BAD_REQUEST,
         "SCH-012",
         "해당 요청의 스케줄은 공개되지 않았습니다."
     );
 
-    private final HttpStatus httpStatus;
-    private final String code;
-    private final String message;
+    override fun getHttpStatus(): HttpStatus = status
+
+    override fun getCode(): String = errorCode
+
+    override fun getMessage(): String = errorMessage
 }
