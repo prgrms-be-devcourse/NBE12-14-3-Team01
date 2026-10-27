@@ -21,11 +21,11 @@ class MembershipHistoryService(
             .findAllByUser_IdAndLeftAtIsNotNullOrderByLeftAtDescIdDesc(actorUserId)
             .map { member ->
                 MembershipHistory(
-                    memberId = requireNotNull(member.id),
+                    memberId = checkNotNull(member.id) { "조회된 소속의 ID가 없습니다." },
                     workplaceName = member.workplace.name,
                     role = member.role,
                     joinedAt = member.joinedAt,
-                    leftAt = requireNotNull(member.leftAt)
+                    leftAt = checkNotNull(member.leftAt) { "종료 소속 조회 결과에 퇴사 시각이 없습니다." }
                 )
             }
     }

@@ -53,6 +53,8 @@ class WorkplaceMember @JvmOverloads constructor(
     /**
      * 소속 Row만 종료한다. 근무·대타 정리와 Lock 후 재검증을 마친 퇴사 Command가
      * 같은 업무 Transaction 안에서 호출해야 하며, 단독 퇴사 처리로 사용하지 않는다.
+     * check는 내부 상태 안전장치다. Command는 이미 종료된 소속·관리자 대상 요청을
+     * 호출 전에 업무 오류로 처리해야 한다. 해당 ErrorCode는 아직 구현되지 않았다.
      */
     fun leave(now: LocalDateTime) {
         check(isCurrent()) { "이미 종료된 소속입니다." }
