@@ -333,6 +333,9 @@ public class WorkplaceServiceTest {
         when(workplaceRepository.existsByInviteCode(any()))
             .thenReturn(true, false);
 
+        when(workplaceMemberRepository.save(any(WorkplaceMember.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
         workplaceService.createWorkplace("테스트 매장", user);
 
         verify(workplaceRepository, times(2))
