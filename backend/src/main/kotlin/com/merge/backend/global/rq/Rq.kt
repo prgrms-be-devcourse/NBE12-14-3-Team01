@@ -24,7 +24,8 @@ class Rq(
     private var cookieSameSite: String? = null
 
     // Kotlin에서는 rq.actorId, Java에서는 rq.getActorId()로 부름
-    val actorId: Long?
+    // 로그인한 사용자의 id라 null이 아님 (로그인 정보가 없으면 그 전에 예외)
+    val actorId: Long
         get() {
             val authentication = SecurityContextHolder.getContext().authentication
             val principal = authentication?.principal as SecurityUser
