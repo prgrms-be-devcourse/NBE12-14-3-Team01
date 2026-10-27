@@ -314,7 +314,7 @@ class ScheduleService(
     ) {
         for (shift in shifts) {
             val member: WorkplaceMember =
-                shift.getMember()
+                shift.member
 
             if (member.workplace.id != workplaceId
                 || member.leftAt != null) {
@@ -330,8 +330,8 @@ class ScheduleService(
     ) {
         for (shift in shifts) {
             if (!TimeRangeUtils.isValidRange(
-                    shift.getStartAt(),
-                    shift.getEndAt()
+                    shift.startAt,
+                    shift.endAt
                 )
             ) {
                 throw BusinessException(
@@ -339,9 +339,9 @@ class ScheduleService(
                 )
             }
 
-            if (shift.getStartAt()
+            if (shift.startAt
                     .toLocalDate()
-                != shift.getEndAt()
+                != shift.endAt
                     .toLocalDate()
             ) {
                 throw BusinessException(
@@ -365,9 +365,9 @@ class ScheduleService(
                 .atStartOfDay()
 
         for (shift in shifts) {
-            if (shift.getStartAt()
+            if (shift.startAt
                     .isBefore(scheduleStart)
-                || shift.getEndAt()
+                || shift.endAt
                     .isAfter(scheduleEnd)
             ) {
                 throw BusinessException(
@@ -386,19 +386,19 @@ class ScheduleService(
             for (j in i + 1 until shifts.size) {
                 val second = shifts[j]
 
-                if (first.getMember()
-                        .getId()
-                    != second.getMember()
-                        .getId()
+                if (first.member
+                        .id
+                    != second.member
+                        .id
                 ) {
                     continue
                 }
 
                 val overlaps =
-                    first.getStartAt()
-                        .isBefore(second.getEndAt())
-                    && second.getStartAt()
-                        .isBefore(first.getEndAt())
+                    first.startAt
+                        .isBefore(second.endAt)
+                    && second.startAt
+                        .isBefore(first.endAt)
 
                 if (overlaps) {
                     throw BusinessException(
@@ -414,7 +414,7 @@ class ScheduleService(
     ) {
         for (shift in shifts) {
             val userId =
-                shift.getMember()
+                shift.member
                     .user
                     .id
 
@@ -423,8 +423,8 @@ class ScheduleService(
                     .existsOverlappingOfficialShift(
                         userId,
                         ScheduleStatus.PUBLISHED,
-                        shift.getStartAt(),
-                        shift.getEndAt(),
+                        shift.startAt,
+                        shift.endAt,
                         null
                     )
 
@@ -441,7 +441,7 @@ class ScheduleService(
     ): Boolean {
         for (shift in shifts) {
             val userId =
-                shift.getMember()
+                shift.member
                     .user
                     .id
 
@@ -449,8 +449,8 @@ class ScheduleService(
                 unavailableTimeRepository
                     .existsOverlappingUnavailableTime(
                         userId,
-                        shift.getStartAt(),
-                        shift.getEndAt()
+                        shift.startAt,
+                        shift.endAt
                     )
 
             if (hasConflict) {
@@ -535,7 +535,7 @@ class ScheduleService(
         val userIds =
             shifts.stream()
                 .map { shift ->
-                    shift.getMember()
+                    shift.member
                         .user
                         .id
                 }
@@ -559,8 +559,8 @@ class ScheduleService(
     ): List<Long> =
         shifts.stream()
             .map { shift ->
-                shift.getMember()
-                    .getId()
+                shift.member
+                    .id
             }
             .distinct()
             .sorted()
