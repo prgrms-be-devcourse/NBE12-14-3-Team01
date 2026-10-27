@@ -1,6 +1,6 @@
-package com.merge.backend.domain.notification.entity;
+package com.merge.backend.domain.notification.entity
 
-public enum NotificationType {
+enum class NotificationType {
     SCHEDULE_PUBLISHED,
     SUBSTITUTE_REQUEST_RECEIVED,
     SUBSTITUTE_NO_CANDIDATE,
