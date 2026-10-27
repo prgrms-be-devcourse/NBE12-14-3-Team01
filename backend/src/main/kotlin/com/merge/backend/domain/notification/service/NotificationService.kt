@@ -11,7 +11,6 @@ import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 import com.merge.backend.global.exception.BusinessException
 import java.time.Clock
 import java.time.LocalDateTime
-import java.util.Objects.requireNonNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
