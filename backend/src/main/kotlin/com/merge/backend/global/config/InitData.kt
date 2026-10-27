@@ -50,7 +50,7 @@ class InitData(
             val now = LocalDateTime.now()
 
             // 환경변수에서 읽어온 비밀번호를 암호화
-            val defaultPassword = passwordEncoder.encode(rawDefaultPassword)
+            val defaultPassword = requireNotNull(passwordEncoder.encode(rawDefaultPassword))
 
             // User 생성 (매니저 1명, 직원 2명)
             val managerUser = userRepository.save(User("manager@test.com", defaultPassword, "김점장"))

@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -175,5 +176,28 @@ class ApiV1UserControllerTest {
                 .header("Authorization", "Bearer " + forgedToken))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-006"));
+    }
+
+    @Test
+    @DisplayName("회원가입 요청에 email이 없으면 400과 COM-001, 틀린 필드 정보를 반환한다")
+    void test7() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"password": "%s", "name": "유저2"}
+                    """.formatted(PASSWORD)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COM-001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("email"));
+    }
+
+    @Test
+    @DisplayName("회원가입하면 비밀번호 원문이 아니라 BCrypt 해시가 DB에 저장된다")
+    void test8() {
+        String passwordHash = userRepository.findByEmail(EMAIL).orElseThrow().getPasswordHash();
+
+        assertThat(passwordHash).isNotEqualTo(PASSWORD);
+        // 서버 설정과 별개로 새 BCrypt로 확인해야 암호화를 빼먹은 경우도 잡음
+        assertThat(new BCryptPasswordEncoder().matches(PASSWORD, passwordHash)).isTrue();
     }
 }

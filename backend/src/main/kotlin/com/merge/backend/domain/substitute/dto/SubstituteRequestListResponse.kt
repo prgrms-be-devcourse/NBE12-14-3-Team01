@@ -7,11 +7,11 @@ import java.time.LocalDateTime
 
 @JvmRecord
 data class SubstituteRequestListResponse(
-    val requestId: Long?,
-    val shiftId: Long?,
-    val requesterMemberId: Long?,
+    val requestId: Long,
+    val shiftId: Long,
+    val requesterMemberId: Long,
     val requesterName: String,
-    val workplaceId: Long?,
+    val workplaceId: Long,
     val workplaceName: String,
     val startAt: LocalDateTime,
     val endAt: LocalDateTime,
@@ -23,7 +23,7 @@ data class SubstituteRequestListResponse(
     // acceptedMember 응답 전용 규격 DTO
     @JvmRecord
     data class AcceptedMemberResponse(
-        val memberId: Long?,
+        val memberId: Long,
         val name: String,
     ) {
 
@@ -31,7 +31,7 @@ data class SubstituteRequestListResponse(
 
             fun from(candidate: SubstituteCandidate): AcceptedMemberResponse =
                 AcceptedMemberResponse(
-                    memberId = candidate.member.id,
+                    memberId = requireNotNull(candidate.member.id),
                     name = candidate.member.user.name,
                 )
         }
@@ -56,11 +56,11 @@ data class SubstituteRequestListResponse(
             val workplace = shift.schedule.workplace
 
             return SubstituteRequestListResponse(
-                requestId = request.id,
-                shiftId = shift.id,
-                requesterMemberId = request.requesterMember.id,
+                requestId = requireNotNull(request.id),
+                shiftId = requireNotNull(shift.id),
+                requesterMemberId = requireNotNull(request.requesterMember.id),
                 requesterName = request.requesterMember.user.name,
-                workplaceId = workplace.id,
+                workplaceId = requireNotNull(workplace.id),
                 workplaceName = workplace.name,
                 startAt = shift.startAt,
                 endAt = shift.endAt,

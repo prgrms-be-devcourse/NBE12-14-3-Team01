@@ -45,7 +45,12 @@ object Ut {
         }
 
         @JvmStatic
-        fun payloadOrNull(jwt: String, secretPattern: String): Map<String, Any>? {
+        fun payloadOrNull(jwt: String?, secretPattern: String): Map<String, Any>? {
+            // Java 원본은 null이면 isValid에서 예외를 잡아 false → null 반환
+            if (jwt == null) {
+                return null
+            }
+
             val secretKey = Keys.hmacShaKeyFor(secretPattern.toByteArray(StandardCharsets.UTF_8))
 
             if (!isValid(jwt, secretPattern)) {
