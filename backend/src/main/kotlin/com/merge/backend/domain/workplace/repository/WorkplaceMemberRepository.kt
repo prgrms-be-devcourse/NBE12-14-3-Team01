@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
     fun existsByWorkplaceAndUser(workplace: Workplace?, user: User?): Boolean
 
+    @EntityGraph(attributePaths = ["user"])
+    fun findByIdAndWorkplace_Id(memberId: Long, workplaceId: Long): Optional<WorkplaceMember>
+
     fun findByWorkplace_IdAndUser_IdAndLeftAtIsNull(
         workplaceId: Long?,
         userId: Long?

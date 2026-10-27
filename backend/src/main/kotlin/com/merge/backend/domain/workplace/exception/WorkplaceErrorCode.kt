@@ -33,6 +33,11 @@ enum class WorkplaceErrorCode(
         "WPL-005",
         "존재하지 않는 근무지입니다."
     ),
+    WORKPLACE_MEMBER_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "WPL-006",
+        "존재하지 않는 근무지 소속입니다."
+    ),
     MANAGER_CANNOT_LEAVE(
         HttpStatus.CONFLICT,
         "WPL-007",

@@ -28,4 +28,21 @@ class WorkplaceMemberService(
 
         return member
     }
+
+    /** 권한 → 근무지 범위 → 현재 상태 순서로 검사하며 소속을 변경하지 않는다. */
+    fun requireLeaveTarget(actorUserId: Long, workplaceId: Long, memberId: Long): WorkplaceMember {
+        requireManager(actorUserId, workplaceId)
+
+        val member = workplaceMemberRepository.findByIdAndWorkplace_Id(memberId, workplaceId)
+            .orElseThrow { BusinessException(WorkplaceErrorCode.WORKPLACE_MEMBER_NOT_FOUND) }
+
+        if (!member.isCurrent()) {
+            throw BusinessException(WorkplaceErrorCode.MEMBERSHIP_ALREADY_ENDED)
+        }
+        if (member.role != WorkplaceRole.EMPLOYEE) {
+            throw BusinessException(WorkplaceErrorCode.MANAGER_CANNOT_LEAVE)
+        }
+
+        return member
+    }
 }
