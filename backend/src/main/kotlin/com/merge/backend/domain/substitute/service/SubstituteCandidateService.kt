@@ -68,7 +68,7 @@ class SubstituteCandidateService(
             }
             .filterNot { member ->
                 substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
-                    member.user.id,
+                    requireNotNull(member.user.id),
                     targetShift.startAt,
                     targetShift.endAt,
                     now,
@@ -176,7 +176,7 @@ class SubstituteCandidateService(
         val candidate = validateRespondableCandidate(candidateId, userId)
 
         val targetShift = candidate.request.shift
-        val candidateUserId = candidate.member.user.id
+        val candidateUserId = requireNotNull(candidate.member.user.id)
 
         // 같은 User의 시간 상태를 변경하는 작업끼리 직렬화
         userService.getByIdForUpdate(candidateUserId)
@@ -251,9 +251,9 @@ class SubstituteCandidateService(
         // 현재 Candidate를 제외하고 다른 PENDING 후보가 남아 있는지 확인
         val hasOtherPendingCandidate =
             substituteCandidateRepository.existsByRequest_IdAndStatusAndIdNot(
-                request.id,
+                requireNotNull(request.id),
                 CandidateStatus.PENDING,
-                candidate.id,
+                requireNotNull(candidate.id),
             )
 
         // 다른 PENDING 후보가 없다면 마지막 후보가 거절한 것
@@ -273,11 +273,11 @@ class SubstituteCandidateService(
 
         val managerMemberIds = workplaceMemberRepository
             .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(workplaceId, WorkplaceRole.MANAGER)
-            .map { member -> member.id }
+            .map { member -> requireNotNull(member.id) }
 
         applicationEventPublisher.publishEvent(
             SubstituteCandidateAcceptedEvent(
-                requestId = request.id,
+                requestId = requireNotNull(request.id),
                 managerMemberIds = managerMemberIds,
             ),
         )
@@ -286,17 +286,17 @@ class SubstituteCandidateService(
     private fun publishSubstituteAllCandidatesRejectedEvent(request: SubstituteRequest) {
         val workplaceId = request.shift.schedule.workplace.id
 
-        val requesterMemberId = request.requesterMember.id
+        val requesterMemberId = requireNotNull(request.requesterMember.id)
 
         val managerMemberIds = workplaceMemberRepository
             .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(workplaceId, WorkplaceRole.MANAGER)
-            .map { member -> member.id }
+            .map { member -> requireNotNull(member.id) }
 
         val recipientMemberIds = (listOf(requesterMemberId) + managerMemberIds).distinct()
 
         applicationEventPublisher.publishEvent(
             SubstituteAllCandidatesRejectedEvent(
-                requestId = request.id,
+                requestId = requireNotNull(request.id),
                 recipientMemberIds = recipientMemberIds,
             ),
         )

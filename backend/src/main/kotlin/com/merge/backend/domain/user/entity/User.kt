@@ -34,7 +34,7 @@ class User() : BaseEntity() {
 
     // passwordHash는 받지 않음 (Java 원본과 같음)
     constructor(id: Long?, email: String, name: String) : this() {
-        setId(id)
+        this.id = id
         this.email = email
         this.name = name
     }
