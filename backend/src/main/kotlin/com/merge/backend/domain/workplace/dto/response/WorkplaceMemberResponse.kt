@@ -7,9 +7,9 @@ import kotlin.jvm.JvmRecord
 @JvmRecord
 data class WorkplaceMemberResponse(
     val memberId: Long?,
-    val name: String?,
-    val email: String?,
-    val role: WorkplaceRole?
+    val name: String,
+    val email: String,
+    val role: WorkplaceRole
 ) {
     companion object {
         @JvmStatic

@@ -6,7 +6,7 @@ import kotlin.jvm.JvmRecord
 @JvmRecord
 data class WorkplaceInviteCodeResponse(
     val workplaceId: Long?,
-    val inviteCode: String?
+    val inviteCode: String
 ) {
     companion object {
         @JvmStatic
