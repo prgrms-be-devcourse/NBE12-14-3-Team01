@@ -1706,6 +1706,74 @@ class UnavailableTimeServiceTest {
     }
 
     @Test
+    @DisplayName("UNA-01: 공식 Shift와 충돌하고 확인값이 null이면 Warning 예외가 발생한다")
+    void register_officialShiftConflict_withNullConfirmation_throwsWarning() {
+        // given
+        LocalDateTime startAt = NOW.plusDays(1).withHour(10);
+        LocalDateTime endAt = NOW.plusDays(1).withHour(12);
+
+        when(rq.getActorId())
+            .thenReturn(USER_ID);
+
+        when(userService.getByIdForUpdate(USER_ID))
+            .thenReturn(user);
+
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
+
+        when(shiftRepository.existsOverlappingOfficialShift(
+            USER_ID,
+            ScheduleStatus.PUBLISHED,
+            startAt,
+            endAt,
+            null
+        )).thenReturn(true);
+
+        // when
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> unavailableTimeService.register(
+                startAt,
+                endAt,
+                null
+            )
+        );
+
+        // then
+        assertThat(exception.getErrorCode())
+            .isEqualTo(
+                UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
+
+        assertThat(exception.getData())
+            .isInstanceOf(ConfirmationRequiredResponse.class);
+
+        ConfirmationRequiredResponse data =
+            (ConfirmationRequiredResponse) exception.getData();
+
+        assertThat(data.requiresConfirmation())
+            .isTrue();
+
+        verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            );
+
+        verify(unavailableTimeRepository, never())
+            .save(any(UnavailableTime.class));
+    }
+
+    @Test
     @DisplayName("UNA-01: 공식 Shift와 충돌해도 사용자가 확인하면 등록할 수 있다")
     void register_officialShiftConflict_withConfirmation_success() {
         // given
