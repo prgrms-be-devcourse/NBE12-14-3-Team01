@@ -457,3 +457,12 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - NEW-SHIFT-KEY: 신규 추가 첫409 저장0; 동일계획 확인 후생성, 키 변조/대상·시간변경에 이전확인 재사용불가, 동시추가는 기존충돌검사/Lock으로 중복정합성확인. 키 자체의 멱등성은 주장하지 않음.
 
 경합은 실제 MySQL 별도 트랜잭션·Latch/Barrier로 순서를 강제하고 timeout/정리 및 worker 예외 회수를 포함한다. sleep이나 단순 반복 PASS로 동시성 안전을 주장하지 않는다. 완료 판정은 성공/거부 각각의 새 트랜잭션 DB 결과와 부작용을 확인한 실행 SHA·XML·로그로 한다. 운영 DB에서는 실행하지 않는다.
+
+### V5-J4 다중 현재 소속 Query 보호 (제출안, 2026-10-26)
+
+- 정식 ID 제안: **V5-N-33** (이번 Draft 리뷰에서 배정 확인, 아직 팀 확정 아님). 기존 예약31·32를 사용하지 않는다. J3의 작업 ID/정식 숫자 매핑과 별개로 중복 확인한다.
+- 시나리오: J4-MULTI-ACTIVE. Class/Method: `NotificationQueryIntegrationTest.getNotificationsReturnsOwnNotificationsAcrossAllActiveWorkplaces`. ID 등록 때문에 JUnit 이름/테스트 소스를 변경하지 않았다.
+- 구분: MIGRATION / AS-IS 보호, Java Notification + develop6793552의 Kotlin Workplace/V4.
+- 계약: 같은 User의 두 현재 소속 AX/AY 알림만 정확히 반환하고 종료 AZ·다른 User BX/BW를 제외한다. 알림 ID와 근무지 ID·이름의 대응을 검사한다. 제외용까지5건을 실제 MySQL에 Commit한 뒤 Service 새 Transaction으로 조회한다.
+- 근거: EV-021 최신 기준선400, EV-022 단독1, EV-023 전체401·기준400보존·Checkstyle/Gate. 전부 LOCAL_ONLY 개별 XML 근거.
+- J2 V5-N-23의 정렬·HTTP 계약은 재사용하되 PR16은 미병합이다. 이 테스트는 다중 현재소속 합집합을 추가 보호한다. 재가입 새Row 격리·새 퇴사정책·AFTER_COMMIT·전체 동시성·운영은 완료 판정 범위 밖이다. J3/J5와 혼동하지 않는다.
