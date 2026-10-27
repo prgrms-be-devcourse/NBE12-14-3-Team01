@@ -56,7 +56,7 @@ class ScheduleController(
     fun getWeeklySchedule(
         @PathVariable workplaceId: Long?,
         @RequestParam weekStartDate: LocalDate
-    ): ResponseEntity<ApiResponse<ManagerScheduleResponse>> {
+    ): ResponseEntity<ApiResponse<ManagerScheduleResponse?>> {
         val actorUserId = rq.actorId
         val response = scheduleService.getWeeklySchedule(
             actorUserId,
@@ -66,7 +66,7 @@ class ScheduleController(
 
         if (response == null) {
             return ResponseEntity.ok(
-                ApiResponse.success<ManagerScheduleResponse>(
+                ApiResponse.success<ManagerScheduleResponse?>(
                     "200",
                     "해당 주차의 근무표가 아직 생성되지 않았습니다.",
                     null
