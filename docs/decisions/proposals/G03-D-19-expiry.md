@@ -1,19 +1,100 @@
 # G03-D-19 대타 요청 만료 표현 (Expiry)
 
+> **현재 승인 상태 (2026-10-26):** 사용자 전달 구두 승인과 PR 리뷰에 따른 채택 범위·예외는 [Decision Log](../DECISION-LOG.md) §4를 따른다. 아래 최초 작성 당시 PROPOSED/PENDING 표기는 이력이며 현재 승인 범위를 덮어쓰지 않는다. 구현·실험·배포 및 미결정 사항은 각각 별도 상태다.
+
 | 축 | 상태 |
 |---|---|
-| 결정 단계 | 제안 (작성자 검토용 초안 보존). 사용자 잠정 결정 문장은 아직 확인 전 |
+| 결정 단계 | **사용자 잠정 결정** (2026-10-25, §0). 팀 승인 전 |
 | ② 정책 | `PROPOSED`. `DECISION-LOG` G03-D-19는 `PENDING` |
 | ③ 문서 | `DRAFT` |
 | 구현 | 없음 |
 | ④ / ⑤ | 신규·변경 Test 전부 `SPECIFIED` / `NOT_RUN` |
-| 기준 코드 | 3차 `docs/switch-v3-foundation` `0071db3` (Production Java = `cdaaa13`). 정적 확인 |
+| 기준 코드 | 3차 `docs/switch-v3-foundation` `0071db3` (Production Java = `cdaaa13`). 정적 확인. §0은 `develop` `a148a62`에서 다시 정적 확인 (Production Java는 `cdaaa13`과 같음) |
 | 관련 ID | G03-D-19, G03-D-20, G03-D-26, G03-D-27, D-NOW-04, V4-P10, C-45 |
 | 주관 / 리뷰 | V4 Owner (주관), Frontend, 공통 설정 Owner |
 
 > 2026-10-23 작성자 로컬 대화에서 작성한 초안을 옮겼다. 대화 형식 문장(도입·맺음)만 뺐고 판단 내용은 바꾸지 않았다.
 > 본문의 "추천"은 작성 당시 제안이다. 결정이 아니다.
 > 2차 명세(API-SUB, API-SCH, P0) 쪽수는 외부 원본 기준이다. 원본은 저장소에 없다 (DL-005).
+> §0은 2026-10-25 사용자 잠정 결정이다. §1~§13은 그 전에 쓴 제안 본문이며 판단 근거로 그대로 둔다.
+
+## 0. 사용자 잠정 결정 (2026-10-25)
+
+### 0-1. 결정 문장
+
+| ID | 사용자 잠정 결정 | 선택 이유 | 성격 |
+|---|---|---|---|
+| D19-1 | §3의 **B1**을 고른다. OPEN 또는 ACCEPTED 요청이 근무 시작 시각까지 최종 승인되지 않으면 조회 응답은 `CLOSED` / `EXPIRED`이고, 응답의 `closedAt`은 대상 Shift의 `startAt`으로 계산한다 | 지금은 조회 시각이 들어가 같은 요청의 종료 시각이 조회할 때마다 바뀐다. 근무 시작 시각은 요청이 더 이상 처리될 수 없게 된 시각이라 의미가 일관된다 | 응답 값 변경 (Improvement) |
+| D19-2 | 응답의 `closedAt`은 **요청이 업무상 효력을 잃은 시각**이다. Scheduler 실행 시각, DB에 저장된 종료 시각, 누군가 종료한 시각이 아니다. 자동 만료는 DB의 status·`closedAt`을 바꾸지 않는다 | DB 값과 응답 값의 의미 차이를 명시해 다른 개발자의 오해를 막는다 | 계약 설명 |
+| D19-3 | B1은 **자동 만료(조회 시 계산되는 `EXPIRED`)에만** 적용한다. 다른 종료 사유와 APPROVED에는 적용하지 않는다 (§0-2) | 관리자가 전날 종료한 요청을 근무 시작 시각에 종료된 것처럼 보이면 안 된다 | 적용 범위 |
+| D19-4 | 만료 판정 경계는 지금과 같다: `now ≥ startAt`이면 만료 (`now == startAt` 포함). 만료된 요청의 수락·거절·승인·종료는 거부한다 | 쓰기 API의 거부 경계와 조회의 만료 경계가 같아야 한다 | AS-IS 유지 |
+| D19-5 | 보낸 대타 요청 화면은 만료 요청에 "근무 시작 시각에 만료됨"과 **만료 시각(날짜와 시각)**을 보여 준다. 대상 근무의 시작·종료 시간과 요청 만료 시각을 다른 줄·다른 라벨로 구분한다. 라벨은 "종료일"이 아니라 "만료 시각"이다 | 사용자가 언제, 왜 요청이 끝났는지 알 수 있다. "종료일"은 근무 종료로 오해할 수 있다 | Frontend 변경 (Frontend 담당 리뷰) |
+| D19-6 | 적용 시점은 §8 추천대로 Kotlin 전환 후 별도 Improvement PR이다. Migration PR은 현행 A를 그대로 옮긴다 | AI-RULES §2 | 순서 |
+
+### 0-2. 종료 원인별 `closedAt`의 의미
+
+| 종료 원인 | 저장 상태 | 응답의 `closedAt` | B1 적용 |
+|---|---|---|---|
+| 자동 만료 (`EXPIRED`, 조회 시 계산) | OPEN 또는 ACCEPTED 그대로, DB `closedAt` = null | 대상 Shift의 `startAt` | **적용** |
+| 관리자 직접 종료 (`MANAGER_CLOSED`) | CLOSED, DB `closedAt` = 종료 처리 시각 | 저장된 값 | 적용 안 함 |
+| 후보 전원 거절 (`ALL_CANDIDATES_REJECTED`) | CLOSED, DB `closedAt` = 마지막 거절 처리 시각 | 저장된 값 | 적용 안 함 |
+| 근무 취소·인계 (`SHIFT_CHANGED`, ML-3 제안) | CLOSED, DB `closedAt` = 그 Command 시각 | 저장된 값 | 적용 안 함 |
+| 후보 자격 상실 (`CANDIDATE_INELIGIBLE`, ML-3 제안) | CLOSED, DB `closedAt` = 그 Command 시각 | 저장된 값 | 적용 안 함 |
+| 승인 (APPROVED) | APPROVED, DB `closedAt` = 승인 시각 (`approveRequest`, test4 L83) | 저장된 값 | 적용 안 함. 자동 만료로 덮어쓰지 않음 |
+
+AS-IS에서도 만료 분기는 OPEN·ACCEPTED만 대상이다 (`SentSubstituteRequestResponse` L32-34). D19-3은 이 범위를 그대로 유지한다는 뜻이다.
+
+### 0-3. 세 가지 시각
+
+| 시각 | 의미 | B1 적용 후 |
+|---|---|---|
+| `Shift.startAt` | 근무 시작 시각 | 실제 일정 값 |
+| 응답의 `closedAt` (만료일 때) | 요청이 업무상 효력을 잃은 시각 | `Shift.startAt`과 같음. **계산값이며 DB 저장값과 다를 수 있다** |
+| DB의 `closedAt` | 상태 전이로 저장한 종료 시각 | 자동 만료로는 바뀌지 않음 (null 유지) |
+
+만료 통계, 감사 기록, 만료 알림(G03-D-20)이 필요해지면 §3의 C(저장)를 따로 검토한다.
+
+### 0-4. 결정 전에 다시 확인한 사실 (정적, `a148a62`)
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| 만료 후 수락·거절 거부 | 거부. `now ≥ startAt`이면 `SUB-012` (`SHIFT_ALREADY_STARTED`, 400) | `SubstituteCandidateService` L169. Test: `SubstituteCandidateServiceTest` L435 (지남), L452 (`startAt == now`), L631 (거절 경계) |
+| 만료 후 승인 거부 | 거부. 경계 포함. **단 ErrorCode가 `SFT-006` (`INVALID_TIME_VALUE`, "시간 형식이나 값이 올바르지 않습니다.")** | `SubstituteRequestService` L294-299, L354-357. Test: `SubstituteRequestServiceTest` L556 (지남), L569 (경계) |
+| 만료 후 관리자 종료 거부 | 거부. `SUB-018` | `SubstituteRequestService` L395-396. Test: L1177, L1195 |
+| 시간대 | Backend는 `Clock` (Asia/Seoul)과 `LocalDateTime` (오프셋 없음). 보낸 요청 화면은 서버 문자열을 `+09:00`으로 읽는다 | `TimeConfig` L16, `substitutes/sent/page.tsx` L43-50 |
+| 현재 Frontend 표시 | 만료는 배지 "기간 만료"와 설명 "근무 시작 전까지 처리되지 않았어요."만 보이고 종료 날짜는 숨김. 다른 종료는 날짜만 보임 ("N월 N일 종료") | `sent/page.tsx` L108-113, L132-149 |
+
+- **승인 거부 ErrorCode 불일치:** 만료 후 승인은 동작으로는 막혀 있지만, 사용자가 받는 메시지는 "시간 형식이나 값이 올바르지 않습니다."다. 수락은 `SUB-012`를 쓴다. 이 카드에서는 바꾸지 않는다. G03-D-03(ErrorCode 체계)에서 함께 다룬다.
+- **시간대:** B1의 값은 `Shift.startAt`을 그대로 쓰므로 새로운 시간대 변환이 생기지 않는다. 조회 시각(`now`)을 쓰던 지금보다 `startAt`과 같은 기준이 된다. 화면이 날짜 경계(자정 근무)에서 날짜를 맞게 보여 주는지는 Frontend 확인 항목이다 (§0-5).
+
+### 0-5. 검증 계약 (전부 ④ `SPECIFIED` / ⑤ `NOT_RUN`)
+
+| 시나리오 | 기대 결과 | Test |
+|---|---|---|
+| 시작 전 OPEN 조회 | OPEN, `closedAt` = null | V4-T-01 (기존, 변경 없음) |
+| OPEN이고 시작 시각 지남 | CLOSED / EXPIRED, `closedAt == startAt` | V4-T-02 **기대값 변경** (`now` → `SHIFT_START`). Charter §6-2 승인 대상 |
+| ACCEPTED이고 `now == startAt` | CLOSED / EXPIRED, `closedAt == startAt` | V4-T-03 **확인 추가** (기존 기대값 유지, Assertion 추가). 승인 대상 |
+| OPEN이고 `now == startAt` | CLOSED / EXPIRED, `closedAt == startAt` | V4-N-26 (신규) |
+| 같은 요청을 다른 두 시각에 조회 | 두 응답의 `closedAt` 같음 | V4-N-23 (신규) |
+| 조회한 뒤 DB 확인 | DB status·`closedAt` 그대로 | V4-N-24 (신규, MySQL) |
+| 서비스 목록에서 같은 값 | `closedAt == startAt` | V4-N-25 (기존 `getSentRequests_ReturnsLatestFirst_MarksExpired` L1633에 확인 추가) |
+| 만료 후 수락·거절·승인·종료 | 거부 (위 §0-4 ErrorCode) | 기존 Test (§0-4 근거 칸). 회귀만 확인 |
+| 관리자 종료, 전원 거절 | 저장된 `closedAt` | V4-T-05 (기존) |
+| APPROVED | 저장값 유지, 만료로 덮어쓰지 않음 | V4-T-04 (기존) |
+| `SHIFT_CHANGED` 등 ML-3 사유 | 저장된 `closedAt`, B1 미적용 | ML-3 카드 Test (ML-3 승인 후) |
+| 보낸 요청 화면 | 만료 시각과 근무 시간이 구분되어 보임. 자정 근처 근무에서 날짜가 맞음 | Frontend 확인 (Backend Inventory 밖) |
+
+### 0-6. 재검토 조건
+
+- 공개 근무의 **시작 시각을 직접 바꾸는 기능**(G03-D-27 시간 변경)을 도입하면 이 결정을 다시 연다. 이미 만료된 요청의 계산된 만료 시각이 바뀌기 때문이다 (§6, §11-3·6).
+- 만료 통계·감사·만료 알림이 필요해지면 C(저장)를 다시 검토한다 (§10).
+
+### 0-7. 다른 카드와의 관계 (2026-10-25 대조, 문서 대조만)
+
+- **ML-2:** 공개 후 변경은 추가·취소·담당자 변경이고 시간 변경은 보류다. 그래서 B1의 전제(공개된 Shift의 `startAt`이 바뀌지 않음)가 유지된다.
+- **ML-3:** 근무가 취소·인계되면 같은 Transaction에서 활성 요청을 `SHIFT_CHANGED`로 종료한다. 그래서 §6의 "취소된 근무의 요청이 시작 전까지 OPEN으로 보인다" 문제가 해결된다. **단 이것은 ML-3 종료 처리와 ML-5의 Shift 우선 Lock이 취소·인계 기능과 함께 구현될 때만 성립한다.** 취소·인계 기능만 먼저 배포하면 안 된다 (통합 구현 계획에 기록).
+- **ML-3-H:** APPROVED는 과거 승인 이력이고, 수락자는 Candidate(ACCEPTED)로 표시한다. 이 카드는 APPROVED 응답을 바꾸지 않는다.
+- 위 관계는 문서끼리 대조한 결과다. 실행으로 검증하지 않았다.
 
 ## 1. 결정 배경과 기존 코드
 
@@ -160,3 +241,4 @@ G03-D-27을 채택할 때 검토할 조건이다.
 | 일자 | 내용 |
 |---|---|
 | 2026-10-23 | 작성자 로컬 대화의 초안을 옮김. 대화 문장 제거. 도입 문단의 API-SCH 근거를 §1 표의 행으로 옮김. 상태 표, §10 마지막 항목(ML 연결) 추가 |
+| 2026-10-25 | §0 추가: 사용자 잠정 결정 D19-1~6 (B1, 보낸 요청 화면에 만료 시각 표시). 적용 범위를 자동 만료로 한정, 세 시각 구분, 재확인한 AS-IS 사실(승인 거부 ErrorCode `SFT-006` 포함), 검증 계약, 재검토 조건, ML-2·3과의 관계. §1~§13 본문은 바꾸지 않음. 팀 승인 아님 |
