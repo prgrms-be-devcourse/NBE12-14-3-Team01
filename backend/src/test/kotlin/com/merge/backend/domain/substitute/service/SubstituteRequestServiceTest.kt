@@ -341,32 +341,43 @@ class SubstituteRequestServiceTest {
         }
 
         @Test
-        @DisplayName("실패: 승인 요청자가 해당 근무지 소속이 아니면 예외가 발생한다")
+        @DisplayName("실패: 승인 요청자가 어느 근무지에도 소속이 아니면 요청을 조회하기 전에 MANAGER_REQUIRED가 발생한다")
         fun approve_fail_actor_not_in_workplace() {
             // given
-            setupValidRequestBasicInfo()
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(request)
-            given(workplaceMemberService.requireManager(actorId, workplaceId))
-                .willThrow(BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER))
-
-            // when & then
-            assertApproveFails(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER)
-            verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(anyOrNull(), anyOrNull())
-        }
-
-        @Test
-        @DisplayName("실패: 승인 요청자가 MANAGER가 아니면 예외가 발생한다")
-        fun approve_fail_actor_not_manager() {
-            // given
-            setupValidRequestBasicInfo()
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(request)
-            given(workplaceMemberService.requireManager(actorId, workplaceId))
-                .willThrow(BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
+            given(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)).willReturn(emptyList())
 
             // when & then
             assertApproveFails(WorkplaceErrorCode.MANAGER_REQUIRED)
+            verify(substituteRequestRepository, never()).findScopeById(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
+        }
+
+        @Test
+        @DisplayName("실패: 승인 요청자가 다른 근무지의 MANAGER이면 없는 요청과 같은 SUBSTITUTE_REQUEST_NOT_FOUND가 발생한다")
+        fun approve_fail_actor_manager_of_other_workplace() {
+            // given
+            setupActorManagerOf(999L)
+            given(substituteRequestRepository.findScopeById(requestId))
+                .willReturn(SubstituteRequestScope(shiftId, workplaceId))
+
+            // when & then
+            assertApproveFails(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+            verify(shiftRepository, never()).findByIdForUpdate(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
+        }
+
+        @Test
+        @DisplayName("실패: 승인 요청자가 MANAGER가 아니면 요청을 조회하기 전에 예외가 발생한다")
+        fun approve_fail_actor_not_manager() {
+            // given
+            val actorMember = mock<WorkplaceMember>()
+            given(actorMember.role).willReturn(WorkplaceRole.EMPLOYEE)
+            given(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)).willReturn(listOf(actorMember))
+
+            // when & then
+            assertApproveFails(WorkplaceErrorCode.MANAGER_REQUIRED)
+            verify(substituteRequestRepository, never()).findScopeById(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
             verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(anyOrNull(), anyOrNull())
         }
 
