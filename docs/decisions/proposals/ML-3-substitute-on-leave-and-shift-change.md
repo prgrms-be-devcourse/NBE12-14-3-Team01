@@ -173,9 +173,9 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 
 | ID | Given | When | Then (지켜야 할 결과) |
 |---|---|---|---|
-| H6-C1 | OPEN Request, 후보 B PENDING | 관리자 인계(A→C)와 B의 수락 동시 실행 | 인계 확정 후 그 근무에 **유효한 OPEN·ACCEPTED Request가 0건**. B의 수락이 먼저 Commit됐다면 B `ACCEPTED` 이력은 남을 수 있다. 근무 담당 C. 승인 불가 |
-| H6-C2 | ACCEPTED Request | 관리자 인계와 승인 동시 실행 | Deadlock 없이 둘 중 하나 순서로 정리. 최종 담당자 1명. 승인이 먼저면 담당자 = 수락자 → 인계가 그 상태를 다시 검사. 인계가 먼저면 승인 `INVALID_MEMBER` 또는 `INVALID_REQUEST` |
-| H6-C3 | 공개 근무 | 관리자 취소와 새 대타 요청 생성 동시 실행 | 취소 확정 후 그 근무에 활성 Request 0건 |
+| H6-C1 | OPEN Request, 후보 B PENDING | 관리자 인계(A→C)와 B의 수락 동시 실행 | 인계 확정 후 그 근무에 **유효한 OPEN·ACCEPTED Request가 0건**. B의 수락이 먼저 Commit됐다면 B `ACCEPTED` 이력은 남을 수 있다. 근무 담당 C. 승인 불가. 실행 (2026-10-29): 실제 V3 재배정 × 수락 양쪽 순서 `SubstituteShiftChangeIntegrationTest.reassignWaitsForAcceptInProgress`·`acceptWaitsForReassignInProgress`, `LOCAL_PASSED` (EV-039) |
+| H6-C2 | ACCEPTED Request | 관리자 인계와 승인 동시 실행 | Deadlock 없이 둘 중 하나 순서로 정리. 최종 담당자 1명. 승인이 먼저면 담당자 = 수락자 → 인계가 그 상태를 다시 검사. 인계가 먼저면 승인 `INVALID_MEMBER` 또는 `INVALID_REQUEST`. 실행 (2026-10-29): 실제 V3 재배정 × 승인 양쪽 순서 `reassignWaitsForApproveInProgress`·`approveWaitsForReassignInProgress`, Deadlock 0, `LOCAL_PASSED` (EV-039) |
+| H6-C3 | 공개 근무 | 관리자 취소와 새 대타 요청 생성 동시 실행 | 취소 확정 후 그 근무에 활성 Request 0건. 실행 (2026-10-29): 실제 V3 취소 × 대타 생성 `createWaitsForCancelInProgress` → `SHIFT_CANCELLED`, `LOCAL_PASSED` (EV-039) |
 | H6-C4 | 공개 근무 | 관리자 두 명의 인계 동시 실행 | 최종 담당자 1명, 배정 이력 순서가 실제 반영 순서와 일치 |
 | H6-C5 | 후보 B PENDING | B 퇴사와 B 본인의 수락 동시 실행 | 퇴사 확정 후 B가 **유효한 수락자이거나 승인 가능한 후보로 남지 않는다.** 수락이 먼저 Commit됐다면 B `ACCEPTED` 이력 + Request `CANDIDATE_INELIGIBLE` CLOSED (A-a)가 정상 |
 | H6-C6 | 후보 B·C PENDING | B 퇴사와 C의 거절 동시 실행 | **응답 가능 후보가 실제로 0명이 된 경우에만** Request CLOSED, 사유 `CANDIDATE_INELIGIBLE`. 다른 응답 가능 후보가 남아 있으면 OPEN이 정상 |
@@ -313,3 +313,4 @@ ML-3-P·P1·A의 V4 부분. V2 퇴사 확정 Command(API-LV-02)가 같은 Transa
 | 2026-10-28 | 근무 변경 시 대타 종료 구현: 머리 표 구현·④/⑤, §9 확인 행 (MySQL ENUM, 예전 ENUM 저장 실패 재현, `ALTER` 필요), 끝에 "V4 구현 기록" 절 (EV-034) |
 | 2026-10-29 | 퇴사자 후보 처리 구현: 머리 표 구현·④/⑤, §9에 ENUM 2개 ALTER, 끝에 "V4 구현 기록 — 퇴사자 후보 처리" 절 (EV-038). 머리 표의 근무 변경 구현 상태를 PR #80 머지·V3 호출로 갱신 |
 | 2026-10-29 | PR #92 리뷰 반영: 거절 경로를 퇴사 함수와 같은 응답 가능 판정으로, 응답 가능 정의에 EMPLOYEE·같은 근무지 추가, ML-3-P1 행에 구현 정의 연결, 원문 B+ 정리 문장과의 차이를 열린 항목으로 기록, §9 ENUM 값 순서 주의 (EV-038) |
+| 2026-10-29 | §10 H6-C1·C2·C3에 실제 V3 취소·재배정 Command 실행 표시 (EV-039) |
