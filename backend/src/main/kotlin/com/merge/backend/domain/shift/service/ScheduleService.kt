@@ -91,21 +91,21 @@ class ScheduleService(
         for (pattern in patterns) {
             val shiftDate =
                 savedSchedule.resolveDate(
-                    pattern.getDayOfWeek()
+                    pattern.dayOfWeek
                 )
             val startAt =
                 shiftDate.atTime(
-                    pattern.getStartTime()
+                    pattern.startTime
                 )
 
             val endAt =
                 shiftDate.atTime(
-                    pattern.getEndTime()
+                    pattern.endTime
                 )
 
             shiftService.createFromValidatedPattern(
                 savedSchedule,
-                pattern.getMember(),
+                pattern.member,
                 startAt,
                 endAt
             )
