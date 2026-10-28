@@ -122,7 +122,7 @@ class SubstituteRequestService(
             throw BusinessException(SubstituteRequestErrorCode.SHIFT_CANCELLED)
         }
 
-        if (shift.member.user.id != actorUserId) {
+        if (shift.member.user.id != actorUserId || shift.member.leftAt != null) {
             throw BusinessException(SubstituteRequestErrorCode.NOT_OWN_SHIFT)
         }
 
