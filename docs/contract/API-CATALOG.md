@@ -203,6 +203,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | Test | ML-4 V2-N-39 (조회 규칙) 등 |
 | 메모 | ML-4 §6-1에 "'시작 전'으로 범위를 제한하면 건수가 작다"는 비용 메모가 있는데, 결정된 범위는 "미래 + 최근 7일"이다. 구현 때 건수를 다시 확인한다 |
 | 이력 근거가 충분한가 | 인계 전 담당자는 **새로 만드는 배정 이력 Table**(ML-2 D27-4, 당시 WorkplaceMember ID 저장)에서만 알 수 있다. AS-IS에는 공개 근무를 관리자가 인계하는 경로가 없고, 담당자를 바꾸는 유일한 경로는 대타 승인인데 이것은 빠진 근무 대상이 아니다. 그래서 **기능 출시 이후의 사건은 모두 이력에 남고, 출시 이전에는 재구성할 사건이 없다** (정적 추론). 취소는 Shift가 끝 상태라 `shift.member`가 취소 당시 담당자다 (ML-4 §6-1) |
+| 구현 (2026-10-29) | `feat/v5-removed-shifts` (V3 담당과 협의해 V5가 구현), Test `RemovedShiftQueryServiceTest` 12건 (V2-N-39 포함, 실제 MySQL, 취소·재배정은 API-PS-02·03 Command로 생성). 응답 필드: `shiftId`, `workplaceId`, `workplaceName`, `startAt`, `endAt`, `event` (`CANCELLED`/`REASSIGNED`), `occurredAt` (취소 = `cancelledAt`, 인계 = 배정 이력 생성 시각), `reason`. 문서에 없어 V5가 정한 것: 정렬 = 사건 시각 최신순·같으면 근무 ID 최신순 (API-SB-01과 같음, 알림에서 들어온 사건이 맨 위) — ML-4 §6-1의 "근무 시각순"을 PR #95 리뷰 합의로 같이 고침, 7일 경계 포함 (`startAt >= now - 7일`), "가장 마지막 Row" = 그 근무에서 내가 이전 담당인 이력 중 ID 최대, `cancelledAt`이 없는 CANCELLED Row는 제외 (현재 CANCELLED로 바꾸는 경로는 `Shift.cancel`뿐이고 항상 기록함). `MEMBER_LEFT`는 퇴사 확정(API-LV-02) 구현 전이라 데이터가 생기지 않는다 |
 
 #### API-ME-01 내 소속 이력
 
@@ -423,4 +424,5 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | S3 Commit 전: W안·M3와 G03-D-04 연결 명시, API-SB-02 DB 식의 적용 전제(대상 필터 후, APPROVED 제외), `hasNewerActiveRequest`의 진행 중 정의, 이름 스냅샷 사실 |
 | 2026-10-28 | API-AU-01 구현 행 추가 (경로·응답 확정, 출처 검사와 CORS 거부 관계), Test ID V1-N-13 추가 |
 | 2026-10-28 | API-SB-01 구현 행 추가 (경로 확정, 정렬·필드 이름·7일 경계) |
+| 2026-10-29 | API-SC-01 구현 행 추가 (응답 필드, 정렬·7일 경계·마지막 이력 Row 정의) |
 | 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |
