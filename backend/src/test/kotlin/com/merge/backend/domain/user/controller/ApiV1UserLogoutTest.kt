@@ -87,6 +87,13 @@ class ApiV1UserLogoutTest {
     private fun savedRefreshToken(): String? =
         userRepository.findByEmail(email).orElseThrow().refreshToken
 
+    // DB 값을 이 토큰과 같게 맞춰 둠. 같아도 토큰 검증에서 걸러져 지워지지 않는지 보려고 씀
+    private fun storeRefreshToken(token: String) {
+        val user = userRepository.findByEmail(email).orElseThrow()
+        user.updateRefreshToken(token)
+        userRepository.save(user)
+    }
+
     // 로그아웃은 쿠키 삭제 헤더(Max-Age=0)를 보내야 함
     private fun ResultActions.andExpectLogoutSuccess(): ResultActions =
         andExpect(status().isOk())
@@ -149,27 +156,26 @@ class ApiV1UserLogoutTest {
     @DisplayName("다른 비밀키로 서명한 쿠키로 로그아웃하면 DB는 그대로 두고 성공으로 응답한다")
     fun logoutWithForgedTokenSucceedsWithoutChange() {
         // given
-        val refreshToken = refreshTokenOf(login())
         val user = userRepository.findByEmail(email).orElseThrow()
         val forgedToken = Ut.jwt.toString(
             "attacker-secret-key-attacker-secret-key-1234",
             REFRESH_EXPIRE_MILLS,
             java.util.Map.of<String, Any>("id", requireNotNull(user.id), "type", "refresh"),
         )
+        storeRefreshToken(forgedToken)
 
         // when
         val result = logout(forgedToken)
 
-        // then
+        // then: DB 값과 같아도 서명이 틀리면 지우지 않음
         result.andExpectLogoutSuccess()
-        assertThat(savedRefreshToken()).isEqualTo(refreshToken)
+        assertThat(savedRefreshToken()).isEqualTo(forgedToken)
     }
 
     @Test
     @DisplayName("만료된 쿠키로 로그아웃하면 DB는 그대로 두고 성공으로 응답한다")
     fun logoutWithExpiredTokenSucceedsWithoutChange() {
         // given
-        val refreshToken = refreshTokenOf(login())
         val user = userRepository.findByEmail(email).orElseThrow()
         // 서버 비밀키로 서명했지만 만료 시각이 이미 지난 토큰
         val expiredToken = Ut.jwt.toString(
@@ -177,29 +183,29 @@ class ApiV1UserLogoutTest {
             -1000L,
             java.util.Map.of<String, Any>("id", requireNotNull(user.id), "type", "refresh"),
         )
+        storeRefreshToken(expiredToken)
 
         // when
         val result = logout(expiredToken)
 
-        // then
+        // then: DB 값과 같아도 만료됐으면 지우지 않음
         result.andExpectLogoutSuccess()
-        assertThat(savedRefreshToken()).isEqualTo(refreshToken)
+        assertThat(savedRefreshToken()).isEqualTo(expiredToken)
     }
 
     @Test
     @DisplayName("Access Token을 쿠키에 넣어 로그아웃하면 DB는 그대로 두고 성공으로 응답한다")
     fun logoutWithAccessTokenAsCookieSucceedsWithoutChange() {
         // given
-        val loginResult = login()
-        val refreshToken = refreshTokenOf(loginResult)
-        val accessToken: String = JsonPath.read(loginResult.response.contentAsString, "$.data.accessToken")
+        val accessToken: String = JsonPath.read(login().response.contentAsString, "$.data.accessToken")
+        storeRefreshToken(accessToken)
 
         // when
         val result = logout(accessToken)
 
-        // then
+        // then: DB 값과 같아도 Refresh Token이 아니면 지우지 않음
         result.andExpectLogoutSuccess()
-        assertThat(savedRefreshToken()).isEqualTo(refreshToken)
+        assertThat(savedRefreshToken()).isEqualTo(accessToken)
     }
 
     @Test
