@@ -1,10 +1,13 @@
 package com.merge.backend.domain.shift.controller
 
 import com.merge.backend.domain.shift.dto.ShiftCreateResponse
+import com.merge.backend.domain.shift.dto.ShiftCancelResponse
 import com.merge.backend.domain.shift.dto.ShiftDetailResponse
 import com.merge.backend.domain.shift.dto.ShiftListResponse
 import com.merge.backend.domain.shift.dto.ShiftModifyResponse
 import com.merge.backend.domain.shift.dto.ShiftRequest
+import com.merge.backend.domain.shift.dto.ShiftReassignRequest
+import com.merge.backend.domain.shift.dto.ShiftReassignResponse
 import com.merge.backend.domain.shift.service.ShiftService
 import com.merge.backend.global.dto.ApiResponse
 import com.merge.backend.global.rq.Rq
@@ -119,6 +122,58 @@ class ShiftController(
                 "근무가 삭제되었습니다.",
                 null
             )
+        )
+    }
+
+    @PostMapping("/workplaces/{workplaceId}/schedules/{scheduleId}/shifts/{shiftId}/cancel")
+    fun cancel(
+        @PathVariable workplaceId: Long?,
+        @PathVariable scheduleId: Long?,
+        @PathVariable shiftId: Long?,
+    ): ResponseEntity<ApiResponse<ShiftCancelResponse>> {
+        val cancellationResult = shiftService.cancelPublishedShift(
+            workplaceId,
+            scheduleId,
+            shiftId,
+            rq.actorId,
+        )
+
+        return ResponseEntity.status(HttpStatus.OK).body(
+            ApiResponse.success(
+                "200",
+                "공개 근무를 취소했습니다.",
+                ShiftCancelResponse.from(
+                    cancellationResult.shift,
+                    cancellationResult.closedSubstituteRequests,
+                ),
+            )
+        )
+    }
+
+    @PostMapping("/workplaces/{workplaceId}/schedules/{scheduleId}/shifts/{shiftId}/reassign")
+    fun reassign(
+        @PathVariable workplaceId: Long?,
+        @PathVariable scheduleId: Long?,
+        @PathVariable shiftId: Long?,
+        @Valid @RequestBody request: ShiftReassignRequest,
+    ): ResponseEntity<ApiResponse<ShiftReassignResponse>> {
+        val reassignmentResult = shiftService.reassignPublishedShift(
+            workplaceId,
+            scheduleId,
+            shiftId,
+            request,
+            rq.actorId,
+        )
+
+        return ResponseEntity.status(HttpStatus.OK).body(
+            ApiResponse.success(
+                "200",
+                "공개 근무 담당자를 변경했습니다.",
+                ShiftReassignResponse.from(
+                    reassignmentResult.shift,
+                    reassignmentResult.closedSubstituteRequests,
+                ),
+            ),
         )
     }
 }
