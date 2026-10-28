@@ -134,7 +134,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | 대타 생성 | Shift → (후보 소속 `FOR SHARE` + 재확인) → INSERT | **후보 소속 Guard 추가** | V4 변경 |
 | 대타 수락 | Request → User → 후보 소속 `FOR SHARE` 재확인 | **Guard 추가** | V4 변경 |
 | 대타 거절 | Request | 없음 (퇴사가 같은 Request를 잠그므로 직렬화) | ML-3 종료 판정만 변경 |
-| **대타 승인** | (Scalar로 Shift ID) → **Shift → Request** → **Lock 후 `request.shift == 잠근 Shift`와 Request 상태 재검증** → User → 수락자 소속 `FOR SHARE` 재확인 | **순서 변경 + Guard 추가.** Scalar 조회는 Lock이 아니므로 Lock 후 관계를 반드시 다시 확인 | V4 변경 |
+| **대타 승인** | (Scalar로 Shift ID) → **Shift → Request** → **Lock 후 `request.shift == 잠근 Shift`와 Request 상태 재검증** → User → 수락자 소속 `FOR SHARE` 재확인 | **순서 변경 + Guard 추가.** Scalar 조회는 Lock이 아니므로 Lock 후 관계를 반드시 다시 확인 | V4 변경. **구현 PR #83 (2026-10-28)**: 순서·Lock 후 재검증 반영, 수락자 소속 `FOR SHARE`는 묶음 C 후속 |
 | 대타 종료 | Request | 없음 (Shift를 기다리지 않으므로 순환 없음) | — |
 | 공개 후 추가 | Schedule → 새 담당 User → **새 담당 소속 `FOR SHARE` + `leftAt` 재확인** → INSERT | 새 Command | 신규 |
 | 공개 후 인계 | Schedule → Shift → 그 근무의 활성 Request → 새 담당 User → (새 담당 소속 `FOR SHARE`) | 새 Command | 신규 |
@@ -211,7 +211,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 |---|---|---|---|
 | ML5-T1 (H6-C1) | 인계 (Shift 보유) | 대타 생성 같은 근무 → 대기 | 인계 후 활성 Request 0 |
 | ML5-T2 | 대타 생성 (Shift 보유) | 인계 → 대기 | 생성된 Request가 인계 Transaction에서 `SHIFT_CHANGED`로 종료 |
-| ML5-T3 (H6-C2) | 승인 (Shift·Request 보유) | 인계 → 대기 | Deadlock 0, 담당자 1명 |
+| ML5-T3 (H6-C2) | 승인 (Shift·Request 보유) | 인계 → 대기 | Deadlock 0, 담당자 1명. 실행: PR #83 `approveAndShiftFirstHandoverDoNotDeadlock`, `LOCAL_PASSED` |
 | ML5-T4 | 다른 근무지 수락 (User B 보유) | B에게 인계 → 대기 | B 이중 배정 0 |
 | ML5-T5 (H6-C5) | 퇴사 (B 소속 `FOR UPDATE`) | B의 수락 → Guard 대기 후 거부 | B 유효 수락자 아님 |
 | ML5-T6 (H6-C7) | 대타 생성 (B 소속 `FOR SHARE`) | B 퇴사 → 대기 후 다시 조회 → 409 | 퇴사 미반영, B PENDING 남음 (다음 시도에서 INELIGIBLE) |
@@ -221,7 +221,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | ML5-T10 (V2-N-07) | 가입 (Workplace 보유) | 같은 사람 가입 → 대기 후 409 | 현재 소속 1 |
 | ML5-T11 (V2-N-12) | 재발급 (Workplace 보유) | 이전 코드 가입 → 대기 후 WPL-001 | 이전 코드 가입 0 |
 | ML5-T12 | 일부러 Deadlock 유도 | — | 503 매핑, Rollback 확인 |
-| ML5-T13 | 승인에서 Request를 Scalar 조회 후 Lock | 다른 Transaction이 CLOSED Commit | 승인이 CLOSED를 보고 거부 (§4-3 해결 확인) |
+| ML5-T13 | 승인에서 Request를 Scalar 조회 후 Lock | 다른 Transaction이 CLOSED Commit | 승인이 CLOSED를 보고 거부 (§4-3 해결 확인). 실행: PR #83 `approveRechecksStatusAfterLock` (V4-N-46), `LOCAL_PASSED` |
 | ML5-T14 | 퇴사 (B 소속 `FOR UPDATE`) | B 담당 DRAFT 추가 → 소속 대기 후 거부 | 퇴사 Commit 후 B 담당 DRAFT 0건 (ML-2-INV-02) |
 | ML5-T15 | B 담당 DRAFT 추가 (B 소속 `FOR SHARE`, 다른 근무표) | B 퇴사 → 대기 후 다시 조회 → 새 DRAFT 발견 → 409 | 퇴사 미반영, DRAFT 남음 (다음 시도에서 삭제) |
 | ML5-R4 (AS-IS) | B 담당 DRAFT 추가가 `leftAt` 확인을 통과한 직후 B `leftAt`을 Test 전용으로 Commit | 추가 계속 | 퇴사자 DRAFT 생성 재현 여부 |
@@ -297,3 +297,4 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | 2026-10-23 | DRAFT 편집 소속 Guard를 필수로 수정 (ML-2-INV-02), ML5-T14·T15·R4 추가, 실험 성공 기준 표 추가 |
 | 2026-10-23 | 초안. AS-IS Lock 지도, 이전 순서 결함 4개, 수정 순서 후보(Shift를 Request 앞으로), 쌍별 순환 검사, 실패 응답, 재현 Test 계획 |
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
+| 2026-10-28 | §5-1 대타 승인 행에 구현 표시 (PR #83, DECISION-LOG §4-6), ML5-T3·T13 실행 표시 (기존 `runSecondWhileFirstHoldsLock` 방식, `LockWaitProbe` 미도입) |

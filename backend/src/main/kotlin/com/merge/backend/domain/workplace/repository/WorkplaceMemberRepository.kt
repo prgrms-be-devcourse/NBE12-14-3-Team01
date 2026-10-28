@@ -1,3 +1,4 @@
+
 package com.merge.backend.domain.workplace.repository
 
 import com.merge.backend.domain.user.entity.User
@@ -11,8 +12,12 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
+
     @EntityGraph(attributePaths = ["user"])
-    fun findByIdAndWorkplace_Id(memberId: Long, workplaceId: Long): Optional<WorkplaceMember>
+    fun findByIdAndWorkplace_Id(
+        memberId: Long,
+        workplaceId: Long
+    ): Optional<WorkplaceMember>
 
     @Query(
         """
@@ -40,14 +45,14 @@ interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
     ): List<WorkplaceMember>
 
     @EntityGraph(attributePaths = ["user"])
-    fun findAllByWorkplace_IdAndLeftAtIsNull(workplaceId: Long?): List<WorkplaceMember>
+    fun findAllByWorkplace_IdAndLeftAtIsNull(
+        workplaceId: Long?
+    ): List<WorkplaceMember>
 
-    fun findByWorkplaceIdAndUserId(
+    fun existsByWorkplaceIdAndUserId(
         workplaceId: Long?,
         userId: Long?
-    ): Optional<WorkplaceMember>
-
-    fun existsByWorkplaceIdAndUserId(workplaceId: Long?, userId: Long?): Boolean
+    ): Boolean
 
     fun findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
         workplaceId: Long?,

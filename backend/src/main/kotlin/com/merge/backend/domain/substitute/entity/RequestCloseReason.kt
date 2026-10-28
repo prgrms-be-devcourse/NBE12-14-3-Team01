@@ -4,4 +4,5 @@ enum class RequestCloseReason {
     ALL_CANDIDATES_REJECTED,
     EXPIRED,
     MANAGER_CLOSED,
+    SHIFT_CHANGED,
 }

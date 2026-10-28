@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -122,7 +123,7 @@ class SubstituteRequestService(
             throw BusinessException(SubstituteRequestErrorCode.SHIFT_CANCELLED)
         }
 
-        if (shift.member.user.id != actorUserId) {
+        if (shift.member.user.id != actorUserId || shift.member.leftAt != null) {
             throw BusinessException(SubstituteRequestErrorCode.NOT_OWN_SHIFT)
         }
 
@@ -206,9 +207,28 @@ class SubstituteRequestService(
 
     @Transactional
     fun approve(requestId: Long, actorId: Long): SubstituteRequest {
-        // 대체 근무 요청이 존재하는지
+        // 어느 근무지에서도 매니저가 아니면 요청을 조회하기 전에 거절 (API-CATALOG §5-5 역할 먼저 검사)
+        val managedWorkplaceIds = workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)
+            .filter { it.role == WorkplaceRole.MANAGER }
+            .map { it.workplace.id }
+
+        if (managedWorkplaceIds.isEmpty()) {
+            throw BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED)
+        }
+
+        // Lock 없이 ID만 조회. 없는 요청과 다른 근무지 요청은 같은 응답
+        val scope = substituteRequestRepository.findScopeById(requestId)
+            ?.takeIf { it.workplaceId in managedWorkplaceIds }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+
+        // Lock 순서 Shift → Request (ML-5). Entity는 Lock 조회로 처음 읽어야 최신 상태가 보인다
+        shiftRepository.findByIdForUpdate(scope.shiftId)
+
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
             ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+
+        // ID 조회와 Lock 사이에 요청의 근무가 바뀌지 않았는지
+        check(request.shift.id == scope.shiftId) { "대체 근무 요청의 근무가 Lock 전후로 다릅니다." }
 
         // request == ACCEPTED 여부 검사
         if (request.status != RequestStatus.ACCEPTED) {
@@ -216,7 +236,7 @@ class SubstituteRequestService(
         }
         // 근무지 ID 뽑아오기
         val workplaceId = requireNotNull(request.shift.schedule.workplace.id)
-        // 매니저 인가 확인
+        // 매니저 인가 확인 (Lock 뒤 최종 확인)
         workplaceMemberService.requireManager(actorId, workplaceId)
 
         // 요청의 스케줄이 공개되지 않았을 때
@@ -305,6 +325,28 @@ class SubstituteRequestService(
 
         return request
     }
+
+    // 공개 근무 취소·담당자 변경 Command 안에서 호출. 그 근무의 진행 중 요청을 SHIFT_CHANGED로 종료 (ML-3-Q1)
+    // 호출하는 쪽이 먼저 Shift를 잠가야 함 (Lock 순서 Shift → Request, ML-5)
+    // 따로 Commit하지 않고 호출한 Transaction에 합류. Transaction 없이 부르면 예외
+    // 알림은 근무 변경 알림과 합쳐야 해서 여기서 발행하지 않고 받는 사람을 정할 정보만 돌려줌 (NOTIFICATION-TYPES §3-3)
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun closeActiveRequestsByShiftChange(shiftId: Long, now: LocalDateTime): List<ShiftChangeClosedRequest> =
+        substituteRequestRepository.findActiveByShiftIdForUpdate(shiftId).map { request ->
+            val requestId = requireNotNull(request.id)
+
+            // 수락한 후보는 종료 알림 대상이라 같이 알려 줌 (PENDING 후보는 대상 아님)
+            // Lock 전에 읽힌 Entity면 status가 옛 값일 수 있어 보지 않고 ACCEPTED 후보를 직접 찾음
+            // (진행 중 요청에 ACCEPTED 후보가 있으면 그 요청은 ACCEPTED)
+            val acceptedMemberId = substituteCandidateRepository
+                .findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED)
+                ?.member
+                ?.id
+
+            request.closeByShiftChange(now)
+
+            ShiftChangeClosedRequest(requestId, requireNotNull(request.requesterMember.id), acceptedMemberId)
+        }
 
     private fun validateNotStarted(shift: Shift, now: LocalDateTime) {
         if (shift.startAt <= now) {
