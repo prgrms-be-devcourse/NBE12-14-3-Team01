@@ -187,6 +187,61 @@ class SubstituteMemberLeaveTest {
     }
 
     @Test
+    @DisplayName("이미 퇴사했는데 대기로 남은 후보가 있을 때 다른 후보가 거절하면 응답 가능한 후보가 없어 CANDIDATE_INELIGIBLE로 종료된다")
+    fun rejectWithLeftPendingCandidateClosesRequest() {
+        // given: B·C 대기, C의 소속만 끝남 (INELIGIBLE 처리 없이 PENDING으로 남음)
+        val f = createFixture(candidateCount = 2)
+        jdbcTemplate.update("UPDATE workplace_member SET left_at = ? WHERE id = ?", now().minusDays(1), f.candidates[1].memberId)
+
+        // when
+        substituteCandidateService.rejectCandidate(f.candidates[0].candidateId, f.candidates[0].userId)
+
+        // then: 퇴사 처리와 같은 판정 (V4-N-71), C는 정리하지 않고 PENDING 그대로
+        inTransaction {
+            assertClosedAs(f.requestId, RequestCloseReason.CANDIDATE_INELIGIBLE)
+            assertThat(findCandidate(f.candidates[1].candidateId).status).isEqualTo(CandidateStatus.PENDING)
+        }
+        assertThat(applicationEvents.stream(SubstituteCandidateIneligibleEvent::class.java).count()).isEqualTo(1)
+        assertThat(applicationEvents.stream(SubstituteAllCandidatesRejectedEvent::class.java).count()).isZero()
+    }
+
+    @Test
+    @DisplayName("남은 대기 후보가 EMPLOYEE가 아니면 응답 가능한 후보로 세지 않아 거절 시 CANDIDATE_INELIGIBLE로 종료된다")
+    fun rejectWithNonEmployeePendingCandidateClosesRequest() {
+        // given: B·C 대기, C의 역할이 MANAGER로 바뀜 (수락·거절 불가)
+        val f = createFixture(candidateCount = 2)
+        jdbcTemplate.update("UPDATE workplace_member SET role = 'MANAGER' WHERE id = ?", f.candidates[1].memberId)
+
+        // when
+        substituteCandidateService.rejectCandidate(f.candidates[0].candidateId, f.candidates[0].userId)
+
+        // then
+        inTransaction { assertClosedAs(f.requestId, RequestCloseReason.CANDIDATE_INELIGIBLE) }
+    }
+
+    @Test
+    @DisplayName("남은 대기 후보가 다른 근무지 소속이면 응답 가능한 후보로 세지 않아 거절 시 CANDIDATE_INELIGIBLE로 종료된다")
+    fun rejectWithOtherWorkplacePendingCandidateClosesRequest() {
+        // given: B 대기 + 다른 근무지 소속 D가 후보로 잘못 들어간 데이터
+        val f = createFixture(candidateCount = 1)
+        val other = createFixture(candidateCount = 1)
+        inTransaction {
+            substituteCandidateRepository.save(
+                SubstituteCandidate(
+                    findRequest(f.requestId),
+                    workplaceMemberRepository.findById(other.candidates[0].memberId).orElseThrow(),
+                )
+            )
+        }
+
+        // when
+        substituteCandidateService.rejectCandidate(f.candidates[0].candidateId, f.candidates[0].userId)
+
+        // then
+        inTransaction { assertClosedAs(f.requestId, RequestCloseReason.CANDIDATE_INELIGIBLE) }
+    }
+
+    @Test
     @DisplayName("수락한 B가 퇴사하면 요청은 CANDIDATE_INELIGIBLE로 종료되고 B의 수락 기록은 남으며 승인은 거부되고 요청자는 다시 요청할 수 있다")
     fun acceptedCandidateLeavesClosesRequest() {
         // given: B 수락, C 대기

@@ -266,20 +266,20 @@ class SubstituteCandidateService(
         // Candidate: PENDING → REJECTED
         candidate.reject(now)
 
-        // 현재 Candidate를 제외하고 다른 PENDING 후보가 남아 있는지 확인
-        val hasOtherPendingCandidate =
-            substituteCandidateRepository.existsByRequest_IdAndStatusAndIdNot(
+        // 현재 Candidate를 제외하고 응답 가능한 후보가 남아 있는지 확인 (퇴사 처리와 같은 종료 판정, ML-3-P1)
+        val hasOtherRespondableCandidate =
+            substituteCandidateRepository.existsRespondableCandidateExcept(
                 requireNotNull(request.id),
-                CandidateStatus.PENDING,
-                requireNotNull(candidate.id),
+                requireNotNull(candidate.member.id),
             )
 
-        // 다른 PENDING 후보가 없다면 마지막 후보가 거절한 것
-        // 퇴사로 INELIGIBLE이 된 후보가 섞여 있으면 CANDIDATE_INELIGIBLE (ML-3-P1, 퇴사 처리와 같은 종료 판정)
-        if (!hasOtherPendingCandidate) {
-            val hasIneligibleCandidate = substituteCandidateRepository.existsByRequest_IdAndStatus(
+        // 응답 가능한 후보가 없다면 요청 종료
+        // 나머지 후보가 전원 거절이면 ALL_CANDIDATES_REJECTED, 아니면 자격 상실(INELIGIBLE·퇴사·역할 변경)이 원인이라 CANDIDATE_INELIGIBLE
+        if (!hasOtherRespondableCandidate) {
+            val hasIneligibleCandidate = substituteCandidateRepository.existsByRequest_IdAndIdNotAndStatusNot(
                 requireNotNull(request.id),
-                CandidateStatus.INELIGIBLE,
+                requireNotNull(candidate.id),
+                CandidateStatus.REJECTED,
             )
 
             if (hasIneligibleCandidate) {
