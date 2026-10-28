@@ -84,7 +84,7 @@ type LeavePreviewResponse = {
 };
 
 const requestStatusLabels: Record<RequestStatus, string> = {
-  OPEN: "응답 대기", ACCEPTED: "수락 · 승인 대기", APPROVED: "승인됨", CLOSED: "종료됨",
+  OPEN: "진행 중", ACCEPTED: "수락 · 승인 대기", APPROVED: "승인됨", CLOSED: "종료됨",
 };
 const candidateStatusLabels: Record<CandidateStatus, string> = {
   PENDING: "응답 대기", ACCEPTED: "수락", REJECTED: "거절", INELIGIBLE: "후보 자격 상실",
@@ -209,7 +209,6 @@ function LeavePreviewModal({ workplaceId, member, onClose }: {
                   : `퇴사 불가 사유: ${preview.blockingReason ?? "서버에서 퇴사 불가로 안내했습니다."}`}
               </p>}
               {!preview.canLeave && preview.ongoingShift && <div className="mt-3"><ShiftSummary shift={preview.ongoingShift} /></div>}
-              <p className="mt-2 text-xs">퇴사 가능 여부와 관계없이 현재 퇴사 확정은 제공되지 않습니다.</p>
             </section>
             <p className="text-xs">아래는 조회 시점의 예상 영향입니다. 실제 처리 결과가 아니며, 근무·대타 상태에 따라 달라질 수 있습니다.</p>
             <section>
