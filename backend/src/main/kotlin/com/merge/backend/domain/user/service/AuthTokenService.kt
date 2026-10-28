@@ -2,6 +2,7 @@ package com.merge.backend.domain.user.service
 
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.standard.Ut
+import java.util.UUID
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
@@ -29,7 +30,8 @@ class AuthTokenService {
         Ut.jwt.toString(
             secretPattern,
             refreshExpireMills,
-            java.util.Map.of<String, Any?>("id", user.id, "type", "refresh"),
+            // jti: 로그인마다 다른 값이라 같은 1초에 다시 로그인해도 토큰이 달라짐
+            java.util.Map.of<String, Any?>("id", user.id, "type", "refresh", "jti", UUID.randomUUID().toString()),
         )
 
     fun payloadOrNull(jwt: String?): Map<String, Any>? {

@@ -5,9 +5,12 @@ import com.merge.backend.domain.user.dto.LoginResponse
 import com.merge.backend.domain.user.dto.RefreshResponse
 import com.merge.backend.domain.user.dto.SignupRequest
 import com.merge.backend.domain.user.dto.UserResponse
+import com.merge.backend.domain.user.exception.UserErrorCode
 import com.merge.backend.domain.user.service.UserService
 import com.merge.backend.global.dto.ApiResponse
+import com.merge.backend.global.exception.BusinessException
 import com.merge.backend.global.rq.Rq
+import com.merge.backend.global.security.RequestOriginValidator
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 class ApiV1UserController(
     private val userService: UserService,
     private val rq: Rq,
+    private val requestOriginValidator: RequestOriginValidator,
 ) {
 
     @PostMapping("/signup")
@@ -60,6 +64,22 @@ class ApiV1UserController(
         return ResponseEntity.ok(
             ApiResponse.success("200", "Access Token이 재발급되었습니다", RefreshResponse(accessToken)),
         )
+    }
+
+    // Access Token 없이 Refresh Cookie만으로 처리
+    @PostMapping("/logout")
+    fun logout(): ResponseEntity<ApiResponse<Void?>> {
+        // 출처가 틀리면 DB와 쿠키를 건드리기 전에 멈춤
+        if (!requestOriginValidator.isAllowed(rq.getHeader("Origin", null), rq.getHeader("Referer", null))) {
+            throw BusinessException(UserErrorCode.INVALID_REQUEST_ORIGIN)
+        }
+
+        val refreshToken = rq.getCookieValue("refreshToken", "")
+        userService.logout(refreshToken)
+
+        rq.deleteCookie("refreshToken")
+
+        return ResponseEntity.ok(ApiResponse.success("200", "로그아웃되었습니다"))
     }
 
     @GetMapping("/me")
