@@ -9,7 +9,7 @@
 이 문서는 사람이 작업을 나누고 AI가 같은 순서로 검증하도록 하는 실행 순서다. 현재 상태의 원본은 Git·PR·Issue·JUnit XML·CI이며, 정책은 Decision Log §4의 채택 범위가 기준이다. 문서의 과거 PROPOSED 문구나 테스트 통과를 새 정책 승인으로 읽지 않는다. 현재 진행 현황은 이 문서의 스냅샷을 반복 갱신하기보다 Migration Matrix·Issue·새 Evidence에 연결한다.
 
 - Task ID: 2026-10-28 사용자 요청에 따른 출시 준비 계획 초안. Delivery Board ID는 팀 확인 전이다.
-- 변경 대상: 이 계획 문서와 docs/README.md의 문서 Index 한 행. 코드·테스트·정책·기존 Evidence는 변경 대상이 아니다.
+- 변경 대상: 이번 문서 PR은 `docs/contract/API-CATALOG.md`, `docs/contract/ERROR-CODES.md`, `docs/evidence/TEST-INVENTORY.md`, `docs/delivery/RELEASE-READINESS-PLAN.md` 4개 문서의 구현 현황·Test 연결·DB 이행 계획 동기화다. 코드·테스트·정책·기존 실행 Evidence는 변경 대상이 아니다.
 - 금지 대상: Production/Test, application 설정, Gradle 의존성, 승인되지 않은 API·DB·Lock·ErrorCode 변경.
 - 참고 계약: CONTRACT-BASELINE의 각 도메인 행, DECISION-LOG §4, IMPLEMENTATION-PRIORITY §3. 세부 Task에서는 정확한 ID와 승인 상태를 다시 적는다.
 - 이번 문서 검증: 기준 SHA와 현재 파일/Issue/CI 대조, 링크 확인, 문서 Diff 점검. 코드를 실행했다는 의미가 아니다.
@@ -131,6 +131,13 @@ Issue #69는 Backend 한 API의 완료가 아니다. C에서는 현재 관리자
 
 D에서는 기존 소속 Row를 보존하고 새 Row를 만들며, 근무지·사용자당 현재 소속 최대 1개를 DB 제약으로 검증한다. 운영 DDL·기존 데이터 점검·Rollback과 구버전 호환까지 배포 담당이 검토한다. Frontend의 workplaceId만으로 거르던 조회는 현재 소속과 과거 이력 구분에 맞게 연동한다.
 
+**운영 DB 이행 보완 (2026-10-29, 미검증):** [Issue #69](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/issues/69)의 C/D 범위와 아래 PR 설명·리뷰를 참고한 점검 항목이다. 운영 Schema·DDL 적용·백업·복구는 확인하지 않았으며, 병합 사실을 운영 검증 완료로 취급하지 않는다.
+
+- **Unique:** [PR #82](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/82) 기준 `workplace_member.active_marker` 생성식 `CASE WHEN left_at IS NULL THEN 1 END`와 `uk_u2_active_membership(workplace_id, user_id, active_marker)`를 확인한다. 기존 `(workplace_id, user_id)` Unique는 실제 이름·FK/Index 영향을 확인하고 신규 Unique가 유효한 상태에서 제거한다. `ddl-auto: update`에 기존 제약 제거를 맡기지 않는다. 현재 소속 중복 차단과 종료 후 재가입의 새 Row·이력 보존을 별도 검증한다.
+- **ENUM·선행 PR:** [PR #80](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/80)의 `substitute_request.close_reason`에 `SHIFT_CHANGED`가 필요하다. [PR #92](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/92)는 확인 시 OPEN·미병합이며, 최종 병합·V2 연동 범위를 확인한 뒤 `substitute_candidate.status`의 `INELIGIBLE`, `substitute_request.close_reason`의 `CANDIDATE_INELIGIBLE`을 최초 저장 전에 지원한다. 운영 `SHOW CREATE TABLE`로 기존 ENUM 값·순서·NULL/기본값 등을 확인하고 기존 값 끝에 추가하는 DDL을 검토한다. [PR #90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90)의 미리보기 병합은 실제 퇴사 처리나 ENUM 저장 검증 완료를 뜻하지 않는다.
+- **백업·순서·Rollback:** 운영 적용 전 Schema·데이터 백업과 격리 복원본의 DDL·복구 검증을 준비한다. 관련 쓰기 통제 → 백업 확인 → 신규 생성 컬럼/Unique 확보·기존 Unique 제거 및 필요한 ENUM 확장 → Schema 확인 → 호환 앱 배포 → 재가입·새 ENUM 저장/조회 검증 순서를 담당자가 확정한다. 새 ENUM 저장 후 구버전 앱의 조회 실패, 재가입 이력 생성 후 기존 Unique 복원·구버전 단건 조회 실패 위험이 있다. 코드만 되돌리거나 이력을 삭제해 복구하지 않고, 데이터 보존·배포 후 변경분을 포함한 복구안을 확인한다.
+- **담당·상태:** 배포/DDL 실행자·리뷰어·백업/복구 책임자와 V2·V3·V4 연동 확인자를 지정한다 (실명·일정 미확인). 배포 SHA·DB 버전·실제 DDL·적용/검증 결과·근거 링크를 남기기 전에는 위 항목을 미검증으로 유지한다. 운영 접속·DDL 실행은 별도 승인·절차 대상이며 이 문서 보완으로 허용되지 않는다.
+
 **종료 기준:** C와 D의 DB 결과·권한·단일 Transaction·재가입 유일성이 증명되고, 아래 E/F 화면·복구와 결합된다. 필수 화면이나 운영 Unique 이행이 빠진 재가입은 출시 준비 완료가 아니다.
 
 ### 단계 E/F — 각 Command의 결과 화면과 실패 복구
@@ -199,7 +206,7 @@ Migration M과 A~F 구현은 도메인별로 병렬 진행할 수 있다. 각 PR
 
 ## 10. 이 문서를 PR로 공유하는 방법
 
-문서 전용 Draft PR에서 이 계획 문서와 docs/README.md의 새 문서 Index 행만 변경한다. 리뷰어에게 (1) A~F 전체 TARGET과 최종 제공 범위 판정 방식, (2) 도메인/Frontend/배포 담당과 선행조건, (3) 근거가 부족하거나 정책 미정인 완료 기준, (4) 실제 10/29 제출 가능 범위를 확인해 달라고 요청한다. 이 PR은 코드 구현·배포·정책 결정을 승인하는 PR이 아니다. 다른 기능 PR과 병렬로 리뷰할 수 있다.
+이번 문서 전용 PR의 변경 범위는 §0의 API-CATALOG, ERROR-CODES, TEST-INVENTORY, RELEASE-READINESS-PLAN 4개 문서다. 리뷰어에게 (1) A~F 전체 TARGET과 최종 제공 범위 판정 방식, (2) 도메인/Frontend/배포 담당과 선행조건, (3) 근거가 부족하거나 정책 미정인 완료 기준, (4) 실제 10/29 제출 가능 범위를 확인해 달라고 요청한다. 이 PR은 코드 구현·배포·정책 결정을 승인하는 PR이 아니다. 다른 기능 PR과 병렬로 리뷰할 수 있다.
 
 팀이 합의한 담당·일정은 Delivery Board/WBS에, 새 정책 결정은 Decision Log에, 실제 테스트는 TEST-EVIDENCE에 기록한다. 문서 PR이 병합돼 문서 리뷰 축이 PUBLISHED가 되더라도 정책 승인 축이나 테스트 실행 축이 자동으로 바뀌지 않는다. 문서 병합 후에도 기능별 PR은 각자의 승인·CI·병합 절차를 거친다.
 
