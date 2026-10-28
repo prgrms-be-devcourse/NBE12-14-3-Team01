@@ -38,7 +38,7 @@
 - Notification Production Kotlin은 15개, Test Kotlin은 9개다. 이전 로컬 V5 최종 감사 RESULT.md의 Production 16개 표기는 오기이며 정정 대상으로 기록한다. #53은 새 회귀 테스트 17건이 아니라 변경 경로 17개와 신규 테스트 1건이었다.
 - Issue #62 AUTH-1과 #69 H2 Membership는 OPEN이고 체크리스트가 남아 있다. 사용자는 담당자가 작업 중이라고 전달했지만 GitHub assignee는 두 Issue 모두 비어 있고, 구현 PR·최종 테스트 완료는 확인되지 않았다. #69는 초대코드 재발급·기존 코드 무효화도 범위에 포함한다. 상위 #32 Notification과 #63 Schedule Controller Test도 OPEN이다. #63은 대응 Kotlin 파일 존재와 이슈 범위가 일치하는지 확인한다. Migration Matrix §2의 현재 진행 행은 실제 병합 상태와 대조해야 한다.
 - Frontend 헤더 로그아웃은 현재 clearToken만 호출하고 서버 로그아웃 API 호출이 없다. 대타 일부 목록은 workplaceId로 화면 필터링한다. 재가입 뒤 과거 소속과 현재 소속의 분리 근거가 되지 않는다.
-- Checkstyle(Java 전용)은 Java 소스 0개 이후 제거했다 (2026-10-28, `chore/remove-java-build-tools`). ktlint/detekt는 현재 Gradle Gate에 없다 (2026-10-28 일회성 측정만). 현재 CI 성공을 Kotlin 린트 PASS로 표현하지 않는다. 현재 develop의 main Kotlin 소스에서 `fun <Receiver>.<name>` 형식의 확장 함수 선언은 정적 탐색으로 찾지 못했다. 공식 과제의 함수·확장 함수 적용 근거는 최종 제출 전에 실제 코드로 다시 확인해야 한다.
+- Checkstyle(Java 전용)은 Java 소스 0개 이후 제거했다 (2026-10-28, PR #81). ktlint/detekt는 현재 Gradle Gate에 없다 (2026-10-28 일회성 측정만). 현재 CI 성공을 Kotlin 린트 PASS로 표현하지 않는다. 현재 develop의 main Kotlin 소스에서 `fun <Receiver>.<name>` 형식의 확장 함수 선언은 정적 탐색으로 찾지 못했다. 공식 과제의 함수·확장 함수 적용 근거는 최종 제출 전에 실제 코드로 다시 확인해야 한다.
 
 이 스냅샷은 작업 착수 시 최신 GitHub와 다시 대조한다. 사용자 제공 공식 과제의 추가 기능은 선택 사항이지만, 팀이 이번 출시 범위에 넣기로 한 기능은 아래 P0 완료 조건으로 판단한다.
 
