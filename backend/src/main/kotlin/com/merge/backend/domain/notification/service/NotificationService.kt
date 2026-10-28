@@ -36,10 +36,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSchedulePublishedNotifications(recipientMemberIds: List<Long>) {
-        val recipientMembers = workplaceMemberRepository.findAllById(recipientMemberIds)
-        if (recipientMembers.size != recipientMemberIds.size) {
-            throw IllegalStateException("Schedule 공개 알림 수신자를 찾을 수 없습니다.")
-        }
+        val recipientMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            recipientMemberIds,
+            "Schedule 공개 알림 수신자를 찾을 수 없습니다.",
+        )
 
         recipientMembers.forEach { recipientMember ->
             create(
@@ -52,10 +52,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSubstituteRequestReceivedNotifications(candidateMemberIds: List<Long>) {
-        val candidateMembers = workplaceMemberRepository.findAllById(candidateMemberIds)
-        if (candidateMembers.size != candidateMemberIds.size) {
-            throw IllegalStateException("대타 요청 알림 수신자를 찾을 수 없습니다.")
-        }
+        val candidateMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            candidateMemberIds,
+            "대타 요청 알림 수신자를 찾을 수 없습니다.",
+        )
 
         candidateMembers.forEach { candidateMember ->
             create(
@@ -68,10 +68,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSubstituteNoCandidateNotifications(managerMemberIds: List<Long>) {
-        val managerMembers = workplaceMemberRepository.findAllById(managerMemberIds)
-        if (managerMembers.size != managerMemberIds.size) {
-            throw IllegalStateException("대타 후보 없음 알림 수신자를 찾을 수 없습니다.")
-        }
+        val managerMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            managerMemberIds,
+            "대타 후보 없음 알림 수신자를 찾을 수 없습니다.",
+        )
 
         managerMembers.forEach { managerMember ->
             create(
@@ -84,10 +84,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSubstituteAcceptedNotifications(managerMemberIds: List<Long>) {
-        val managerMembers = workplaceMemberRepository.findAllById(managerMemberIds)
-        if (managerMembers.size != managerMemberIds.size) {
-            throw IllegalStateException("대타 수락 알림 수신자를 찾을 수 없습니다.")
-        }
+        val managerMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            managerMemberIds,
+            "대타 수락 알림 수신자를 찾을 수 없습니다.",
+        )
 
         managerMembers.forEach { managerMember ->
             create(
@@ -100,10 +100,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSubstituteAllRejectedNotifications(recipientMemberIds: List<Long>) {
-        val recipientMembers = workplaceMemberRepository.findAllById(recipientMemberIds)
-        if (recipientMembers.size != recipientMemberIds.size) {
-            throw IllegalStateException("대타 후보 전원 거절 알림 수신자를 찾을 수 없습니다.")
-        }
+        val recipientMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            recipientMemberIds,
+            "대타 후보 전원 거절 알림 수신자를 찾을 수 없습니다.",
+        )
 
         recipientMembers.forEach { recipientMember ->
             create(
@@ -123,10 +123,10 @@ class NotificationService(
             requireId(requesterMemberId),
             requireId(acceptedMemberId),
         )
-        val recipientMembers = workplaceMemberRepository.findAllById(recipientMemberIds)
-        if (recipientMembers.size != recipientMemberIds.size) {
-            throw IllegalStateException("대체 근무 승인 알림 수신자를 찾을 수 없습니다.")
-        }
+        val recipientMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            recipientMemberIds,
+            "대체 근무 승인 알림 수신자를 찾을 수 없습니다.",
+        )
 
         val requesterMember = recipientMembers.firstOrNull { member ->
             member.id == requesterMemberId
@@ -150,10 +150,10 @@ class NotificationService(
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun createSubstituteManagerClosedNotifications(recipientMemberIds: List<Long>) {
-        val recipientMembers = workplaceMemberRepository.findAllById(recipientMemberIds)
-        if (recipientMembers.size != recipientMemberIds.size) {
-            throw IllegalStateException("대체 근무 관리자 종료 알림 수신자를 찾을 수 없습니다.")
-        }
+        val recipientMembers = workplaceMemberRepository.findAllRecipientsOrThrow(
+            recipientMemberIds,
+            "대체 근무 관리자 종료 알림 수신자를 찾을 수 없습니다.",
+        )
 
         recipientMembers.forEach { recipientMember ->
             create(
@@ -202,3 +202,13 @@ class NotificationService(
         private const val SUBSTITUTE_MANAGER_CLOSED_MESSAGE = "관리자가 대체 근무 요청을 종료했습니다."
     }
 }
+
+// 받을 사람을 ID 목록 그대로 한 번에 조회한다. 하나라도 찾지 못하면 IllegalStateException을 던져
+// 그 사건의 알림을 하나도 만들지 않는다 (퇴사 여부·중복 ID는 따로 거르지 않음)
+private fun WorkplaceMemberRepository.findAllRecipientsOrThrow(
+    ids: List<Long>,
+    notFoundMessage: String,
+): List<WorkplaceMember> =
+    findAllById(ids).also { members ->
+        check(members.size == ids.size) { notFoundMessage }
+    }
