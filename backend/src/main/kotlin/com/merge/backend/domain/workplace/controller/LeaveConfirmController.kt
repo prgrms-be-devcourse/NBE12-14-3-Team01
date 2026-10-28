@@ -4,6 +4,7 @@ import com.merge.backend.domain.workplace.dto.request.LeaveConfirmRequest
 import com.merge.backend.domain.workplace.dto.response.LeaveConfirmResponse
 import com.merge.backend.domain.workplace.service.LeaveConfirmService
 import com.merge.backend.domain.workplace.service.LeaveConfirmationIntegration
+import com.merge.backend.domain.workplace.service.LeaveConfirmationReadiness
 import com.merge.backend.global.dto.ApiResponse
 import com.merge.backend.global.rq.Rq
 import jakarta.validation.Valid
@@ -15,9 +16,9 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-/** #92 및 경쟁 Command Guard 통합 검증 후 Bridge Bean을 등록해야 노출된다. */
+/** V4 연동만으로 활성화하지 않는다. 경쟁 Command Guard와 미확정 계약 검증이 별도로 필요하다. */
 @RestController
-@ConditionalOnBean(LeaveConfirmationIntegration::class)
+@ConditionalOnBean(value = [LeaveConfirmationIntegration::class, LeaveConfirmationReadiness::class])
 @RequestMapping("/workplaces")
 class LeaveConfirmController(private val service: LeaveConfirmService, private val rq: Rq) {
     @PostMapping("/{workplaceId}/members/{memberId}/leave")

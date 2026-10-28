@@ -3,6 +3,10 @@ package com.merge.backend.domain.shift.service
 import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.dto.ShiftReassignRequest
 import com.merge.backend.domain.shift.dto.AcknowledgedUnavailableConflict
+import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
+import com.merge.backend.domain.shift.dto.PublishedShiftConfirmationRequiredResponse
+import com.merge.backend.domain.shift.dto.NewShiftKey
+import com.merge.backend.domain.shift.dto.NewShiftUnavailableConflictResponse
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.ScheduleStatus
 import com.merge.backend.domain.shift.entity.Shift
@@ -211,6 +215,46 @@ class ShiftService(
         val shift = validShift(scheduleId, shiftId)
 
         shiftRepository.deleteById(requireNotNull(shiftId))
+    }
+
+    @Transactional
+    fun createPublishedShift(
+        workplaceId: Long?,
+        scheduleId: Long?,
+        request: PublishedShiftCreateRequest,
+        actorId: Long?,
+    ): Shift {
+        workplaceMemberService.requireManager(actorId, workplaceId)
+        val schedule = validPublishedSchedule(scheduleId, workplaceId)
+        val memberId = requirePublishedShiftCreateInput(request.memberId)
+        val startAt = requirePublishedShiftCreateInput(request.startAt)
+        val endAt = requirePublishedShiftCreateInput(request.endAt)
+
+        validateNewShiftAcknowledgementKeys(schedule.id, memberId, startAt, endAt, request)
+        validatePublishedShiftTime(schedule, startAt, endAt)
+        validatePublishedShiftNotStarted(startAt)
+
+        val targetScope = workplaceMemberRepository.findScopeById(memberId)
+            ?: throw BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
+        if (targetScope.workplaceId != workplaceId) {
+            throw BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
+        }
+
+        val targetUser = userRepository.findByIdForUpdate(targetScope.userId)
+            .orElseThrow { BusinessException(ShiftErrorCode.NOT_FOUND_ERROR) }
+        val targetMember = workplaceMemberRepository.findByIdForShare(memberId)
+            .orElseThrow { BusinessException(ShiftErrorCode.NOT_FOUND_ERROR) }
+        if (targetMember.workplace.id != workplaceId || targetMember.leftAt != null ||
+            targetMember.user.id != targetUser.id
+        ) {
+            throw BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
+        }
+
+        validatePublishedShiftOverlap(scheduleId, targetMember.id, targetUser.id, startAt, endAt)
+        validateNewShiftUnavailableConflictAcknowledgement(schedule.id, targetMember, startAt, endAt, request)
+        validatePublishedShiftNotStarted(startAt)
+
+        return saveShift(schedule, targetMember, startAt, endAt)
     }
 
     @Transactional
@@ -525,14 +569,11 @@ class ShiftService(
                 .asSequence()
                 .filter { it.shiftId == shift.id && it.targetMemberId == targetMember.id }
                 .flatMap { requireNotNull(it.overlaps).asSequence() }
-                .mapNotNull { overlap ->
-                    val startAt = overlap.startAt
-                    val endAt = overlap.endAt
-                    if (startAt != null && endAt != null && startAt.isBefore(endAt)) {
-                        UnavailableConflictOverlap(startAt, endAt)
-                    } else {
-                        null
-                    }
+                .map { overlap ->
+                    UnavailableConflictOverlap(
+                        requireNotNull(overlap.startAt),
+                        requireNotNull(overlap.endAt),
+                    )
                 }
                 .toList(),
         )
@@ -562,13 +603,131 @@ class ShiftService(
         targetMemberId: Long,
         request: ShiftReassignRequest,
     ) {
-        if (requireNotNull(request.acknowledgedUnavailableConflicts).any {
+        val acknowledgedConflicts = requireNotNull(request.acknowledgedUnavailableConflicts)
+
+        if (acknowledgedConflicts.any {
                 it.shiftId != shift.id || it.targetMemberId != targetMemberId
+            } || acknowledgedConflicts.asSequence()
+                .flatMap { requireNotNull(it.overlaps).asSequence() }
+                .any { overlap ->
+                    val startAt = overlap.startAt
+                    val endAt = overlap.endAt
+                    startAt == null || endAt == null || !startAt.isBefore(endAt)
+                }
+        ) {
+            throw BusinessException(ShiftErrorCode.INVALID_INPUT_VALUE)
+        }
+    }
+
+    private fun validateNewShiftAcknowledgementKeys(
+        scheduleId: Long?,
+        memberId: Long,
+        startAt: LocalDateTime,
+        endAt: LocalDateTime,
+        request: PublishedShiftCreateRequest,
+    ) {
+        val conflicts = requirePublishedShiftCreateInput(request.acknowledgedUnavailableConflicts)
+        if (conflicts.any { conflict ->
+                val key = conflict.newShiftKey
+                key == null || key.scheduleId != scheduleId || key.targetMemberId != memberId ||
+                    key.shiftStartAt != startAt || key.shiftEndAt != endAt ||
+                    requirePublishedShiftCreateInput(conflict.overlaps).any { overlap ->
+                        val overlapStartAt = overlap.startAt
+                        val overlapEndAt = overlap.endAt
+                        overlapStartAt == null || overlapEndAt == null ||
+                            !overlapStartAt.isBefore(overlapEndAt)
+                    }
             }
         ) {
             throw BusinessException(ShiftErrorCode.INVALID_INPUT_VALUE)
         }
     }
+
+    private fun validatePublishedShiftTime(
+        schedule: Schedule,
+        startAt: LocalDateTime,
+        endAt: LocalDateTime,
+    ) {
+        if (startAt.toLocalDate() != endAt.toLocalDate()) {
+            throw BusinessException(ShiftErrorCode.INVALID_SHIFT_SAME_DAY)
+        }
+        if (!TimeRangeUtils.isValidRange(startAt, endAt)) {
+            throw BusinessException(ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE)
+        }
+        validateShiftInScheduleWeek(schedule, startAt, endAt)
+    }
+
+    private fun validatePublishedShiftNotStarted(startAt: LocalDateTime) {
+        if (!startAt.isAfter(LocalDateTime.now(clock))) {
+            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        }
+    }
+
+    private fun validatePublishedShiftOverlap(
+        scheduleId: Long?,
+        memberId: Long?,
+        userId: Long?,
+        startAt: LocalDateTime,
+        endAt: LocalDateTime,
+    ) {
+        if (shiftRepository.existsOverlappingInSchedule(scheduleId, memberId, startAt, endAt, null)) {
+            throw BusinessException(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
+        }
+        if (shiftRepository.existsOverlappingOfficialShift(
+                userId, ScheduleStatus.PUBLISHED, startAt, endAt, null,
+            )
+        ) {
+            throw BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
+        }
+    }
+
+    private fun validateNewShiftUnavailableConflictAcknowledgement(
+        scheduleId: Long?,
+        targetMember: WorkplaceMember,
+        startAt: LocalDateTime,
+        endAt: LocalDateTime,
+        request: PublishedShiftCreateRequest,
+    ) {
+        val currentOverlaps = normalizeUnavailableOverlaps(targetMember.user.id, startAt, endAt)
+        if (currentOverlaps.isEmpty()) return
+
+        val acknowledgedOverlaps = normalizeOverlaps(
+            requirePublishedShiftCreateInput(request.acknowledgedUnavailableConflicts)
+                .asSequence()
+                .flatMap { requirePublishedShiftCreateInput(it.overlaps).asSequence() }
+                .map { overlap ->
+                    UnavailableConflictOverlap(
+                        requirePublishedShiftCreateInput(overlap.startAt),
+                        requirePublishedShiftCreateInput(overlap.endAt),
+                    )
+                }
+                .toList(),
+        )
+        if (currentOverlaps.all { current ->
+                acknowledgedOverlaps.any { acknowledged ->
+                    !acknowledged.startAt.isAfter(current.startAt) &&
+                        !acknowledged.endAt.isBefore(current.endAt)
+                }
+            }
+        ) return
+
+        throw BusinessException(
+            ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED,
+            PublishedShiftConfirmationRequiredResponse(
+                requiresConfirmation = true,
+                unavailableConflicts = listOf(
+                    NewShiftUnavailableConflictResponse(
+                        NewShiftKey(scheduleId, targetMember.id, startAt, endAt),
+                        targetMember.user.name,
+                        currentOverlaps,
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun <T> requirePublishedShiftCreateInput(value: T?): T = value
+        ?: throw BusinessException(ShiftErrorCode.INVALID_INPUT_VALUE)
 
     private fun normalizeUnavailableOverlaps(
         userId: Long?,

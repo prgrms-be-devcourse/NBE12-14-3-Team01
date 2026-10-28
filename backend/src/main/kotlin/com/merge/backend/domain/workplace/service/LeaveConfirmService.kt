@@ -55,7 +55,7 @@ class LeaveConfirmService(
         }
         if (!locked.covers(current)) throw BusinessException(WorkplaceErrorCode.STALE_LEAVE_PLAN)
         val bridge = integration.ifAvailable
-        // 미병합 V4를 빈 성공으로 대체하지 않는다. 업무 변경 전에 연동 부재를 확인한다.
+        // V4를 빈 성공으로 대체하지 않는다. 업무 변경 전에 연동 부재를 확인한다.
         check(plan.candidacies.isEmpty() || bridge != null) { "V4 퇴사 후보 정리(#92) 연동이 필요합니다." }
         val shiftPlan = MemberLeaveShiftPlan(
             plan.reassignments.map { MemberLeaveShiftPlan.Reassignment(

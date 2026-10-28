@@ -13,6 +13,7 @@ import com.merge.backend.domain.substitute.entity.RequestCloseReason
 import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
+import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.workplace.controller.LeaveConfirmController
 import com.merge.backend.domain.workplace.dto.request.LeaveConfirmRequest
@@ -46,6 +47,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.support.StaticListableBeanFactory
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Import
@@ -54,6 +56,7 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.util.AopTestUtils
+import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 
@@ -70,6 +73,7 @@ class LeaveConfirmServiceIntegrationTest {
     @Autowired private lateinit var clock: TestClock
     @Autowired private lateinit var context: ApplicationContext
     @Autowired private lateinit var jdbc: JdbcTemplate
+    @Autowired private lateinit var candidacyAdapter: LeaveCandidacyAdapter
     @MockitoSpyBean private lateinit var writer: LeaveMembershipWriter
     private lateinit var tx: TransactionTemplate
     private lateinit var now: LocalDateTime
@@ -307,10 +311,156 @@ class LeaveConfirmServiceIntegrationTest {
             persist(SubstituteCandidate(request, entityManager.find(WorkplaceMember::class.java, leaving)))
         }
         assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
-        val error = assertThrows<IllegalStateException> { service.confirm(actorUser, wp, leaving, command()) }
-        assertThat(error.message).contains("#92")
+        // 연동 Bean이 실제 존재하는 현재에도 기존 "연동 부재" 실패 시나리오를 명시적으로 보존한다.
+        val serviceTarget = AopTestUtils.getUltimateTargetObject<LeaveConfirmService>(service)
+        val originalProvider = ReflectionTestUtils.getField(serviceTarget, "integration")
+        ReflectionTestUtils.setField(serviceTarget, "integration",
+            StaticListableBeanFactory().getBeanProvider(LeaveConfirmationIntegration::class.java))
+        try {
+            val error = assertThrows<IllegalStateException> { service.confirm(actorUser, wp, leaving, command()) }
+            assertThat(error.message).contains("#92")
+            assertUnchanged()
+        } finally {
+            ReflectionTestUtils.setField(serviceTarget, "integration", originalProvider)
+        }
+    }
+
+    @Test
+    fun actualV4IntegrationDoesNotActivatePostWithoutGuardReadiness() {
+        assertThat(context.getBeansOfType(LeaveConfirmationIntegration::class.java)).hasSize(1)
+        assertThat(context.getBeansOfType(LeaveConfirmationReadiness::class.java)).isEmpty()
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+    }
+
+    @Test
+    fun actualV4ClosesSolePendingCandidateAndCountsBothReasons() {
+        val (requestId, candidateId) = addCandidacy()
+        val result = service.confirm(actorUser, wp, leaving, command())
+        assertThat(result.closedRequests.total).isEqualTo(2)
+        assertThat(result.closedRequests.byReason).containsEntry("SHIFT_CHANGED", 1).containsEntry("CANDIDATE_INELIGIBLE", 1)
+        assertThat(result.ineligibleCandidacies).isEqualTo(1)
+        tx.executeWithoutResult {
+            val candidate = entityManager.find(SubstituteCandidate::class.java, candidateId)
+            assertThat(candidate.status).isEqualTo(CandidateStatus.INELIGIBLE)
+            assertThat(candidate.respondedAt).isNull()
+            val request = entityManager.find(SubstituteRequest::class.java, requestId)
+            assertThat(request.status).isEqualTo(RequestStatus.CLOSED)
+            assertThat(request.closeReason).isEqualTo(RequestCloseReason.CANDIDATE_INELIGIBLE)
+            assertThat(entityManager.find(WorkplaceMember::class.java, leaving).leftAt).isEqualTo(now)
+        }
+    }
+
+    @Test
+    fun actualV4PreservesAcceptedCandidateHistoryWhileClosingRequest() {
+        val (requestId, candidateId) = addCandidacy(accepted = true)
+        val result = service.confirm(actorUser, wp, leaving, command())
+        assertThat(result.ineligibleCandidacies).isZero()
+        assertThat(result.closedRequests.byReason["CANDIDATE_INELIGIBLE"]).isEqualTo(1)
+        tx.executeWithoutResult {
+            val candidate = entityManager.find(SubstituteCandidate::class.java, candidateId)
+            assertThat(candidate.status).isEqualTo(CandidateStatus.ACCEPTED)
+            assertThat(candidate.respondedAt).isEqualTo(now.minusMinutes(1))
+            assertThat(entityManager.find(SubstituteRequest::class.java, requestId).closeReason)
+                .isEqualTo(RequestCloseReason.CANDIDATE_INELIGIBLE)
+        }
+    }
+
+    @Test
+    fun actualV4KeepsRequestOpenWhenAnotherRespondableCandidateRemains() {
+        val (requestId, _) = addCandidacy()
+        tx.executeWithoutResult {
+            val user = persist(User("${UUID.randomUUID()}@leave.test", "pw", "다른 후보"))
+            users += requireNotNull(user.id)
+            val member = persist(WorkplaceMember(entityManager.find(Workplace::class.java, wp), user,
+                WorkplaceRole.EMPLOYEE, now.minusMonths(1)))
+            persist(SubstituteCandidate(entityManager.find(SubstituteRequest::class.java, requestId), member))
+        }
+        val result = service.confirm(actorUser, wp, leaving, command())
+        assertThat(result.ineligibleCandidacies).isEqualTo(1)
+        assertThat(result.closedRequests.byReason["CANDIDATE_INELIGIBLE"]).isZero()
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(SubstituteRequest::class.java, requestId).status).isEqualTo(RequestStatus.OPEN)
+        }
+    }
+
+    @Test
+    fun failureAfterRealV4CleanupRollsBackCandidateAndAllV2V3Changes() {
+        val (requestId, candidateId) = addCandidacy()
+        val targetWriter = AopTestUtils.getUltimateTargetObject<LeaveMembershipWriter>(writer)
+        doThrow(IllegalStateException("after real V4 cleanup")).whenever(targetWriter).complete(any(), any(), any())
+        val error = assertThrows<IllegalStateException> {
+            service.confirm(actorUser, wp, leaving, command().copy(regenerateInviteCode = true))
+        }
+        assertThat(error).hasMessage("after real V4 cleanup")
+        assertUnchanged()
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.PENDING)
+            assertThat(entityManager.find(SubstituteRequest::class.java, requestId).status).isEqualTo(RequestStatus.OPEN)
+        }
+    }
+
+    @Test
+    fun v4RejectsAnUncoveredRequestWithoutWaitingForItsRowLock() {
+        val (requestId, candidateId) = addCandidacy()
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val holder = executor.submit { tx.executeWithoutResult {
+            entityManager.find(SubstituteRequest::class.java, requestId, LockModeType.PESSIMISTIC_WRITE)
+            held.countDown()
+            check(release.await(10, TimeUnit.SECONDS))
+        } }
+        try {
+            check(held.await(10, TimeUnit.SECONDS))
+            val attempted = executor.submit<BusinessException> {
+                assertThrows<BusinessException> {
+                    tx.executeWithoutResult { candidacyAdapter.cleanupCandidacies(leaving, now, emptySet()) }
+                }
+            }
+            assertThat(attempted.get(3, TimeUnit.SECONDS).errorCode).isEqualTo(WorkplaceErrorCode.STALE_LEAVE_PLAN)
+        } finally { release.countDown() }
+        holder.get(10, TimeUnit.SECONDS)
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.PENDING)
+        }
         assertUnchanged()
     }
+
+    @Test
+    fun v4RefusesUnownedRequestLocksBeforeChangingCandidate() {
+        val (requestId, candidateId) = addCandidacy()
+        val error = assertThrows<IllegalStateException> {
+            tx.executeWithoutResult { candidacyAdapter.cleanupCandidacies(leaving, now, setOf(requestId)) }
+        }
+        assertThat(error.message).contains("Request 쓰기 Lock")
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.PENDING)
+        }
+    }
+
+    @Test
+    fun candidateAcceptanceDuringRequestLockWaitMakesOriginalImpactStale() {
+        val (requestId, candidateId) = addCandidacy()
+        val command = command()
+        val error = raceWithLock("substitute_request", {
+            entityManager.find(SubstituteRequest::class.java, requestId, LockModeType.PESSIMISTIC_WRITE)
+            entityManager.find(SubstituteCandidate::class.java, candidateId).acceptRequest(now)
+        }) { service.confirm(actorUser, wp, leaving, command) }
+        assertThat((error as BusinessException).errorCode).isEqualTo(WorkplaceErrorCode.STALE_LEAVE_PLAN)
+        assertUnchanged()
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.ACCEPTED)
+            assertThat(entityManager.find(SubstituteRequest::class.java, requestId).status).isEqualTo(RequestStatus.ACCEPTED)
+        }
+    }
+
+    private fun addCandidacy(accepted: Boolean = false): Pair<Long, Long> = requireNotNull(tx.execute {
+        val shift = persist(Shift(entityManager.find(Schedule::class.java, published), entityManager.find(WorkplaceMember::class.java, target),
+            now.plusDays(3), now.plusDays(3).plusHours(4), ShiftStatus.SCHEDULED))
+        val request = persist(SubstituteRequest(shift, shift.member, RequestStatus.OPEN))
+        val candidate = persist(SubstituteCandidate(request, entityManager.find(WorkplaceMember::class.java, leaving)))
+        if (accepted) candidate.acceptRequest(now.minusMinutes(1))
+        requireNotNull(request.id) to requireNotNull(candidate.id)
+    })
 
     @Test
     fun detectsDraftInsertedWhileWaitingForScheduleLock() {

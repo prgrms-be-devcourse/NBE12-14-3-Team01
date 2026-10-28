@@ -47,6 +47,12 @@ class SubstituteCandidate(
         respondedAt = now // 거절한 시간
     }
 
+    // 후보가 퇴사해 응답할 수 없게 됨. 본인 응답이 아니므로 respondedAt은 그대로 null
+    fun markIneligible() {
+        check(status == CandidateStatus.PENDING) { "응답하지 않은 후보만 INELIGIBLE로 바꿀 수 있습니다." }
+        status = CandidateStatus.INELIGIBLE
+    }
+
     // 1. 후보자 중 1명이 수락을 눌렀을 때
     fun acceptRequest(now: LocalDateTime) {
         // 본인 상태 업데이트
