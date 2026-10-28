@@ -19,7 +19,7 @@ import jakarta.persistence.Table
         Index(name = "idx_shift_assignment_history_shift_id", columnList = "shift_id"),
         Index(
             name = "idx_shift_assignment_history_previous_member_created_date",
-            columnList = "previous_member_id, create_date"
+            columnList = "previous_member_id, create_date, id"
         ),
     ],
 )

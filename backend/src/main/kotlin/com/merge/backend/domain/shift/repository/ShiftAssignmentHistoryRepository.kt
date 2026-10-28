@@ -7,5 +7,5 @@ interface ShiftAssignmentHistoryRepository : JpaRepository<ShiftAssignmentHistor
 
     fun findAllByShift_IdOrderByCreateDateAsc(shiftId: Long): List<ShiftAssignmentHistory>
 
-    fun findAllByPreviousMember_IdOrderByCreateDateDesc(memberId: Long): List<ShiftAssignmentHistory>
+    fun findAllByPreviousMember_IdOrderByCreateDateDescIdDesc(memberId: Long): List<ShiftAssignmentHistory>
 }
