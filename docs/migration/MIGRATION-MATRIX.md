@@ -4,7 +4,7 @@
 > Domain별 상세(API, 정책, Test, DoD)는 `docs/delivery/<Domain>.md`, Test 행 단위는 `docs/evidence/TEST-INVENTORY.md`.
 > 이 문서는 기술 진행 상태의 Source of Truth다. 일정·담당은 Notion Delivery Board가 SoT이고, Board 행은 이 문서의 행 ID로 연결한다.
 > 검증 상태 칸은 **통과한 Run 링크가 있을 때만** 채운다. Test가 존재한다는 것만으로는 채우지 않는다.
-> 2026-10-27 (V1): §2 V1 행을 develop `6ae2727` 기준으로 갱신했다 (근거 TEST-EVIDENCE EV-024~029). 다른 행과 아래 snapshot 설명은 그대로 둔다.
+> 2026-10-27 (V1): §2 V1 행을 develop `6ae2727` 기준으로 갱신했다 (근거 TEST-EVIDENCE EV-024~029). 2026-10-28: §2에 최신 M0·V1 및 PR #79 통합 상태 snapshot을 추가했다.
 > 2026-10-26 (V5-J2): §3 V5 보강 칸, §4 공통 행 R1 분리, §4 아래에 Kotlin 전환 관문 문서 위치를 적었다.
 > S2-6B (2026-10-25): §3에 `a148a62` 정적 집계와 PASS 조건 보완을 추가했다. §2 상태 칸과 Migration 단계의 대응은 [`TEST-STRATEGY`](../evidence/TEST-STRATEGY.md) §2.
 
@@ -42,13 +42,13 @@ Kotlin 상태의 최초 확인 기준은 2026-10-23의 3차 develop cdaaa13이�
 
 ### 2-2. 현재 상태 snapshot (2026-10-28 확인)
 
-기준 origin/develop은 0aec24f367066b88093f94ab05557c224959696c이다. PR #79의 Base는 933fd88cf4c79072a5ae067070e03f8b3dd977c4로 현재 develop보다 이전이다. 아래 PR Head와 Kotlin 소스 검증 Commit은 목적이 다르므로 각각 구분해 기록한다.
+기준 `origin/develop` 및 PR #79 Base는 `0aec24f367066b88093f94ab05557c224959696c`이다. 확인한 PR #79 Head는 `2af320c3b4adc6695835bf2a20a4dd85cb7925f6`이며, Kotlin 테스트 소스 검증 snapshot `f86f0777d4cc4ec33d133d65683892ff23ee0e9a`와 구분한다. PR Head에는 develop 병합 커밋이 포함되어 있다.
 
 | 영역 | 현재 확인 내용 | 판정 및 남은 조건 |
 |---|---|---|
-| 공통 테스트 / M0 / PR #79 | 최신 develop에는 backend/src/test/java 추적 파일 17개가 남아 있다. Kotlin 소스 검증 snapshot f86f0777d4cc4ec33d133d65683892ff23ee0e9a에는 Kotlin 대응 파일 17개(테스트 클래스 14개, 보조 코드 3개)가 있고 backend/src/test/java 추적 파일은 0개다. 그 뒤 PR 브랜치 변경은 문서 두 파일뿐이었다. | PR #79는 OPEN이며 미병합이다. 최신 develop과의 병합 시험에서 docs/migration/MIGRATION-MATRIX.md 충돌이 발생했다. 확인 당시 PR Head의 새 CI 체크는 보고되지 않았고, PR은 DIRTY 상태였다. |
-| PR #79 임시 통합 테스트 | 최신 develop과 PR Kotlin 소스 snapshot을 별도 임시 Worktree에서 결합하고 문서 충돌을 임시 해결한 뒤 ./gradlew clean check --no-daemon --gradle-user-home /tmp/switch-pr79-gradle-home을 실행했다. JUnit XML 70개에서 514건 실행, 실패 0, 오류 0, Skip 0이었다. | 로컬 임시 통합 실행 결과다. PR Head의 CI 성공이나 PR 브랜치의 병합 가능 상태를 뜻하지 않는다. 개별 테스트별 Evidence로 보관된 결과가 아니므로 UNIT_TEST_VERIFIED 또는 INTEGRATION_TEST_VERIFIED를 이 결과만으로 PASS 처리하지 않는다. |
-| Java 테스트·Checkstyle 태스크 | 임시 통합 실행에서 compileTestJava, checkstyleTest, checkstyleMain은 NO-SOURCE였다. 최신 develop의 backend/src/main/java 추적 파일 수는 0개였다. | testCompileOnly(lombok), testAnnotationProcessor(lombok), Checkstyle 및 Lombok 설정의 정리 여부는 별도 Task에서 사용처와 기술 결정 근거를 확인한다. 이번 PR에서는 Gradle 설정을 변경하지 않는다. |
+| 공통 테스트 / M0 / PR #79 | 최신 develop에는 `backend/src/test/java` 추적 파일 17개가 남아 있다. Kotlin 소스 검증 snapshot `f86f0777…`에는 대응 Kotlin 파일 17개(테스트 클래스 14개, 보조 코드 3개)가 있고 Java 테스트 파일은 0개다. 검증 당시 PR Head `2af320c…`에도 Global Kotlin 테스트 파일은 같은 상태였으며, 이후 이 문서 PR 변경은 문서만 수정한다. | 검증 당시 PR Base는 develop `0aec24f…`이다. [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258512)와 [Docker Build CI](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258503)가 성공했다. PR은 OPEN·미병합이고 리뷰 승인이 남아 `BLOCKED`였다. |
+| PR #79 임시 통합 테스트 | 최신 develop과 Kotlin 소스 snapshot의 임시 통합에서 `./gradlew clean check --no-daemon --gradle-user-home /tmp/switch-pr79-gradle-home` 실행. JUnit XML 70개에서 514건, 실패 0, 오류 0, Skip 0이었다. | 임시 Worktree의 로컬 결과이며 정식 PR CI와 구분한다. PR #79 Head의 Backend/Docker CI도 성공했지만 두 CI는 Suite 수준이다. JUnit XML Artifact가 없어 개별 테스트별 상태는 `UNKNOWN`으로 유지한다. |
+| Java 테스트·Checkstyle 태스크 | PR #79 Kotlin 소스 snapshot에는 `backend/src/test/java` 추적 파일이 0개다. 최신 develop은 PR #77 병합으로 `backend/src/main/java` 추적 파일도 0개다. `compileTestJava`, `checkstyleTest`, `checkstyleMain`은 통합 실행에서 `NO-SOURCE`였다. | `checkstyle`은 Kotlin을 검사하지 않으며 ktlint/detekt는 현재 적용되지 않았다 (TECH-STACK-DECISIONS TS-16 `CONDITIONAL`). Kotlin 품질 검토와 `testCompileOnly(lombok)`, `testAnnotationProcessor(lombok)`, Checkstyle·Lombok 설정의 정리 여부는 별도 Task에서 확인한다. 이번 PR에서는 Gradle 설정을 변경하지 않는다. |
 | V1 AUTH-1 서버 로그아웃 | Backend PR #74가 2026-10-28 병합됐고, merge Commit은 115c19275b391f60aea985a4f129ad6df8867d75이다. Issue #62는 종료됐다. Backend Check와 Docker Build CI가 성공했다. | PR #76 Frontend도 2026-10-28 병합됐으며 merge Commit은 eeef2c2155c9b80f2827ee0ba2a111691fabad20이다. 이 병합 사실만으로 배포 환경 검증까지 완료된 것으로 판단하지 않는다. |
 | BackendApplication Kotlin 전환 | PR #77은 2026-10-28 병합됐고 merge Commit은 최신 develop 0aec24f367066b88093f94ab05557c224959696c이다. | 현재 develop의 backend/src/main/java 추적 파일은 0개다. Checkstyle 태스크의 NO-SOURCE 상태와 설정 제거 여부는 별도로 판단한다. |
 
@@ -66,7 +66,7 @@ PR #79의 최신 Head 및 상태는 문서 확인 시점에 다시 조회한다.
 | V2 | `RegularShiftPatternControllerTest` (45), `WorkplaceServiceTest` (6), `WorkplaceMemberServiceTest` (1) | 52 | C-08~C-17 | Workplace Join 성공/실패, DB Unique 실존 (PR #78이 Workplace Controller·Repository·Security·Integration Test 추가, 병합됨, 실행 수 미기록) |
 | V3 | `UnavailableTimeServiceTest` (37), `ScheduleServiceTest` (23), `ShiftServiceTest` (14), `ScheduleControllerTest` (5), `UnavailableTimeRepositoryTest` (5, **H2에서 실행**), `ScheduleTest` (4), `ShiftScheduleConcurrencyTest` (4), `UnavailableTimeConcurrencyTest` (3) | 95 | C-18~C-39 | Publish 성공/실패 DB 최종 상태 (현재 Mock), Shift CREATE/UPDATE 성공, Official Shift Query Repository Test. PR #77이 `ScheduleRollbackIntegrationTest`, `ShiftModifyIntegrationTest` 추가 (병합됨, 실행 수 미기록) |
 | V4 | `SubstituteRequestServiceTest` (Approve 8, Close 11, Create 8, List 5, SentRequests 2), `SentSubstituteRequestResponseTest` (6), `SubstituteCandidateServiceTest` (6), `SubstituteRequestConcurrencyTest` (4), `SubstituteCandidateRepositoryTest` (2) | 52 | C-40~C-50 | **APPROVE 후 `Shift.member` DB 재조회** (C-48, 현재 Mock만), Candidate Filter 실제 DB |
-| V5 | `NotificationServiceTest` (14), `NotificationTest` (3), `SchedulePublishedEventListenerIntegrationTest` (1), `NotificationReadConcurrencyTest` (1) | 19 | C-51~C-56 | 알림 Row 검증 0 (V5 Package 기준) → Publish / Substitute 알림 Row. 단 V3 `ShiftScheduleConcurrencyTest.publishAndModifyKeepAssigneeAndNotificationConsistent`가 근무표 공개 알림 Row 수를 일부 확인한다 (V5-J3에서 중복 작성 주의). **HTTP 계약: V5-N-21~30 (2026-10-26, Test PR #16 Draft·`develop` 미반영, EV-017~020)** |
+| V5 | `NotificationServiceTest` (14), `NotificationTest` (3), `SchedulePublishedEventListenerIntegrationTest` (1), `NotificationReadConcurrencyTest` (1) | 19 | C-51~C-56 | 알림 Row 검증 0 (V5 Package 기준) → Publish / Substitute 알림 Row. 단 V3 `ShiftScheduleConcurrencyTest.publishAndModifyKeepAssigneeAndNotificationConsistent`가 근무표 공개 알림 Row 수를 일부 확인한다 (V5-J3에서 중복 작성 주의). **HTTP 계약: V5-N-21~30 (Java Test PR #16 병합, Kotlin 전환 PR #60 병합; CI Suite 성공, 개별 Test 결과는 XML 미보존)** |
 | 공통 | `TimeRangeUtilsTest` (15), `GlobalExceptionHandlerTest` (7), `ApiResponseTest` (4), `UtTest` (3), `BaseEntityAuditingTest` (2), `BackendApplicationTests` (1) | 32 | 응답 형식, 시간 Util | — |
 | **합계 (Snapshot `243f77c`)** | | **266** | | |
 

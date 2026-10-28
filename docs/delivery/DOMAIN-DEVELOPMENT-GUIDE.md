@@ -288,7 +288,7 @@ Task 이름은 작업 이름이며 Test ID가 아니다 (Test는 TEST-INVENTORY�
 | Task | 목표 | 범위 | 산출물 | 선행 |
 |---|---|---|---|---|
 | V5-J1 | 현재 Java 알림 동작 확인 | 코드 읽기: 목록 Query(`rm.leftAt is null`), 읽음(`findByIdForUpdate` → 본인·현재 소속 확인 → `markAsRead`), 7개 Listener(AFTER_COMMIT, 예외 로그), 생성(`REQUIRES_NEW`), 받는 사람 조회(`findAllById`) | 동작 표 (Delivery Sheet V5 초안) | — |
-| V5-J2 | 알림 HTTP 계약 고정 | `GET /notifications`, `PATCH /notifications/{id}/read` — 성공, 없는 ID, 남의 알림, 과거 소속 알림, 이미 읽은 알림 다시 읽기, 무토큰 401. JSON Field 이름·자료형·null, 다른 알림 불변 | Java Test (Security Filter 포함) | G-A2 범위 합의 (`ApiResponse` 부분). **진행 (2026-10-26): Test PR #16 Draft, V5-N-21~30, 로컬 10/10·전체 404/404, CI 성공 (EV-017~020), `develop` 미반영** |
+| V5-J2 | 알림 HTTP 계약 고정 | `GET /notifications`, `PATCH /notifications/{id}/read` — 성공, 없는 ID, 남의 알림, 과거 소속 알림, 이미 읽은 알림 다시 읽기, 무토큰 401. JSON Field 이름·자료형·null, 다른 알림 불변 | Java 기준선 Test (Security Filter 포함), 이후 PR #60에서 Kotlin 전환 | G-A2 범위 합의 (`ApiResponse` 부분). **완료 기록:** Java Test PR #16 병합, V5-N-21~30 로컬 10/10·전체 404/404와 CI Suite 성공 (EV-017~020); Kotlin Test 전환 PR #60 병합, Backend/Docker CI Suite 성공. Kotlin 개별 Test XML은 보존되지 않아 Test별 실행 상태는 `UNKNOWN`. |
 | V5-J3 | Commit 후 알림·Rollback·알림 실패 | 현재 대타 Event 6개 × G-A3의 4경우. **근무표 공개 알림(Listener 7번째)의 Rollback·알림 실패 경우를 넣을지는 J3 분석에서 정한다** — 기존 `SchedulePublishedEventListenerIntegrationTest`(Service Mock, Commit 후 호출 시점만)와 V3 `ShiftScheduleConcurrencyTest`(공개 알림 Row 수 일부)를 먼저 대조하고, 경로 담당(V3 Owner)과 위치를 정한다 (중복 작성 금지). 알림 실패는 Test 전용 Bean 교체(`@MockitoSpyBean` 등)로 주입 | Java 통합 Test (Commit 사용, §3-2 규칙) | V4 Owner와 V4-N-04 범위 조율 |
 | V5-J4 | 목록 Query·소속 격리 | 현재 소속만 반환, 종료된 소속 알림 제외, 다른 사용자 알림 제외 (MySQL) | Java Repository·통합 Test | — |
 | V5-J5 | Java 회귀 기준선 기록 | J2~J4 + 기존 394 실행, EV 기록 | TEST-EVIDENCE EV | J2~J4 |

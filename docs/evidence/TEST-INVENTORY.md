@@ -385,7 +385,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 ### 6-1. V5-J2 알림 HTTP 계약 (V5-N-21~30)
 
-[DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3 V5-J2. **현재 Java 알림 API의 HTTP 계약을 고정**한 Test다. 구분 `MIGRATION` (현재 동작 고정, 새 계약을 정하는 Test 아님). ④ `IMPLEMENTED` — Test PR #16 (**Draft, `develop` 미반영**). Class: `domain.notification.controller.NotificationHttpContractTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`, `/api/v1/...` + `.contextPath("/api/v1")`로 실제 `CustomAuthenticationFilter`·Security 설정 통과, `TestClock`, MYSQL_TC, `@Transactional` Rollback, DB 확인은 `flush()`·`clear()` 후 재조회).
+[DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3 V5-J2. **Java 기준선에서 관찰한 알림 HTTP 계약**을 고정한 Test다. 구분 `MIGRATION` (기존 동작 고정, 새 계약을 정하는 Test 아님). Java Test는 PR #16에서 추가·병합됐고, Kotlin 대응 Class는 PR #60에서 전환·병합됐다. Class: `domain.notification.controller.NotificationHttpContractTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`, `/api/v1/...` + `.contextPath("/api/v1")`로 실제 `CustomAuthenticationFilter`·Security 설정 통과, `TestClock`, MYSQL_TC, `@Transactional` Rollback, DB 확인은 `flush()`·`clear()` 후 재조회).
 
 | Test ID | Method | 확인하는 현재 Java 동작 | ⑤ 실행 |
 |---|---|---|---|
@@ -402,14 +402,14 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 **⑤ 상태의 뜻 (섞지 않는다):**
 - `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 10/10 (EV-017), 전체 404/404 (EV-018). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
-- CI: PR #16의 `Backend CI`·`Docker Build CI Test` 성공 (EV-020). **Workflow 단위 성공**이며 개별 Test 결과 근거가 아니다.
-- `develop` 미반영: PR #16 Merge 전까지 `develop`에는 이 Test가 없다. G-A2(PR #15)와 **합쳐 실행한 적 없음** (예상 410건, TEST-GAP-ANALYSIS §4-1 C5).
-- Kotlin Migration 이후: `NOT_RUN`.
+- Java 기준선 CI: PR #16의 `Backend CI`·`Docker Build CI Test` 성공 (EV-020). **Workflow 단위 성공**이며 Kotlin 개별 Test 결과가 아니다.
+- Kotlin 전환: PR #60에서 이 Class를 Kotlin으로 전환했다. PR #60의 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40577971110)와 [Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40577970990)는 성공했다. Test별 JUnit XML 결과를 보존하지 않았으므로 Kotlin Test별 ⑤ 상태는 `UNKNOWN`이다.
+- 통합: PR #15와 #16은 모두 병합됐다. 이후 현재 develop 통합 실행은 TEST-GAP-ANALYSIS §4-1 C5에 기록한다. 과거의 예상 410건을 현재 기대값으로 사용하지 않는다.
 - 범위 밖 (이 Test가 보장하지 않음): Commit 후 알림 생성·Rollback·알림 실패 (V5-J3), `AUTH-005`·`006` 자체 (기존 `CustomAuthenticationFilterTest`), Frontend 화면·다른 브라우저의 날짜 해석. P2로 미룬 것: V5-N-31 (잘못된 ID 형식 `COM-003`), V5-N-32 (알림 API의 `AUTH-006`).
 
 ## 7. 공통 `global` (CM) — G-A2 공통 응답 계약
 
-[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **Java 기준선에서 관찰한 공통 응답 계약**을 고정하는 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (기존 동작 보존). Java 원본 테스트는 develop에 존재했고, Kotlin 대응 테스트는 PR #79에서 전환 중이다.
+[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **Java 기준선에서 관찰한 공통 응답 계약**을 고정하는 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (기존 동작 보존). Java 원본 Test PR #15는 병합됐고, Kotlin 대응 Test는 PR #79에서 전환 중이다.
 
 | Test ID | Class · Method | Java 원본에서 확인한 보존 계약 | 종류 · 환경 | ⑤ 실행 (Java 기준선) |
 |---|---|---|---|---|
@@ -423,7 +423,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 **⑤ 상태의 뜻 (섞지 않는다):**
 - `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 6/6 (EV-013), 전체 400/400 (EV-014). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
 - Java 기준선 CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위의 역사적 근거**이며 Kotlin 개별 Test 결과가 아니다.
-- Kotlin 전환 상태 (2026-10-28, Kotlin 소스 검증 snapshot `f86f0777d4cc4ec33d133d65683892ff23ee0e9a`): CM-N-01~06 대응 테스트가 Kotlin으로 전환됐다. 이후 PR 브랜치 변경은 문서 두 파일뿐이며 테스트 소스는 이 snapshot과 같다. PR #79의 기존 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40651240531)와 [Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40651240485)는 이전 Head에서 성공했으며, 문서 후속 Head에는 확인 시점에 체크가 보고되지 않았다. Backend Check Run 메타데이터의 Base는 `933fd88cf4c79072a5ae067070e03f8b3dd977c4`로 당시 develop `eeef2c2155c9b80f2827ee0ba2a111691fabad20`보다 이전이었다. 별도 임시 통합 검증(2026-10-28)은 최신 develop `0aec24f367066b88093f94ab05557c224959696c`과 PR Kotlin 소스 snapshot을 합친 트리에서 문서 충돌을 임시 해결한 뒤 `./gradlew clean check`를 실행해 514/514 PASS, 실패·오류·Skip 0을 확인했다. 이 결과는 PR 브랜치 자체의 CI나 병합 가능 상태를 의미하지 않는다. 개별 JUnit XML은 이 증거에 연결해 보관하지 않았으므로 Test별 ⑤ 상태는 `UNKNOWN`이며 `PASSED`로 올리지 않는다.
+- Kotlin 전환 상태 (2026-10-28, Kotlin 소스 검증 snapshot `f86f0777d4cc4ec33d133d65683892ff23ee0e9a`): CM-N-01~06 대응 Test가 Kotlin으로 전환됐다. PR 검증 Head `2af320c3b4adc6695835bf2a20a4dd85cb7925f6`에는 develop 병합 커밋이 포함되며, Global Kotlin Test 소스는 해당 snapshot과 같다. 당시 PR Base와 최신 develop은 `0aec24f367066b88093f94ab05557c224959696c`이었다. 해당 Head의 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258512)와 [Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258503)는 모두 성공했다. 두 Run은 Suite 수준이고 JUnit XML Artifact가 없어 Test별 ⑤ 상태는 `UNKNOWN`이며 `PASSED`로 올리지 않는다. 그 이후 PR 문서 변경은 테스트 소스를 수정하지 않았다. 임시 통합 `clean check` 514/514는 별도의 로컬 실행 근거다.
 - develop 상태 (조회 당시 `0aec24f367066b88093f94ab05557c224959696c`): PR #79 미병합, `backend/src/test/java` 추적 파일 17개가 남아 있다. PR #79 병합 후 최신 develop에서 다시 확인한다.
 
 ## 8. 변경 이력
@@ -471,7 +471,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 ## V1 AUTH-1 서버 로그아웃 (V1-N-01~13, 2026-10-28)
 
-[AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) §10-1의 예약 번호를 그대로 쓴다. V1-N-13·14는 범위 다음 번호다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-23 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — Issue #62 `feat/auth-server-logout` (**PR 전, `develop` 미반영**). 한 ID에 Method가 여러 개면 모두 적는다.
+[AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) §10-1의 예약 번호를 그대로 쓴다. V1-N-13·14는 범위 다음 번호다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-23 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — Issue #62는 Backend PR #74 병합 후 종료됐다. Frontend PR #76도 병합됐다. EV-032는 로컬 구현 Test 근거이며, 각 PR의 CI 상태는 PR 기록에서 확인한다. 한 ID에 Method가 여러 개면 모두 적는다.
 
 | Test ID | Class · Method | 확인하는 것 | 종류 · 환경 | ⑤ 실행 |
 |---|---|---|---|---|
