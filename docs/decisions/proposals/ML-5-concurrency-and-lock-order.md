@@ -209,9 +209,9 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 
 | ID | 첫 Transaction (붙잡음) | 두 번째 | 지켜야 할 결과 |
 |---|---|---|---|
-| ML5-T1 (H6-C1) | 인계 (Shift 보유) | 대타 생성 같은 근무 → 대기 | 인계 후 활성 Request 0 |
-| ML5-T2 | 대타 생성 (Shift 보유) | 인계 → 대기 | 생성된 Request가 인계 Transaction에서 `SHIFT_CHANGED`로 종료 |
-| ML5-T3 (H6-C2) | 승인 (Shift·Request 보유) | 인계 → 대기 | Deadlock 0, 담당자 1명. 실행: PR #83 `approveAndShiftFirstHandoverDoNotDeadlock`, `LOCAL_PASSED` |
+| ML5-T1 (H6-C1) | 인계 (Shift 보유) | 대타 생성 같은 근무 → 대기 | 인계 후 활성 Request 0. 실행: `SubstituteShiftChangeIntegrationTest.createWaitsForReassignInProgress` (실제 V3 재배정), `LOCAL_PASSED`. **문서 불일치:** 괄호의 "(H6-C1)"은 ML-3 §10 H6-C1(인계 × 수락)과 다르다. 이 행은 인계 × 생성이라 H6-C1과 따로 실행했다 (H6-C1 = `reassignWaitsForAcceptInProgress`·`acceptWaitsForReassignInProgress`) |
+| ML5-T2 | 대타 생성 (Shift 보유) | 인계 → 대기 | 생성된 Request가 인계 Transaction에서 `SHIFT_CHANGED`로 종료. 실행: `SubstituteShiftChangeIntegrationTest.reassignWaitsForCreateInProgress`, `LOCAL_PASSED` |
+| ML5-T3 (H6-C2) | 승인 (Shift·Request 보유) | 인계 → 대기 | Deadlock 0, 담당자 1명. 실행: PR #83 `approveAndShiftFirstHandoverDoNotDeadlock`, `LOCAL_PASSED`. 실제 V3 재배정 Command로도 실행: `SubstituteShiftChangeIntegrationTest.reassignWaitsForApproveInProgress` (H6-C2 ①) |
 | ML5-T4 | 다른 근무지 수락 (User B 보유) | B에게 인계 → 대기 | B 이중 배정 0 |
 | ML5-T5 (H6-C5) | 퇴사 (B 소속 `FOR UPDATE`) | B의 수락 → Guard 대기 후 거부 | B 유효 수락자 아님 |
 | ML5-T6 (H6-C7) | 대타 생성 (B 소속 `FOR SHARE`) | B 퇴사 → 대기 후 다시 조회 → 409 | 퇴사 미반영, B PENDING 남음 (다음 시도에서 INELIGIBLE) |
@@ -298,3 +298,4 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | 2026-10-23 | 초안. AS-IS Lock 지도, 이전 순서 결함 4개, 수정 순서 후보(Shift를 Request 앞으로), 쌍별 순환 검사, 실패 응답, 재현 Test 계획 |
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
 | 2026-10-28 | §5-1 대타 승인 행에 구현 표시 (PR #83, DECISION-LOG §4-6), ML5-T3·T13 실행 표시 (기존 `runSecondWhileFirstHoldsLock` 방식, `LockWaitProbe` 미도입) |
+| 2026-10-29 | §7 ML5-T1·T2 실행 표시, ML5-T3에 실제 재배정 Command 실행 추가, ML5-T1 "(H6-C1)" 표기와 ML-3 H6-C1의 불일치 기록 (EV-039) |
