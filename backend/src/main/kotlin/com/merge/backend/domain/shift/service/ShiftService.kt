@@ -4,12 +4,14 @@ import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.ScheduleStatus
 import com.merge.backend.domain.shift.entity.Shift
+import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.entity.ShiftStatus.SCHEDULED
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ScheduleRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.domain.workplace.entity.Workplace
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
@@ -18,6 +20,7 @@ import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
 import com.merge.backend.global.exception.BusinessException
 import com.merge.backend.global.util.TimeRangeUtils
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -31,7 +34,9 @@ class ShiftService(
     private val workplaceMemberService: WorkplaceMemberService,
     private val workplaceMemberRepository: WorkplaceMemberRepository,
     private val workplaceRepository: WorkplaceRepository,
-    private val unavailableTimeRepository: UnavailableTimeRepository
+    private val unavailableTimeRepository: UnavailableTimeRepository,
+    private val substituteRequestService: SubstituteRequestService,
+    private val clock: Clock,
 ) {
 
     @Transactional(readOnly = true)
@@ -197,6 +202,31 @@ class ShiftService(
         shiftRepository.deleteById(requireNotNull(shiftId))
     }
 
+    @Transactional
+    fun cancelPublishedShift(
+        workplaceId: Long?,
+        scheduleId: Long?,
+        shiftId: Long?,
+        actorId: Long?,
+    ): PublishedShiftCancellationResult {
+        val actorMember = workplaceMemberService.requireManager(actorId, workplaceId)
+        val schedule = validPublishedSchedule(scheduleId, workplaceId)
+        val shift = validPublishedShift(schedule, shiftId)
+        val now = LocalDateTime.now(clock)
+        val closedRequests = substituteRequestService.closeActiveRequestsByShiftChange(
+            requireNotNull(shift.id),
+            now,
+        )
+
+        shift.cancel(
+            ShiftCancellationReason.MANAGER_CANCELLED,
+            now,
+            actorMember,
+        )
+
+        return PublishedShiftCancellationResult(shift, closedRequests.size)
+    }
+
     //스케줄 관련 예외 검사 메서드
     private fun validSchedule(scheduleId: Long?, workplaceId: Long?): Schedule {
         //스케줄 존재 확인
@@ -215,6 +245,38 @@ class ShiftService(
             throw BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE)
         }
         return schedule
+    }
+
+    private fun validPublishedSchedule(scheduleId: Long?, workplaceId: Long?): Schedule {
+        val schedule = scheduleRepository.findByIdForUpdate(scheduleId)
+            .orElseThrow {
+                BusinessException(ShiftErrorCode.NOT_FOUND_SCHEDULE_ERROR)
+            }
+
+        if (schedule.workplace.id != workplaceId) {
+            throw BusinessException(ShiftErrorCode.NOT_FOUND_SCHEDULE_ERROR)
+        }
+        if (schedule.status != ScheduleStatus.PUBLISHED) {
+            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        }
+
+        return schedule
+    }
+
+    private fun validPublishedShift(schedule: Schedule, shiftId: Long?): Shift {
+        val shift = shiftRepository.findByIdForUpdate(shiftId)
+            .orElseThrow {
+                BusinessException(ShiftErrorCode.NOT_FOUND_SHIFT_ERROR)
+            }
+
+        if (shift.schedule.id != schedule.id) {
+            throw BusinessException(ShiftErrorCode.NOT_FOUND_SHIFT_ERROR)
+        }
+        if (shift.status != ShiftStatus.SCHEDULED || !shift.startAt.isAfter(LocalDateTime.now(clock))) {
+            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        }
+
+        return shift
     }
 
     private fun validShift(scheduleId: Long?, shiftId: Long?): Shift {

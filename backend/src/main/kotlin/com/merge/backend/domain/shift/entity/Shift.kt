@@ -1,7 +1,9 @@
 package com.merge.backend.domain.shift.entity
 
+import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.global.entity.BaseEntity
+import com.merge.backend.global.exception.BusinessException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -43,6 +45,20 @@ class Shift(
     var status: ShiftStatus = status
         protected set
 
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "cancellation_reason")
+    var cancellationReason: ShiftCancellationReason? = null
+        protected set
+
+    @field:Column(name = "cancelled_at")
+    var cancelledAt: LocalDateTime? = null
+        protected set
+
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "cancelled_by_member_id")
+    var cancelledBy: WorkplaceMember? = null
+        protected set
+
     fun update(
         member: WorkplaceMember,
         startAt: LocalDateTime,
@@ -57,5 +73,20 @@ class Shift(
 
     fun changeMember(member: WorkplaceMember) {
         this.member = member
+    }
+
+    fun cancel(
+        reason: ShiftCancellationReason,
+        cancelledAt: LocalDateTime,
+        cancelledBy: WorkplaceMember?
+    ) {
+        if (status != ShiftStatus.SCHEDULED || !cancelledAt.isBefore(startAt)) {
+            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        }
+
+        status = ShiftStatus.CANCELLED
+        cancellationReason = reason
+        this.cancelledAt = cancelledAt
+        this.cancelledBy = cancelledBy
     }
 }

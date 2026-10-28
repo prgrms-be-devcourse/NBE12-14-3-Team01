@@ -34,5 +34,5 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Run tests and Checkstyle
+      - name: Run backend checks
         run: ./gradlew check --no-daemon

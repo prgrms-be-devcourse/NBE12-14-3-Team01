@@ -102,6 +102,11 @@ enum class ShiftErrorCode(
         HttpStatus.NOT_FOUND,
         "SFT-019",
         "해당 근무지를 찾을 수 없습니다."
+    ),
+    PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED(
+        HttpStatus.CONFLICT,
+        "SFT-020",
+        "공개 후 변경 불가 상태입니다."
     );
 
     override fun getHttpStatus(): HttpStatus = httpStatus
