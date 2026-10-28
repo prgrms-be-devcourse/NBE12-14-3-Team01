@@ -98,7 +98,7 @@ S2-6B 보완 (2026-10-25, 제안): ① Java ↔ Kotlin 호출 호환성을 위�
 | V1 | M0 완료, TS-08 (Lombok) | `SecurityConfig` Matcher 목록 그대로 (G03-OQ-01), Cookie·JWT 설정 | G03-D-23, G03-D-24, G03-D-28, G03-OQ-01 |
 | V2 | M0 완료, TS-03 (JPA), TS-06 (Jackson) | Unique (`workplace_id,user_id`, `invite_code`), `leftAt` 처리 현행 | G03-D-02, G03-D-11~14, G03-D-25 |
 | V3 | M0 완료, TS-03, TS-06 | `@Lock` Query, Publish 충돌 검사 순서, Cross-Workplace 현행 동작 (DL-001) | G03-D-03~08, G03-D-26, G03-D-27, DL-001, DL-002 |
-| V4 | M0 완료, TS-03, TS-06 | `@Lock` Query, 상태 전이, Candidate 재검증 | G03-D-09, G03-D-15, G03-D-17, G03-D-19, G03-D-21 |
+| V4 | M0 완료, TS-03, TS-06 | `@Lock` Query, 상태 전이, Candidate 재검증 | G03-D-09, G03-D-15, G03-D-17, G03-D-19 (Migration은 기존 `closedAt = now` 보존, `closedAt = startAt`은 별도 Improvement로 2026-10-28 구현), G03-D-21 |
 | V5 | M0 완료 | `@TransactionalEventListener` phase, 알림 생성 시점 | G03-D-10, G03-D-16, G03-D-18, G03-D-20, G03-D-22 |
 | 공통 | M0 완료 | `ApiResponse` 형식, `ErrorCode` 인터페이스, `GlobalExceptionHandler` 매핑, `BaseEntity` Auditing. **단 R1(Controller 없는 경로가 마지막 `Exception` 처리로 가서 500 `COM-500`, MockMvc 관찰)은 보존할 계약이 아니다** — 전환에서 일부러 바꾸지도, Test로 고정하지도 않고, 처리 방식은 별도 Improvement 결정으로 다룬다 (TEST-GAP-ANALYSIS §4-1 R1) | G03-D-01 |
 
