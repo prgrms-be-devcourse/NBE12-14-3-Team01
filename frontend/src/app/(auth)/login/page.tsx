@@ -130,10 +130,11 @@ export default function LoginPage() {
                       : "서버 로그아웃을 확인하지 못했습니다. 다시 시도해 주세요."}
                 </p>
 
+                {/* 로그인 중에 누르면 새 로그인 쿠키로 로그아웃을 보낼 수 있어서 막음 */}
                 <button
                     type="button"
                     onClick={handleRetryLogout}
-                    disabled={isRetryingLogout}
+                    disabled={isRetryingLogout || isLoading}
                     className="mt-3 rounded-xl border border-[#d95555] bg-white px-3 py-2 text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isRetryingLogout ? "다시 시도 중..." : "다시 시도"}
