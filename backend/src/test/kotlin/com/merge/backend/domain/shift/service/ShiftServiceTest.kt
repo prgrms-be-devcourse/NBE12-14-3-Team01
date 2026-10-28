@@ -34,12 +34,15 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Optional
+import java.util.stream.Stream
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
@@ -936,6 +939,67 @@ class ShiftServiceTest {
         )
     }
 
+    @ParameterizedTest
+    @MethodSource("invalidAcknowledgedUnavailableOverlaps")
+    @DisplayName("잘못된 확인 구간은 충돌 여부와 관계없이 입력 오류로 거부하고 변경 작업을 시작하지 않는다")
+    fun reassignPublishedShift_RejectsInvalidAcknowledgedUnavailableOverlap(
+        invalidOverlap: UnavailableOverlap,
+    ) {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId,
+                            targetMemberId,
+                            listOf(invalidOverlap),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(
+            substituteRequestService,
+            userRepository,
+            shiftAssignmentHistoryRepository,
+        )
+    }
+
     @Test
     @DisplayName("확인 구간이 현재 충돌 범위를 모두 포함하지 않으면 재확인을 요구한다")
     fun reassignPublishedShift_RequiresConfirmationForInsufficientAcknowledgement() {
@@ -1075,6 +1139,22 @@ class ShiftServiceTest {
             substituteRequestService,
             userRepository,
             shiftAssignmentHistoryRepository,
+        )
+    }
+
+    companion object {
+        @JvmStatic
+        fun invalidAcknowledgedUnavailableOverlaps(): Stream<UnavailableOverlap> = Stream.of(
+            UnavailableOverlap(null, LocalDateTime.of(2026, 10, 28, 17, 0)),
+            UnavailableOverlap(LocalDateTime.of(2026, 10, 28, 16, 0), null),
+            UnavailableOverlap(
+                LocalDateTime.of(2026, 10, 28, 17, 0),
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+            ),
+            UnavailableOverlap(
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+            ),
         )
     }
 

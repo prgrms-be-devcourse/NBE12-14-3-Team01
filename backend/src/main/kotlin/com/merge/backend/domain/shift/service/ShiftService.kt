@@ -465,14 +465,11 @@ class ShiftService(
                 .asSequence()
                 .filter { it.shiftId == shift.id && it.targetMemberId == targetMember.id }
                 .flatMap { requireNotNull(it.overlaps).asSequence() }
-                .mapNotNull { overlap ->
-                    val startAt = overlap.startAt
-                    val endAt = overlap.endAt
-                    if (startAt != null && endAt != null && startAt.isBefore(endAt)) {
-                        UnavailableConflictOverlap(startAt, endAt)
-                    } else {
-                        null
-                    }
+                .map { overlap ->
+                    UnavailableConflictOverlap(
+                        requireNotNull(overlap.startAt),
+                        requireNotNull(overlap.endAt),
+                    )
                 }
                 .toList(),
         )
@@ -510,9 +507,17 @@ class ShiftService(
         targetMemberId: Long,
         request: ShiftReassignRequest,
     ) {
-        if (requireNotNull(request.acknowledgedUnavailableConflicts).any {
+        val acknowledgedConflicts = requireNotNull(request.acknowledgedUnavailableConflicts)
+
+        if (acknowledgedConflicts.any {
                 it.shiftId != shift.id || it.targetMemberId != targetMemberId
-            }
+            } || acknowledgedConflicts.asSequence()
+                .flatMap { requireNotNull(it.overlaps).asSequence() }
+                .any { overlap ->
+                    val startAt = overlap.startAt
+                    val endAt = overlap.endAt
+                    startAt == null || endAt == null || !startAt.isBefore(endAt)
+                }
         ) {
             throw BusinessException(ShiftErrorCode.INVALID_INPUT_VALUE)
         }
