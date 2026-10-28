@@ -7,6 +7,8 @@ import com.merge.backend.domain.shift.exception.ScheduleErrorCode
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.dto.ClosedSubstituteRequestPageResponse
+import com.merge.backend.domain.substitute.dto.ClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse
@@ -29,11 +31,13 @@ import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.exception.BusinessException
+import com.merge.backend.global.exception.GlobalErrorCode
 import java.time.Clock
 import java.time.LocalDateTime
 import kotlin.jvm.optionals.getOrNull
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -164,6 +168,59 @@ class SubstituteRequestService(
         return requests.map { request ->
             SubstituteRequestListResponse.from(request, acceptedCandidateMap)
         }
+    }
+
+    // API-SB-02 - MANAGER: 근무지의 끝난 대타 요청 (종료·계산된 만료). 조회만 하고 DB는 바꾸지 않음
+    @Transactional(readOnly = true)
+    fun findClosedRequests(
+        workplaceId: Long,
+        actorId: Long,
+        from: LocalDateTime?, // 효력 종료 시각 하한 (포함)
+        to: LocalDateTime?, // 효력 종료 시각 상한 (포함)
+        page: Int,
+        size: Int,
+    ): ClosedSubstituteRequestPageResponse {
+        workplaceMemberService.requireManager(actorId, workplaceId)
+
+        val now = LocalDateTime.now(clock)
+
+        // 기본은 최근 7일. 보존 기간·조회 상한이 아니라 기본 필터 (API-CATALOG API-SB-02)
+        val periodFrom = from ?: now.minusDays(7)
+        val periodTo = to ?: now
+        if (periodFrom > periodTo || page < 0 || size !in 1..MAX_CLOSED_PAGE_SIZE) {
+            throw BusinessException(GlobalErrorCode.INVALID_REQUEST_PARAMETER)
+        }
+
+        val slice = substituteRequestRepository.findClosedByWorkplaceId(
+            workplaceId,
+            now,
+            periodFrom,
+            periodTo,
+            PageRequest.of(page, size),
+        )
+        val requests = slice.content
+        if (requests.isEmpty()) {
+            return ClosedSubstituteRequestPageResponse(emptyList(), page, size, slice.hasNext())
+        }
+
+        // 수락자: 끝난 요청은 수락자가 없을 수 있어 getAcceptedCandidates(ACCEPTED 요청 전용)를 쓰지 않음
+        val accepterByRequestId = substituteCandidateRepository
+            .findByRequestIdInAndStatus(requests.map { requireNotNull(it.id) }, CandidateStatus.ACCEPTED)
+            .associateBy { requireNotNull(it.request.id) }
+
+        // 같은 근무의 진행 중 요청 ID (더 최근 = 요청 ID가 더 큼)
+        val activeRequestIdsByShiftId = substituteRequestRepository
+            .findActiveByShiftIdIn(requests.map { requireNotNull(it.shift.id) }.distinct(), now)
+            .groupBy({ requireNotNull(it.shift.id) }, { requireNotNull(it.id) })
+
+        val items = requests.map { request ->
+            val requestId = requireNotNull(request.id)
+            val hasNewerActiveRequest = activeRequestIdsByShiftId[request.shift.id].orEmpty().any { it > requestId }
+
+            ClosedSubstituteRequestResponse.from(request, accepterByRequestId[requestId], hasNewerActiveRequest, now)
+        }
+
+        return ClosedSubstituteRequestPageResponse(items, page, size, slice.hasNext())
     }
 
     // 내부적으로 사용하는 수락자 조회 - private으로 캡슐화
@@ -482,5 +539,8 @@ class SubstituteRequestService(
 
     companion object {
         private val log = LoggerFactory.getLogger(SubstituteRequestService::class.java)
+
+        // API-SB-02 한 페이지 최대 개수 (구현 계약)
+        const val MAX_CLOSED_PAGE_SIZE = 100
     }
 }

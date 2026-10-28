@@ -4,6 +4,8 @@ import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
 import jakarta.persistence.LockModeType
 import java.time.LocalDateTime
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
@@ -111,6 +113,58 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
     )
     fun findAllByWorkplaceId(
         @Param("workplaceId") workplaceId: Long,
+        @Param("now") now: LocalDateTime,
+    ): List<SubstituteRequest>
+
+    // API-SB-02
+    // 근무지의 끝난 요청: CLOSED(모든 사유) 또는 계산된 만료(OPEN·ACCEPTED이면서 근무 시작 시각 <= now). APPROVED 제외
+    // 효력 종료 시각 = CLOSED는 저장된 closedAt, 만료는 근무 시작 시각. 기간·정렬·페이지를 DB에서 처리
+    @Query(
+        """
+        SELECT s
+        FROM SubstituteRequest s
+        JOIN FETCH s.shift sh
+        JOIN FETCH s.requesterMember rm
+        JOIN FETCH rm.user
+        WHERE sh.schedule.workplace.id = :workplaceId
+          AND (
+                s.status = com.merge.backend.domain.substitute.entity.RequestStatus.CLOSED
+             OR (s.status IN (com.merge.backend.domain.substitute.entity.RequestStatus.OPEN,
+                              com.merge.backend.domain.substitute.entity.RequestStatus.ACCEPTED)
+                 AND sh.startAt <= :now)
+          )
+          AND (CASE WHEN s.status = com.merge.backend.domain.substitute.entity.RequestStatus.CLOSED
+                    THEN s.closedAt ELSE sh.startAt END) BETWEEN :from AND :to
+        ORDER BY (CASE WHEN s.status = com.merge.backend.domain.substitute.entity.RequestStatus.CLOSED
+                       THEN s.closedAt ELSE sh.startAt END) DESC,
+                 s.id DESC
+        """,
+    )
+    fun findClosedByWorkplaceId(
+        @Param("workplaceId") workplaceId: Long,
+        @Param("now") now: LocalDateTime,
+        @Param("from") from: LocalDateTime,
+        @Param("to") to: LocalDateTime,
+        pageable: Pageable,
+    ): Slice<SubstituteRequest>
+
+    // API-SB-02 hasNewerActiveRequest
+    // 근무들의 진행 중 요청 (SUB-06 findAllByWorkplaceId와 같은 조건)
+    @Query(
+        """
+        SELECT s
+        FROM SubstituteRequest s
+        WHERE s.shift.id IN :shiftIds
+          AND s.status IN (com.merge.backend.domain.substitute.entity.RequestStatus.OPEN,
+                            com.merge.backend.domain.substitute.entity.RequestStatus.ACCEPTED)
+          AND s.shift.schedule.status =
+                  com.merge.backend.domain.shift.entity.ScheduleStatus.PUBLISHED
+          AND s.shift.status = com.merge.backend.domain.shift.entity.ShiftStatus.SCHEDULED
+          AND s.shift.startAt > :now
+        """,
+    )
+    fun findActiveByShiftIdIn(
+        @Param("shiftIds") shiftIds: Collection<Long>,
         @Param("now") now: LocalDateTime,
     ): List<SubstituteRequest>
 }
