@@ -6,6 +6,7 @@ import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.workplace.dto.request.LeaveConfirmRequest
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
 import org.springframework.stereotype.Component
 
@@ -22,9 +23,10 @@ class LeavePlanPreparation(private val contexts: LeavePreviewContextService, pri
         memberId: Long,
         request: LeaveConfirmRequest,
         current: LeavePreviewFacts,
-        references: References
+        references: References,
+        evaluatedAt: Instant = clock.instant()
     ): Result {
-        val now = clock.instant()
+        val now = evaluatedAt
         val businessNow = LocalDateTime.ofInstant(now, clock.zone)
         val context = request.previewContext?.takeIf { it.isNotBlank() } ?: return Result.InvalidRequest
         val decisions = request.decisions ?: return Result.InvalidRequest
