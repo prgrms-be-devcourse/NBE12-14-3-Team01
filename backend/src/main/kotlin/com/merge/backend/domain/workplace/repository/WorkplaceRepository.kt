@@ -13,6 +13,9 @@ interface WorkplaceRepository : JpaRepository<Workplace, Long> {
 
     fun findByInviteCode(inviteCode: String?): Optional<Workplace>
 
+    @Query("SELECT w.id FROM Workplace w WHERE w.inviteCode = :inviteCode")
+    fun findIdByInviteCode(@Param("inviteCode") inviteCode: String?): Long?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w\nFROM Workplace w\nWHERE w.id = :workplaceId\n")
     fun findByIdForUpdate(
