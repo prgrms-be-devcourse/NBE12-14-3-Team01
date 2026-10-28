@@ -129,7 +129,7 @@ function getStatusView(request: SentSubstituteRequest): StatusView {
   };
 }
 
-// 요청·승인·종료 날짜 한 줄 (만료는 종료 날짜가 조회 시각이라 안 보여줌)
+// 요청·승인·종료 날짜 한 줄. 만료 요청의 closedAt은 서버가 근무 시작 시각으로 보내지만(G03-D-19), 만료 시각 표시는 D19-5 작업에서 따로 넣을 예정이라 여기서는 빼둠
 function getDateLine(request: SentSubstituteRequest): string {
   const parts = [`${formatDateLabel(request.createdAt)} 요청`];
 

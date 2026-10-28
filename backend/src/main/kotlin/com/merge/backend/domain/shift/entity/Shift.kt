@@ -1,7 +1,9 @@
 package com.merge.backend.domain.shift.entity
 
+import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.global.entity.BaseEntity
+import com.merge.backend.global.exception.BusinessException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -78,6 +80,10 @@ class Shift(
         cancelledAt: LocalDateTime,
         cancelledBy: WorkplaceMember?
     ) {
+        if (status != ShiftStatus.SCHEDULED || !cancelledAt.isBefore(startAt)) {
+            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        }
+
         status = ShiftStatus.CANCELLED
         cancellationReason = reason
         this.cancelledAt = cancelledAt

@@ -77,7 +77,7 @@
 | V4-P07 | APPROVE: 현재 MANAGER, Request ACCEPTED, 수락자 현재 EMPLOYEE, 재검증 후 `Shift.member = 수락자`, APPROVED. Self Approval 허용 | `approve` L232~352 | C-48 | V4-T-23~30 (Mock) |
 | V4-P08 | CLOSE: 현재 MANAGER, OPEN/ACCEPTED, 시작 전 → `CLOSED / MANAGER_CLOSED`. Candidate 불변, 재탐색 없음 | `close` L360~415 | C-49 | V4-T-36~46 |
 | V4-P09 | 주요 Command는 `startAt > now` (Asia/Seoul Clock). `startAt == now`는 시작된 것 | 각 Command | C-50 | V4-T-21, 25, 44, 45 |
-| V4-P10 | 조회 시 OPEN/ACCEPTED ∧ `now ≥ startAt` → 응답 `CLOSED/EXPIRED` (DB 불변) | `SentSubstituteRequestResponse` L28~52 | C-45 (조회 의미, 조회 중 상태 불변). **EXPIRED 표시는 C-45에서 분리된 G03-D-19 (Expiry) `PENDING`** — 현재 표시 방식은 보존 대상이나 계약 후보 아님 | V4-T-01~05, 47 |
+| V4-P10 | 조회 시 OPEN/ACCEPTED ∧ `now ≥ startAt` → 응답 `CLOSED/EXPIRED` (DB 불변) | `SentSubstituteRequestResponse` L28~52 | C-45 (조회 의미, 조회 중 상태 불변). **EXPIRED 표시는 C-45에서 분리된 G03-D-19 (Expiry) `PENDING`** — 현재 표시 방식은 보존 대상이나 계약 후보 아님. **2026-10-28: G03-D-19 APPROVED(DECISION-LOG §4-2)에 따라 만료 응답의 `closedAt` = 근무 시작 시각으로 변경 (`feat/v4-expiry-closed-at`, EV-036)** | V4-T-01~05, 47, V4-N-23~26 |
 
 ### C1. 상태 전이 (현재 Java)
 
