@@ -66,8 +66,8 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | Test ID | Policy | Class · Method | 종류 · 환경 | 유형 | 기대 결과 | 검증 충분성 |
 |---|---|---|---|---|---|---|
 | V4-T-01 | V4-P10, G03-D-19 | `SentSubstituteRequestResponseTest.test1` (OPEN·시작 전 → OPEN) | UNIT · NONE | NORMAL | OPEN | SUFFICIENT |
-| V4-T-02 | V4-P10 | `.test2` (OPEN·시작 지남 → CLOSED/EXPIRED) | UNIT · NONE | BOUNDARY | CLOSED/EXPIRED | SUFFICIENT |
-| V4-T-03 | V4-P10, G03-D-19 | `.test3` (ACCEPTED·`now == startAt` → 만료) | UNIT · NONE | BOUNDARY | CLOSED/EXPIRED | SUFFICIENT |
+| V4-T-02 | V4-P10, G03-D-19 | `.test2` (OPEN·시작 지남 → CLOSED/EXPIRED) | UNIT · NONE | BOUNDARY | CLOSED/EXPIRED, `closedAt == startAt` (2026-10-28 G03-D-19, 전: `now`) | SUFFICIENT |
+| V4-T-03 | V4-P10, G03-D-19 | `.test3` (ACCEPTED·`now == startAt` → 만료) | UNIT · NONE | BOUNDARY | CLOSED/EXPIRED, `closedAt == startAt` 확인 추가 (2026-10-28) | SUFFICIENT |
 | V4-T-04 | V4-P10 | `.test4` (APPROVED 유지) | UNIT · NONE | NORMAL | APPROVED | SUFFICIENT |
 | V4-T-05 | V4-P10 | `.test5` (CLOSED 저장값 유지) | UNIT · NONE | NORMAL | 저장된 사유·`closedAt` | SUFFICIENT |
 | V4-T-06 | — | `.test6` (식별자·근무지 Mapping) | UNIT · NONE | NORMAL | Field 일치 | SUFFICIENT |
@@ -184,12 +184,12 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-N-05 | SUB-EV-05 / SUB-DC-01 | 동시 ACCEPT 결정적 재현, RC·RR 대조 | H6 · MYSQL_TC RC+RR | PROPOSED_IMPROVEMENT | PENDING (DL-009, DL-010) | **BLOCKED** (Harness LOCAL_ONLY) | Harness 공유 후 가능 |
 | V4-N-06 | ML-SUB-STATE-01 (B+) | 퇴사 후보 `INELIGIBLE` / `CANDIDATE_INELIGIBLE` | — | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (기능 없음) |
 | V4-N-07 | ML-CONCURRENCY-01-R | 퇴사 vs 후보 생성 경합 (H6-ML-01~03) | H6 · MYSQL_TC | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 불가 (퇴사 기능 없음). AS-IS 재현만 Test 전용 `left_at` 갱신으로 가능 |
-| V4-N-23 | G03-D-19 D19-1 | 같은 만료 요청을 서로 다른 두 시각(`startAt` 이후)에 변환 → 두 응답의 `closedAt`이 같고 `== startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
-| V4-N-24 | G03-D-19 D19-2 | 만료 요청을 목록 조회한 뒤 DB Row 확인 → status OPEN/ACCEPTED, DB `closedAt` = null 그대로 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT (현재 동작 고정을 겸함) | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
-| V4-N-25 | G03-D-19 D19-1 | `getSentRequests_ReturnsLatestFirst_MarksExpired` (L1633)에 만료 응답 `closedAt == startAt` 확인 추가 (기존 기대값 유지) | UNIT · MOCK | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
-| V4-N-26 | G03-D-19 D19-1, D19-4 | OPEN이고 `now == startAt` → CLOSED / EXPIRED, `closedAt == startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | **PROPOSED** | SPECIFIED (작성 금지) | 승인 후 가능 |
+| V4-N-23 | G03-D-19 D19-1 | 같은 만료 요청을 서로 다른 두 시각(`startAt` 이후)에 변환 → 두 응답의 `closedAt`이 같고 `== startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | APPROVED (DECISION-LOG §4-2) | `SentSubstituteRequestResponseTest``.test7` | `LOCAL_PASSED` (EV-036) |
+| V4-N-24 | G03-D-19 D19-2 | 만료 요청을 목록 조회한 뒤 DB Row 확인 → status OPEN/ACCEPTED, DB `closedAt` = null 그대로 | INTEGRATION · MYSQL_TC | PROPOSED_IMPROVEMENT (현재 동작 고정을 겸함) | APPROVED (DECISION-LOG §4-2) | `SentSubstituteRequestExpiryIntegrationTest.listingExpiredRequestsKeepsDbRows` | `LOCAL_PASSED` (EV-036) |
+| V4-N-25 | G03-D-19 D19-1 | `getSentRequests_ReturnsLatestFirst_MarksExpired` (L1633, 지금 L1258)에 만료 응답 `closedAt == startAt` 확인 추가 (기존 기대값 유지) | UNIT · MOCK | PROPOSED_IMPROVEMENT | APPROVED (DECISION-LOG §4-2) | 확인 1줄 추가함 | `LOCAL_PASSED` (EV-036) |
+| V4-N-26 | G03-D-19 D19-1, D19-4 | OPEN이고 `now == startAt` → CLOSED / EXPIRED, `closedAt == startAt` | UNIT · NONE | PROPOSED_IMPROVEMENT | APPROVED (DECISION-LOG §4-2) | `SentSubstituteRequestResponseTest``.test8` | `LOCAL_PASSED` (EV-036) |
 
-G03-D-19 관련 기존 Test 변경 후보 (승인 전 변경 금지, `PROCESS-CHARTER` §6-2): V4-T-02 `closedAt` 기대값 `now` → `SHIFT_START` (**기대값 변경**), V4-T-03에 `closedAt == SHIFT_START` 확인 추가. V4-N-08~22는 로컬 ML-3 Draft가 예약한 번호라 G03-D-19는 23부터 쓴다.
+G03-D-19 관련 기존 Test 변경 후보 (승인 전 변경 금지, `PROCESS-CHARTER` §6-2): V4-T-02 `closedAt` 기대값 `now` → `SHIFT_START` (**기대값 변경**), V4-T-03에 `closedAt == SHIFT_START` 확인 추가. **2026-10-28 변경함** (G03-D-19 APPROVED, `feat/v4-expiry-closed-at` `0dab46a`, EV-036). V4-N-08~22는 로컬 ML-3 Draft가 예약한 번호라 G03-D-19는 23부터 쓴다.
 
 신규 행의 선행 조건은 종류가 다르다.
 
@@ -198,7 +198,7 @@ G03-D-19 관련 기존 Test 변경 후보 (승인 전 변경 금지, `PROCESS-CH
 | V4-N-01~04 | Kotlin 전환 전 현재 Java 동작 고정 (`MIGRATION`, 동작 변경 0) | 정책 승인 대상 아님. V4 Owner 확정과 Task 승인 (`docs/ai/AI-RULES.md` §1) |
 | V4-N-05 | 현재 동작의 동시성 재현 (Production 변경 0) | 정책 승인이 아니라 DL-009 (Harness 공유)·DL-010 (검증 지위) 결정. Harness가 `LOCAL_ONLY`라 ④ `BLOCKED` |
 | V4-N-06·07 | 새 정책(② `PROPOSED`) 구현 검증 | `DECISION-LOG`의 `APPROVED` 전 작성 금지 (④ `SPECIFIED`까지) |
-| V4-N-23~26 | 새 정책(G03-D-19, ② `PROPOSED`) 구현 검증 | 위와 같음. V4-N-24는 현재 동작 고정을 겸하지만 같은 카드에 묶여 있어 함께 승인 대상 |
+| V4-N-23~26 | 새 정책(G03-D-19, ② `PROPOSED`) 구현 검증 | 위와 같음. V4-N-24는 현재 동작 고정을 겸하지만 같은 카드에 묶여 있어 함께 승인 대상. **2026-10-28 해소** (G03-D-19 APPROVED, 작성·실행 EV-036) |
 
 V4-N-07의 "AS-IS 재현"은 새 정책 구현 Test가 아니라 별도 후속 항목(ML-CONCURRENCY-02, 아직 이 Inventory에 없음)이며, V4-N-05와 같이 DL-009가 먼저 결정돼야 한다.
 현재 동작 재현 Test 전반에 대한 일반 승인 규칙은 아직 문서화돼 있지 않다 (위 표는 각 행의 기존 기록을 모은 것이다).
@@ -255,7 +255,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 
 | 임시 ID | 정식 ID / 참조 | 소유 | 구분 | 비고 |
 |---|---|---|---|---|
-| D19 (G03-D-19) | V4-N-23~26 (기존) | V4 | PROPOSED_IMPROVEMENT | 변경 없음 |
+| D19 (G03-D-19) | V4-N-23~26 (기존) | V4 | PROPOSED_IMPROVEMENT | 변경 없음. 2026-10-28 작성·`LOCAL_PASSED` |
 | D21-T1 | 참조: `ShiftServiceTest` L412·L493 (V3-T 번호는 V3 Delivery Sheet 때) | V3 | BASELINE | 회귀 |
 | D21-T2 | **V3-N-20** | V3 | MIGRATION | 기존 Test 없음 확인 (`SFT-010` Test 0, §5-3). 관련: V3-N-24 |
 | D21-T3 | 참조: **V4-T-29** | V4 | BASELINE | 회귀 |
@@ -341,7 +341,7 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 
 | 기존 Test | 현재 기대값 (Migration 보존) | Improvement 기대값 | 근거 | 변경 시점 |
 |---|---|---|---|---|
-| V4-T-02 `test2` L53 | `closedAt == now` | `closedAt == startAt` | G03-D-19 (V4-N-23~26) | D-19 승인 후 Improvement PR |
+| V4-T-02 `test2` L53 | `closedAt == now` | `closedAt == startAt` | G03-D-19 (V4-N-23~26) | **변경됨: 2026-10-28 `feat/v4-expiry-closed-at` (EV-036)** |
 | V4-T-25 (L556), V4-T-81 (L570) | `SFT-006` | 새 SUB code 409 | G03-D-03 T1-01 (V4-N-40) | D-03 승인 후 |
 | V4-T-64·65·72 | `SUB-012` | `SUB-023` 409 | T1-02 (V4-N-41) | D-03 승인 후 |
 | V4-T-63 `acceptCandidate_ShiftCancelled` | `SUB-014` | `SUB-023` 409 | T1-03 (V4-N-42) | D-03 승인 후 |
@@ -448,6 +448,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | API-SB-01 종료된 대타 조회: §5-1 D22 행에 구현 표시, 끝에 "V4 종료된 대타 조회" 절 신설 (V4-N-27~35·38, 새 V4-N-60) |
 | 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
+| 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 

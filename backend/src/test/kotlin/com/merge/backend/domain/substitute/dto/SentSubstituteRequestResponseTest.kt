@@ -42,7 +42,7 @@ class SentSubstituteRequestResponseTest {
 
         assertThat(response.status).isEqualTo(RequestStatus.CLOSED)
         assertThat(response.closeReason).isEqualTo(RequestCloseReason.EXPIRED)
-        assertThat(response.closedAt).isEqualTo(now)
+        assertThat(response.closedAt).isEqualTo(SHIFT_START)
     }
 
     @Test
@@ -55,6 +55,7 @@ class SentSubstituteRequestResponseTest {
 
         assertThat(response.status).isEqualTo(RequestStatus.CLOSED)
         assertThat(response.closeReason).isEqualTo(RequestCloseReason.EXPIRED)
+        assertThat(response.closedAt).isEqualTo(SHIFT_START)
     }
 
     @Test
@@ -107,6 +108,30 @@ class SentSubstituteRequestResponseTest {
         assertThat(response.workplaceName).isEqualTo("SWITCH 카페")
         assertThat(response.startAt).isEqualTo(SHIFT_START)
         assertThat(response.endAt).isEqualTo(SHIFT_END)
+    }
+
+    @Test
+    @DisplayName("같은 만료 요청을 서로 다른 시각에 조회해도 closedAt은 근무 시작 시각으로 같다")
+    fun test7() {
+        val request = createRequest(RequestStatus.OPEN)
+
+        val first = SentSubstituteRequestResponse.from(request, SHIFT_START.plusMinutes(1))
+        val later = SentSubstituteRequestResponse.from(request, SHIFT_START.plusDays(3))
+
+        assertThat(first.closedAt).isEqualTo(SHIFT_START)
+        assertThat(later.closedAt).isEqualTo(SHIFT_START)
+    }
+
+    @Test
+    @DisplayName("OPEN 상태에서 now == startAt(경계값)이면 만료되고 closedAt은 근무 시작 시각이다")
+    fun test8() {
+        val request = createRequest(RequestStatus.OPEN)
+
+        val response = SentSubstituteRequestResponse.from(request, SHIFT_START)
+
+        assertThat(response.status).isEqualTo(RequestStatus.CLOSED)
+        assertThat(response.closeReason).isEqualTo(RequestCloseReason.EXPIRED)
+        assertThat(response.closedAt).isEqualTo(SHIFT_START)
     }
 
     private fun createRequest(
