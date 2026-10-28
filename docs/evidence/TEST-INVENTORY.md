@@ -450,6 +450,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 | 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
 | 2026-10-29 | 퇴사자 후보 처리: 끝에 "V4 퇴사자 후보 처리" 절 신설 (V4-N-13~16·22, H6-C5·C6, 새 V4-N-65~71), V4-N-06 행·§5-1 H6 행에 연결 (EV-038) |
+| 2026-10-29 | PR #92 리뷰 반영: "V4 퇴사자 후보 처리" 절에 V4-N-72~74 추가 (거절 경로 응답 가능 판정), ⑤ 상태 갱신 (EV-038) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -554,7 +555,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - 회귀 (기대값 변경 0): 기존 Test 542개 목록 그대로 통과
 - 범위 밖: V4-N-36·37 (D22-T10·T11, SUB-07·SUB-05 현재 소속 = CHG-02·03, 묶음 D. SUB-07 조건은 PR #82가 추가). Frontend "수락한 요청 — 종료" 화면
 
-## V4 퇴사자 후보 처리 (V4-N-13~16·22, H6-C5·C6, V4-N-65~71, 2026-10-29)
+## V4 퇴사자 후보 처리 (V4-N-13~16·22, H6-C5·C6, V4-N-65~74, 2026-10-29)
 
 [ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) §11 예약 번호와 §10 H6. 계약 Test는 범위 다음 번호 (V4-N-61~64는 공개 근무 변경 연결 Test 예정). Class: `SubstituteMemberLeaveTest` (MySQL Testcontainers, test Profile). 퇴사 Command가 없어 "소속 `leftAt` 기록 + 함수 호출"을 한 Transaction으로 흉내 낸다
 
@@ -576,8 +577,11 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | V4-N-69 | `handlesAllCandidaciesInIdOrder` | 걸린 요청 3건 모두 처리, 닫은 요청은 ID 오름차순, INELIGIBLE 3 | `LOCAL_PASSED` |
 | V4-N-70 | `usesLatestStatusEvenIfReadBeforeLock` | 퇴사 Transaction이 Lock 전에 후보를 읽은 뒤 그 후보가 수락 → 최신 상태로 판단, ACCEPTED를 INELIGIBLE로 덮지 않음 | `LOCAL_PASSED` |
 | V4-N-71 | `leftPendingCandidateIsNotRespondable` | 이미 퇴사했는데 PENDING으로 남은 후보(예전 데이터)는 응답 가능 후보로 세지 않음 → 요청 종료 | `LOCAL_PASSED` |
+| V4-N-72 | `rejectWithLeftPendingCandidateClosesRequest` | 퇴사했는데 PENDING으로 남은 C가 있을 때 B 거절 → 응답 가능 후보 0명 → `CANDIDATE_INELIGIBLE`, 새 Event 1건, C는 PENDING 그대로 (PR #92 리뷰 재현, 원문 B+ §6 #8 상황) | `LOCAL_PASSED` |
+| V4-N-73 | `rejectWithNonEmployeePendingCandidateClosesRequest` | 남은 대기 후보 C의 역할이 MANAGER → 응답 가능으로 세지 않음 → B 거절 시 `CANDIDATE_INELIGIBLE` | `LOCAL_PASSED` |
+| V4-N-74 | `rejectWithOtherWorkplacePendingCandidateClosesRequest` | 다른 근무지 소속이 후보로 들어간 데이터 → 응답 가능으로 세지 않음 → B 거절 시 `CANDIDATE_INELIGIBLE` | `LOCAL_PASSED` |
 
 **⑤ 상태의 뜻:**
-- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `b411f2e` 위 전체 600/600 (EV-038). CI는 PR 생성 후 기록
-- 회귀 (기대값 변경 0): 기존 Test 584개 목록 그대로 통과 (`rejectCandidate_LastCandidate_ClosesRequest` 포함)
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `b411f2e` 위 전체 600/600, 리뷰 반영 후 develop `cade449` 병합 `443a68c` 위 전체 638/638 (EV-038). CI는 PR 생성 후 기록
+- 회귀 (기대값 변경 0): 기존 Test 584개 목록 그대로 통과 (`rejectCandidate_LastCandidate_ClosesRequest` 포함). 리뷰 반영 때 Mock Test 3곳은 Mock하는 조회 이름만 바꿈 (`existsRespondableCandidateExcept`)
 - 범위 밖: V2 퇴사 확정 경로 Test (V2-N-53), 대타 생성 × 퇴사 (H6-C7, 소속 `FOR SHARE` 필요), 알림 Type·받는 사람 (V5, V5-N-20), 요청자 퇴사 시 본인 근무의 요청 (V3 인계·취소의 `SHIFT_CHANGED`, V4-N-12)
