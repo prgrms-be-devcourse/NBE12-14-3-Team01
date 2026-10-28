@@ -18,6 +18,7 @@ enum class UserErrorCode(
         HttpStatus.UNAUTHORIZED, "AUTH-005", "Authorization 헤더가 Bearer 형식이 아닙니다."
     ),
     INVALID_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-006", "Access Token이 유효하지 않습니다."),
+    INVALID_REQUEST_ORIGIN(HttpStatus.FORBIDDEN, "AUTH-007", "허용되지 않은 요청 출처입니다."),
     ;
 
     // Java 인터페이스 getter라서 val로는 override 못 하고 fun으로 구현

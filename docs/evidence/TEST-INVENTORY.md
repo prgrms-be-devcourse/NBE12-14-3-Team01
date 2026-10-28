@@ -90,7 +90,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-T-23 | V4-P07, C-48 | `$ApproveTest.approve_success` | UNIT · MOCK | NORMAL | APPROVED | **STRENGTHEN: DB에서 `Shift.member` 재조회 (V4-N-02)** |
 | V4-T-24 | V4-P07 | `.approve_fail_invalid_request_status` (PR #5에서 `@ParameterizedTest` 3건: OPEN·APPROVED·CLOSED) | UNIT · MOCK | FAILURE | SUB-002 | SUFFICIENT |
 | V4-T-25 | V4-P07, P09 | `.approve_fail_past_shift_start_time` | UNIT · MOCK | BOUNDARY | 예외 | SUFFICIENT |
-| V4-T-26 | V4-P07 | `.approve_fail_actor_not_in_workplace` | UNIT · MOCK | FAILURE | 예외 | SUFFICIENT |
+| V4-T-26 | V4-P07 | `.approve_fail_actor_not_in_workplace` (PR #83에서 둘로 나눔: 어디서도 MANAGER 아님 → 이 Method, 다른 근무지 MANAGER → `.approve_fail_actor_manager_of_other_workplace`) | UNIT · MOCK | FAILURE | WPL-004 / SUB-001 (PR #83, 전: WPL-003) | SUFFICIENT |
 | V4-T-27 | V4-P07 | `.approve_fail_candidate_not_employee` | UNIT · MOCK | FAILURE | SFT-004 | SUFFICIENT |
 | V4-T-28 | V4-P07, C-48, C-30 | `.approve_fail_conflicting_shift` | UNIT · MOCK | FAILURE | SUB-005 | SUFFICIENT |
 | V4-T-29 | V4-P07, C-40 | `.approve_fail_conflicting_unavailable_time` | UNIT · MOCK | FAILURE | SUB-006 | SUFFICIENT |
@@ -145,7 +145,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-T-71 | S2-6 연결 | `SubstituteCandidateServiceTest$RejectTest.rejectCandidate_RequestNotOpen` L615 (실패 - 다른 후보가 이미 수락한 Request는 거절할 수 없다) | UNIT · MOCK | FAILURE | SUB-023 (`REQUEST_NOT_OPEN`) | 미판정 |
 | V4-T-72 | S2-6 연결 | `SubstituteCandidateServiceTest$RejectTest.rejectCandidate_ShiftAlreadyStarted` L627 (실패 - 이미 시작된 Shift는 거절할 수 없다) | UNIT · MOCK | FAILURE | SUB-012 (`SHIFT_ALREADY_STARTED`) | 미판정 |
 | V4-T-73 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_request_not_found` L381 (실패: 존재하지 않는 요청이면 예외가 발생한다) | UNIT · MOCK | FAILURE | SUB-001 (`SUBSTITUTE_REQUEST_NOT_FOUND`) | 미판정 |
-| V4-T-74 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_actor_not_manager` L428 (실패: 승인 요청자가 MANAGER가 아니면 예외가 발생한다) | UNIT · MOCK | FAILURE | WPL-004 (`MANAGER_REQUIRED`) | 미판정 |
+| V4-T-74 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_actor_not_manager` L371 (실패: 승인 요청자가 MANAGER가 아니면 요청을 조회하기 전에 예외가 발생한다, PR #83에서 이름·조회 전 거절 확인 추가) | UNIT · MOCK | FAILURE | WPL-004 (`MANAGER_REQUIRED`) | 미판정 |
 | V4-T-75 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_schedule_not_published` L443 (실패: 근무표가 공개 전(DRAFT)이면 승인할 수 없다) | UNIT · MOCK | FAILURE | SCH-012 (`NOT_PUBLISHED`) | 미판정 |
 | V4-T-76 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_shift_cancelled` L456 (실패: Shift가 취소됐으면 승인할 수 없다) | UNIT · MOCK | FAILURE | SFT-013 (`IS_CANCELED_SHIFT`) | 미판정 |
 | V4-T-77 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_shift_member_changed` L470 (실패: 요청 이후 Shift 담당자가 바뀌었으면 승인할 수 없다) | UNIT · MOCK | FAILURE | SUB-004 (`INVALID_MEMBER`) | 미판정 |
@@ -279,13 +279,13 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | D05-T4·T5·T5b·T5c·T7·T8·T9·T11 | **V2-N-45·46·47·48·49·50·51·52** (순서대로) | V2 | PROPOSED_IMPROVEMENT | 퇴사 확정(API-LV-02)의 확인 응답 |
 | D05-T10 | **V3-N-22** | V3 | MIGRATION | 기존 DRAFT 생성·Publish·불가능 시간 경고 형식 회귀 |
 | D05-R1~R3 | 보류 (H6) | ML-5 | H6 | `BLOCKED` |
-| M3-T1 | **V4-N-44** | V4 | PROPOSED_IMPROVEMENT | 승인 범위 밖 = 없는 ID와 같은 404 |
-| M3-T2·T3 | **V4-N-45·46** | V4 | PROPOSED_IMPROVEMENT · H6 | ④ `BLOCKED` (H6 Harness) |
+| M3-T1 | **V4-N-44** | V4 | PROPOSED_IMPROVEMENT | 승인 범위 밖 = 없는 ID와 같은 404. PR #83 `SubstituteApprovePermissionLockTest``.outOfScopeApproveGetsSameResponseRegardlessOfRequest` (W안: 어디서도 MANAGER 아님 403 `WPL-004`, 다른 근무지 MANAGER 404), `LOCAL_PASSED` |
+| M3-T2·T3 | **V4-N-45·46** | V4 | PROPOSED_IMPROVEMENT · H6 | PR #83 `SubstituteApprovePermissionLockTest``.outOfScopeApproveDoesNotWaitForLocks`·`.approveRechecksStatusAfterLock`, 기존 `runSecondWhileFirstHoldsLock` 방식 (H6 Harness 대신), `LOCAL_PASSED` |
 | M3-T4 | **V3-N-23** | V3 | PROPOSED_IMPROVEMENT | 근무 상세 |
 | M3-T5 | **V4-N-47** (후보 응답·대타 종료) + **V5-N-18** (알림 읽음) | V4 / V5 | PROPOSED_IMPROVEMENT | Domain별로 나눔 |
 | M3-T6 | 참조: 기존 BASELINE (V4-T-23·36 등, 각 API의 정상 경로 Test) | 각 Domain | BASELINE | 회귀 |
 | NT-T1~T16 | **V5-N-01~16** (번호 그대로) | V5 | T3·T8·T12는 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | §6 |
-| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존) | ML-5 | H6 | `BLOCKED` |
+| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면 | ML-5 | H6 | `BLOCKED` (ML5-T3·T13은 `LOCAL_PASSED`) |
 | ErrorCode Test 0 (11개) | **V3-N-24~32**, **V4-N-48** | V3 / V4 | MIGRATION | §5-3 |
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
@@ -350,10 +350,10 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | SUB-05·`ShiftService.detail` 관련 (대상 Method는 ML-4 §8 승인 때 특정) | 현재 소속 확인 없음 | 현재 소속 기준 | ML-4 §8 | ML-4 승인 후 |
 | SUB-006 문구 (T1-04) | — | — | message를 확인하는 Test 없음 → 기대값 변경 0 | — |
 | Pattern `SHIFT-004`·`SHIFT-005` 4개 (`RegularShiftPatternControllerTest` L812·857·1449·1505) | 대상 직원 의미 | 그대로 (실행자 쪽 M-01 정정은 새 Test만) | ERROR-CODES M-01 | — |
-| V4-T-26 `approve_fail_actor_not_in_workplace` (L413) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 실행자가 어디서도 MANAGER가 아니면 403 `WPL-004` (Request 조회 전, 없는 ID와 같은 응답), 다른 근무지 MANAGER면 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일). Unit Fixture를 실행자의 MANAGER 소속 유무로 나눈다. (S2-6A 안: 404 일괄) | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 (V4-N-44) | CHG-06 승인 후 |
+| V4-T-26 `approve_fail_actor_not_in_workplace` (L413, PR #83 뒤 L345) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 실행자가 어디서도 MANAGER가 아니면 403 `WPL-004` (Request 조회 전, 없는 ID와 같은 응답), 다른 근무지 MANAGER면 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일). Unit Fixture를 실행자의 MANAGER 소속 유무로 나눈다. (S2-6A 안: 404 일괄) | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 (V4-N-44) | **변경됨: PR #83 (2026-10-28, DECISION-LOG §4-6)** |
 | V4-T-39 `close_NotManager_ThrowsException` (L1099) (S2-6A 발견). 이름과 달리 Mock은 `NOT_WORKPLACE_MEMBER` → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 위 V4-T-26과 같음 (어디서도 MANAGER 아님 → 403 `WPL-004`, 다른 근무지 MANAGER → 404 `SUB-001`) | 같음, M3-T5 (V4-N-47) | CHG-07 승인 후 |
 | V4-T-58 `acceptCandidate_NotOwnCandidate` (L348), V4-T-68 `rejectCandidate_NotOwnCandidate` (L577) (S2-6A 발견). Candidate는 본인만 볼 수 있음 → **범위 밖** | `SUB-020` 403 | 404 `SUB-019` "해당 대타 후보를 찾을 수 없습니다." (없는 Candidate ID와 동일) | M3-T5 (V4-N-47) | CHG-07 승인 후 |
-| V4-T-74 `approve_fail_actor_not_manager` (L428) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **S3-A 결정 (W안, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`): 어디서도 MANAGER가 아니면 403 `WPL-004` — 지금 code와 같고 검사 순서만 바뀐다 (Request 조회·Lock 전). 다른 근무지 MANAGER면 404 `SUB-001`.** (S3 검토 기록:) 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 | CHG-06 승인 후 |
+| V4-T-74 `approve_fail_actor_not_manager` (L428, PR #83 뒤 L371) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **S3-A 결정 (W안, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`): 어디서도 MANAGER가 아니면 403 `WPL-004` — 지금 code와 같고 검사 순서만 바뀐다 (Request 조회·Lock 전). 다른 근무지 MANAGER면 404 `SUB-001`.** (S3 검토 기록:) 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 | **변경됨: PR #83 (2026-10-28, DECISION-LOG §4-6)** |
 | `NotificationServiceTest` "다른 사용자의 알림은 읽음 처리할 수 없다" (L187, 확인 L232) (S2-6A 발견) | `NOT-002` 403 | M3-T5를 따르면 404. **단 G03-D-10 (`DEFER`)과 같은 질문이라 팀 결정 전에는 변경 대상으로 확정하지 않는다.** S3-A: 권한 확인 전 Lock 제거(CHG-07)는 응답 code와 별도로 진행 가능 | M3-T5 (V5-N-18), G03-D-10 | 팀 결정 후 |
 | V4-T-35 `list_NotManager_ThrowsException` | `WPL-004` | 그대로 (근무지 ID가 Path에 있음) | API-CATALOG §5-5 | — |
 | `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) — B-2 내 과거 소속 알림 (S3-B 분리) | `NOT-002` 403 | **미정 — G03-D-16 (`PENDING`) 결정 대기.** 현재 잠정 규칙(§5-5 "실행자 자신의 소속 종료 → 403")대로면 그대로, USER-PATH-REVIEW §9-2 선택지 B'면 404. 결정 전에는 변경 대상으로 확정하지 않는다 | G03-D-16, USER-PATH-REVIEW §9-2 | 팀 결정 후 |
@@ -385,7 +385,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 ### 6-1. V5-J2 알림 HTTP 계약 (V5-N-21~30)
 
-[DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3 V5-J2. **현재 Java 알림 API의 HTTP 계약을 고정**한 Test다. 구분 `MIGRATION` (현재 동작 고정, 새 계약을 정하는 Test 아님). ④ `IMPLEMENTED` — Test PR #16 (**Draft, `develop` 미반영**). Class: `domain.notification.controller.NotificationHttpContractTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`, `/api/v1/...` + `.contextPath("/api/v1")`로 실제 `CustomAuthenticationFilter`·Security 설정 통과, `TestClock`, MYSQL_TC, `@Transactional` Rollback, DB 확인은 `flush()`·`clear()` 후 재조회).
+[DOMAIN-DEVELOPMENT-GUIDE](../delivery/DOMAIN-DEVELOPMENT-GUIDE.md) §7-3 V5-J2. **Java 기준선에서 관찰한 알림 HTTP 계약**을 고정한 Test다. 구분 `MIGRATION` (기존 동작 고정, 새 계약을 정하는 Test 아님). Java Test는 PR #16에서 추가·병합됐고, Kotlin 대응 Class는 PR #60에서 전환·병합됐다. Class: `domain.notification.controller.NotificationHttpContractTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`, `/api/v1/...` + `.contextPath("/api/v1")`로 실제 `CustomAuthenticationFilter`·Security 설정 통과, `TestClock`, MYSQL_TC, `@Transactional` Rollback, DB 확인은 `flush()`·`clear()` 후 재조회).
 
 | Test ID | Method | 확인하는 현재 Java 동작 | ⑤ 실행 |
 |---|---|---|---|
@@ -402,29 +402,33 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 **⑤ 상태의 뜻 (섞지 않는다):**
 - `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 10/10 (EV-017), 전체 404/404 (EV-018). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
-- CI: PR #16의 `Backend CI`·`Docker Build CI Test` 성공 (EV-020). **Workflow 단위 성공**이며 개별 Test 결과 근거가 아니다.
-- `develop` 미반영: PR #16 Merge 전까지 `develop`에는 이 Test가 없다. G-A2(PR #15)와 **합쳐 실행한 적 없음** (예상 410건, TEST-GAP-ANALYSIS §4-1 C5).
-- Kotlin Migration 이후: `NOT_RUN`.
+- Java 기준선 CI: PR #16의 `Backend CI`·`Docker Build CI Test` 성공 (EV-020). **Workflow 단위 성공**이며 Kotlin 개별 Test 결과가 아니다.
+- Kotlin 전환: PR #60에서 이 Class를 Kotlin으로 전환했다. PR #60의 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40577971110)와 [Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40577970990)는 성공했다. PR #60 시점의 Test별 JUnit XML은 보존하지 않았다. 이후 develop `0aec24f` (+ PR #79 Kotlin Test) 로컬 `clean check`에서 이 Class 10 / 10 PASS (Kotlin `LOCAL_PASSED`, 전체 515 / 515, 근거 TEST-INVENTORY §7 ②).
+- 통합: PR #15와 #16은 모두 병합됐다. 이후 현재 develop 통합 실행은 TEST-GAP-ANALYSIS §4-1 C5에 기록한다. 과거의 예상 410건을 현재 기대값으로 사용하지 않는다.
 - 범위 밖 (이 Test가 보장하지 않음): Commit 후 알림 생성·Rollback·알림 실패 (V5-J3), `AUTH-005`·`006` 자체 (기존 `CustomAuthenticationFilterTest`), Frontend 화면·다른 브라우저의 날짜 해석. P2로 미룬 것: V5-N-31 (잘못된 ID 형식 `COM-003`), V5-N-32 (알림 API의 `AUTH-006`).
 
 ## 7. 공통 `global` (CM) — G-A2 공통 응답 계약
 
-[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **현재 Java 공통 응답의 대표 계약을 고정**한 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (현재 동작 고정), ④ `IMPLEMENTED` (Test PR #15, **Draft, `develop` 미반영**).
+[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **Java 기준선에서 관찰한 공통 응답 계약**을 고정하는 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (기존 동작 보존). Java 원본 Test PR #15는 병합됐고, Kotlin 대응 Test는 PR #79에서 전환했다 (Class·Method 이름 유지).
 
-| Test ID | Class · Method | 확인하는 현재 Java 동작 | 종류 · 환경 | ⑤ 실행 |
+| Test ID | Class · Method | Java 원본에서 확인한 보존 계약 | 종류 · 환경 | ⑤ 실행 (Java 기준선 · Kotlin 전환 후) |
 |---|---|---|---|---|
-| CM-N-01 | `global.dto.ApiResponseJsonContractTest.successResponseSerializesFourFields` | 응답 key가 정확히 `success`·`code`·`message`·`data`, `success` boolean, `code`·`message` 문자열 | SPRINGBOOT (애플리케이션 Jackson Mapper) · MYSQL_TC 설정 | LOCAL_PASSED |
-| CM-N-02 | `…ApiResponseJsonContractTest.successResponseWithoutDataKeepsNullDataField` | data 없는 성공 응답도 `data: null` key 유지 | 같음 | LOCAL_PASSED |
-| CM-N-03 | `…ApiResponseJsonContractTest.errorResponseWithoutDataKeepsNullDataField` | 오류 응답 `success: false` + `data: null` 유지 | 같음 | LOCAL_PASSED |
-| CM-N-04 | `global.exception.ApiResponseHttpContractTest.signupSuccessResponseContract` | `POST /api/v1/auth/signup` → 201, `code "201"`, `data` key 정확히 `id`(number)·`email`·`name` | HTTP (MockMvc, `/api/v1` Context Path, Security Chain·전역 예외 처리기 포함) · MYSQL_TC, `@Transactional` Rollback | LOCAL_PASSED |
-| CM-N-05 | `…ApiResponseHttpContractTest.businessErrorResponseContract` | 가입하지 않은 이메일 로그인 → 401 `AUTH-002`, 메시지 고정, `data: null` | 같음 | LOCAL_PASSED |
-| CM-N-06 | `…ApiResponseHttpContractTest.validationErrorResponseContract` | 값이 빈 회원가입 → 400 `COM-001`, `data.fieldErrors[].{field, message}`, field 집합 {email, password, name} (문구·순서는 고정 안 함) | 같음 | LOCAL_PASSED |
+| CM-N-01 | `global.dto.ApiResponseJsonContractTest.successResponseSerializesFourFields` | 응답 key가 정확히 `success`·`code`·`message`·`data`, `success` boolean, `code`·`message` 문자열 | SPRINGBOOT (애플리케이션 Jackson Mapper) · MYSQL_TC 설정 | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
+| CM-N-02 | `…ApiResponseJsonContractTest.successResponseWithoutDataKeepsNullDataField` | data 없는 성공 응답도 `data: null` key 유지 | 같음 | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
+| CM-N-03 | `…ApiResponseJsonContractTest.errorResponseWithoutDataKeepsNullDataField` | 오류 응답 `success: false` + `data: null` 유지 | 같음 | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
+| CM-N-04 | `global.exception.ApiResponseHttpContractTest.signupSuccessResponseContract` | `POST /api/v1/auth/signup` → 201, `code "201"`, `data` key 정확히 `id`(number)·`email`·`name` | HTTP (MockMvc, `/api/v1` Context Path, Security Chain·전역 예외 처리기 포함) · MYSQL_TC, `@Transactional` Rollback | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
+| CM-N-05 | `…ApiResponseHttpContractTest.businessErrorResponseContract` | 가입하지 않은 이메일 로그인 → 401 `AUTH-002`, 메시지 고정, `data: null` | 같음 | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
+| CM-N-06 | `…ApiResponseHttpContractTest.validationErrorResponseContract` | 값이 빈 회원가입 → 400 `COM-001`, `data.fieldErrors[].{field, message}`, field 집합 {email, password, name} (문구·순서는 고정 안 함) | 같음 | Java `LOCAL_PASSED` · Kotlin `LOCAL_PASSED` |
 
 **⑤ 상태의 뜻 (섞지 않는다):**
-- `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 6/6 (EV-013), 전체 400/400 (EV-014). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
-- CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위 성공**이며 개별 Test 결과 근거가 아니다 (CI는 Test Report를 보관하지 않음).
-- `develop` 미반영: PR #15가 Merge되기 전까지 `develop`에서는 이 Test가 없다.
-- Kotlin Migration 이후: `NOT_RUN` (전환 후 같은 Test를 다시 실행해야 함).
+- Java `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 6/6 (EV-013), 전체 400/400 (EV-014). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- Java 기준선 CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위의 역사적 근거**이며 Kotlin 개별 Test 결과가 아니다.
+- Kotlin `LOCAL_PASSED` (2026-10-28, PR #79): 같은 Class·Method 이름의 Kotlin Test로 전환했다. 개별 결과 근거는 로컬 JUnit XML 두 벌이다 (저장소 밖, 팀원 접근 불가. XML의 testcase 이름은 `@DisplayName` 값).
+  - ① 전환 Commit `baf1aca` (base develop `933fd88`): `./gradlew clean check --no-daemon` JUnit XML 65개, 488 / 488 PASS. 전환 전 `933fd88` 488개와 Class#Test 이름 단위로 비교해 누락 0·추가 0·상태 변화 0. CM-N-01~06 6/6 PASS. 실행자 로컬 `s4-evidence/S2-global-tests/run-001/`.
+  - ② 통합 확인 (develop `0aec24f` + PR #79 Kotlin Test 소스): `./gradlew clean check --no-daemon` JUnit XML 71개, **515 / 515 PASS** (= `933fd88` 488 + PR #74 27). CM-N-01~06 6/6 PASS. 실행자 로컬 `s4-evidence/S2-global-tests/run-002-integration-0aec24f/`.
+  - 집계는 이름이 줄여 저장되는 결과 파일(`__TEST-…NotificationServiceScheduleTransactionIntegrationTest.xml`, 1건)까지 포함한다. `TEST-*.xml`만 세면 70개·514건으로 1건이 빠진다.
+- Kotlin CI: PR #79 Head `2af320c` (develop `0aec24f` 병합 포함)의 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258512)·[Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40660258503) 성공. Suite 단위이며 CI는 JUnit XML을 보관하지 않으므로 CI만으로는 Test별 결과를 확인할 수 없다. 이후 Commit은 문서만 바꿨다.
+- Java Test 잔여: PR #79 병합 시 `backend/src/test/java` 추적 파일 0개 (병합 전 develop `0aec24f`에는 17개). `backend/src/main/java`는 PR #77 병합으로 이미 0개. 병합 후 develop SHA에서 다시 센다 (S4 최종 Audit).
 
 ## 8. 변경 이력
 
@@ -437,7 +441,12 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
 | 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
 | 2026-10-26 | V5-J2: §5-4에 알림 Test 6행 (V5-N-28·29·23 변경 후보, V5-N-27·성공 code·읽음 동시성 연관만)과 구분·운영 규칙, §6-1에 V5-N-21~30 (PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN`) |
+| 2026-10-28 | AUTH-1 코드 검토 반영: V1-N-03 확인 방법 보강, V1-N-13 Method 2개 추가, V1-N-14 추가 (EV-033) |
+| 2026-10-28 | AUTH-1: 끝에 "V1 AUTH-1 서버 로그아웃" 절 신설. 예약 V1-N-01~12 등록, 범위 다음 번호 V1-N-13 추가 (출처 검사 단위 Test). ④ `IMPLEMENTED`, ⑤ `LOCAL_PASSED` (EV-032) |
+| 2026-10-28 | ML-3 근무 변경 시 대타 종료: 끝에 "V4 근무 변경 시 대타 종료" 절 신설. 예약 V4-N-08~11·17·19·20 등록 (08·09는 V4 함수 부분만), 범위 다음 번호 V4-N-55~59 추가 (EV-034) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
+| 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
+| 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -466,3 +475,55 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - 계약: 같은 User의 두 현재 소속 AX/AY 알림만 정확히 반환하고 종료 AZ·다른 User BX/BW를 제외한다. 알림 ID와 근무지 ID·이름의 대응을 검사한다. 제외용까지5건을 실제 MySQL에 Commit한 뒤 Service 새 Transaction으로 조회한다.
 - 근거: EV-021 최신 기준선400, EV-022 단독1, EV-023 전체401·기준400보존·Checkstyle/Gate. 전부 LOCAL_ONLY 개별 XML 근거.
 - J2 V5-N-23의 정렬·HTTP 계약은 재사용하되 PR16은 미병합이다. 이 테스트는 다중 현재소속 합집합을 추가 보호한다. 재가입 새Row 격리·새 퇴사정책·AFTER_COMMIT·전체 동시성·운영은 완료 판정 범위 밖이다. J3/J5와 혼동하지 않는다.
+
+## V1 AUTH-1 서버 로그아웃 (V1-N-01~13, 2026-10-28)
+
+[AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) §10-1의 예약 번호를 그대로 쓴다. V1-N-13·14는 범위 다음 번호다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-23 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — Issue #62는 Backend PR #74 병합 후 종료됐다. Frontend PR #76도 병합됐다. EV-032는 로컬 구현 Test 근거이며, 각 PR의 CI 상태는 PR 기록에서 확인한다. 한 ID에 Method가 여러 개면 모두 적는다.
+
+| Test ID | Class · Method | 확인하는 것 | 종류 · 환경 | ⑤ 실행 |
+|---|---|---|---|---|
+| V1-N-01 | `ApiV1UserLogoutTest.logoutClearsRefreshTokenAndDeletesCookie` | 200 "로그아웃되었습니다", `data: null`, DB `refreshToken` null, `Set-Cookie` Max-Age 0 | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-02 | `.logoutWithOldDeviceTokenKeepsNewerLogin` | 예전 기기 쿠키로 로그아웃해도 DB = 새 기기 토큰, 새 기기 재발급 200 | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-03 | `.logoutWithoutCookieSucceedsWithoutChange`, `.logoutWithForgedTokenSucceedsWithoutChange`, `.logoutWithExpiredTokenSucceedsWithoutChange`, `.logoutWithAccessTokenAsCookieSucceedsWithoutChange` | 쿠키 없음·위조·만료·Access Token → 200, DB 그대로, 쿠키 삭제 헤더. 위조·만료·Access Token은 **DB 값을 그 토큰으로 맞춰 둔 뒤** 확인 (DB 값과 같아도 토큰 검증에서 걸러지는지) | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-04 | `.refreshAfterLogoutFails` | 로그아웃한 Refresh로 재발급 → 401 `AUTH-003` | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-05 | `RqTest.deleteCookieUsesSameAttributesAsIssuedCookie` | Domain·Secure·SameSite를 채운 설정에서 삭제 쿠키의 Path·HttpOnly·Secure·SameSite·Domain = 발급 쿠키, Max-Age 0 (기존 test5는 Domain 빈 값·Path 미확인) | UNIT · NONE | LOCAL_PASSED |
+| V1-N-06 | `ApiV1UserLogoutTest.logoutWithoutValidAccessTokenPassesSecurityFilter` | Access Token 없음 / 잘못된 Bearer 헤더에도 로그아웃 200 (같은 조건의 `/auth/me`는 401 `AUTH-004`·`AUTH-006`으로 Filter 동작 확인) | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-07 | `AuthTokenServiceTest.genRefreshTokenReturnsDifferentTokensInSameSecond` | 같은 1초 두 번 발급해도 토큰이 다름. jti 추가 전 코드에서 실패 확인 (결함 재현) | UNIT · NONE | LOCAL_PASSED |
+| V1-N-08 | `.genRefreshTokenFitsRefreshTokenColumn` | 64바이트 키(HS512) + 7자리 id에서 255자 이하. (이 Test 밖 실측: id 8자리부터 256자, EV-032. 배포 확인 항목) | UNIT · NONE | LOCAL_PASSED |
+| V1-N-09 | `ApiV1UserLogoutTest.logoutWithAllowedOriginSucceeds`, `.logoutWithOtherOriginIsRejected`, `.logoutWithNullOriginIsRejected`, `.logoutWithAllowedRefererSucceeds`, `.logoutWithOtherRefererIsRejected`, `.logoutWithoutOriginAndRefererIsRejected` | 허용 Origin 200 / 다른 Origin·`null` 403 (기존 CORS가 먼저 거부, JSON 아님) / Origin 없음 + 허용 Referer 200 / 다른 Referer·둘 다 없음 403 `AUTH-007`. 거부 시 DB·쿠키 그대로 (`Set-Cookie` 없음) | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-10 | `.oldTokenWithoutJtiStillWorks` | jti 없는 예전 형식 토큰도 재발급 200, 로그아웃 후 DB null | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-11 | `UserLogoutConcurrencyTest.logoutWaitsForNewerLoginAndKeepsIt`, `.loginWaitsForLogoutAndNewerLoginRemains` | 한쪽이 행을 잡고 Commit 전 대기(Latch) → 다른 쪽이 Lock을 기다림(1초 Timeout 확인) → 최종 DB = 새 기기 토큰 | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
+| V1-N-12 | `ApiV1UserLogoutDbErrorTest.logoutWithDbErrorFailsWithoutChange` | 진짜 조건부 UPDATE가 1행을 바꾼 뒤 DB 오류 주입 → 500 `COM-500`, `Set-Cookie` 없음, DB 토큰 되돌려짐 | API · MYSQL_TC (`@MockitoSpyBean`) | LOCAL_PASSED |
+| V1-N-13 | `RequestOriginValidatorTest.isAllowedUsesOnlyOriginWhenPresent`, `.isAllowedComparesRefererOriginWhenOriginMissing`, `.isAllowedMatchesCorsRules`, `.isAllowedRejectsWildcardEntry`, `.isAllowedRejectsMissingOrBrokenHeaders` | Origin이 있으면 Origin만 비교 (CORS가 막지 못해도 거부), 없으면 Referer 출처(scheme·host·port). 비교는 Spring CORS와 같은 규칙 (목록 끝의 `/`·대소문자 무시, Referer 기본 포트 80·443 제거). 목록에 `*`가 있어도 거부. 앞글자만 같은 주소·깨진 값·둘 다 없음 거부 | UNIT · NONE | LOCAL_PASSED |
+| V1-N-14 | `ApiV1UserLogoutOriginConfigTest.logoutWithOriginWrittenDifferentlyInConfigSucceeds` | 허용 목록을 `https://app.example.com/`, `https://Shop.Example.com`처럼 적어도 CORS를 통과한 Origin(소문자, `/` 없음)은 로그아웃 200 + CORS 허가 헤더 + DB null. 고치기 전 코드(정확히 같은 글자 비교)에서 403으로 실패 확인 (같은 설정의 임시 재현에서 응답 `AUTH-007`) | API · MYSQL_TC (Property 덮어쓰기) | LOCAL_PASSED |
+
+**⑤ 상태의 뜻 (섞지 않는다):**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 `7c1b77d` 전체 512/512 (EV-032), 수정 후 `8da19fa` 전체 515/515 (EV-033). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
+- 회귀 (기대값 변경 0): `UserServiceTest`, `ApiV1UserControllerTest`, `RqTest` test1~5, `CustomAuthenticationFilterTest` 그대로 통과 (EV-032).
+- 범위 밖: Frontend 로그아웃·다시 시도 (FE-AUTH-01~09, 별도 Issue), 운영 CORS Origin·쿠키 SameSite·비밀키 길이 (배포 담당 확인).
+
+## V4 근무 변경 시 대타 종료 (V4-N-08~11·17·19·20, V4-N-55~59, 2026-10-28)
+
+[ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) §11의 예약 번호(V4-N-08~22)를 그대로 쓴다. V4-N-55~59는 V4에서 이미 쓴 번호(V4-N-54) 다음이다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-15 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — `feat/v4-shift-change-close-requests` (**PR 전, `develop` 미반영**). 모두 `SubstituteShiftChangeCloseTest` (MySQL Testcontainers, 실제 Commit). V3 근무 취소·담당자 변경 Command가 아직 없어서 "Shift를 `FOR UPDATE`로 잠근 Transaction 안에서 `SubstituteRequestService.closeActiveRequestsByShiftChange` 호출"로 흉내 낸다.
+
+| Test ID | Method | 확인하는 것 | 종류 · 환경 | ⑤ 실행 |
+|---|---|---|---|---|
+| V4-N-08 (V4 함수 부분) | `closesOpenRequestAndKeepsCandidates` | OPEN + PENDING 후보 2명 → `CLOSED / SHIFT_CHANGED`, `closedAt = now`, 후보 PENDING 그대로, 반환 1건 (요청자 소속, 수락 후보 없음). 배정 이력 연결·근무 담당 변경·종료 알림은 V3·V5 몫이라 이 Test 범위 밖 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-09 (V4 함수 부분) | `closesAcceptedRequestAndKeepsAcceptedRecord` | ACCEPTED → `CLOSED / SHIFT_CHANGED`, 수락 후보 ACCEPTED와 응답 시각(`respondedAt`, 종료 1시간 전) 그대로, 반환에 수락 후보 소속 포함. 근무 취소·알림은 V3·V5 몫 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-10 | `requesterCanCreateNewRequestAfterClose` | 종료 뒤 같은 근무로 새 대타 요청 생성 성공 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-11 | `pendingCandidateCannotAcceptAfterClose` | 종료 뒤 대기 후보 수락 → `REQUEST_NOT_OPEN`, 요청 상태 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-17 | `leavesApprovedRequestAsIs` | APPROVED 요청은 그대로 (`closeReason` null, `approvedAt` 유지), 반환 0건, `Shift.member` = 수락자 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-19 | `closedRequestCannotBeReopened` | 종료된 요청에 수락·거절·승인·관리자 종료 → 모두 `BusinessException`, `CLOSED / SHIFT_CHANGED`와 후보 상태 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-20 | `publishesNoSubstituteEvent` | 종료 함수가 대타 이벤트를 발행하지 않음 (`MANAGER_CLOSED` 알림 0). 앞선 수락 이벤트가 세어지는지로 셈 자체를 확인 (`@RecordApplicationEvents`, `stream(Any::class.java)`) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-55 | `leavesClosedRequestAndClosesOnlyActive` | 하루 전 `MANAGER_CLOSED`된 요청은 사유·`closedAt` 그대로, 그 뒤 만든 진행 중 요청만 종료 (API-CATALOG §4 CLOSED 행) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-56 | `closesAllActiveRequestsInIdOrder` | 진행 중 요청 2건(서비스 검사로는 생기지 않는 데이터) → 모두 종료, 반환 ID 오름차순 (API-CATALOG §4 "모든 OPEN·ACCEPTED". G03-D-15의 2건 이상 처리 미결정 → 팀 확인 대상) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-57 | `requiresCallerTransaction` | Transaction 없이 호출 → `IllegalTransactionStateException`, 요청 OPEN 그대로 (`Propagation.MANDATORY`) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-58 | `waitsForAcceptInProgress` | 후보 수락이 Request를 잡고 Commit 전 → Shift를 잡은 종료 함수가 기다림(1초 Timeout 확인) → 수락 Commit 후 ACCEPTED 상태로 종료, 수락 후보 반환 (`runSecondWhileFirstHoldsLock`) | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
+| V4-N-59 | `reportsAcceptedCandidateEvenIfRequestWasReadBeforeLock` | Lock 없이 요청을 먼저 읽어 둔(OPEN) Transaction에서 그사이 수락이 Commit돼도 수락 후보를 놓치지 않음 (1차 캐시의 옛 status를 보지 않음, ML-5 §4-3) | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
+
+**⑤ 상태의 뜻 (섞지 않는다):**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 `77bae13` 전체 500/500, develop 병합 `22a5a2e` 전체 527/527 (EV-034). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
+- 회귀 (기대값 변경 0): 기존 대타 Test 전체 그대로 통과 (EV-034).
+- 범위 밖: V3 근무 취소·담당자 변경 Command와 그 경로 Test (V3-N-33, H6-C1~C4), 종료 알림 Type·받는 사람·합치기 (V5, NOTIFICATION-TYPES §3-3), 퇴사 시 후보 처리 (V4-N-12~16·22), 종료 원인 연결 (V4-N-18), 운영 `close_reason` ENUM 변경 (배포 담당, ML-3 §9).

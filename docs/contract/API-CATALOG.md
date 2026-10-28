@@ -260,7 +260,8 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | 하지 않는 것 | Access Token 즉시 무효화, 다중 기기 세션, Rotation (AUTH-1 Q2-1, G03-D-24) |
 | 배포 환경 확인 (S3) | Frontend와 Backend의 출처가 다르면(다른 도메인) Refresh Cookie는 `SameSite=None; Secure`여야 전송된다. 이 값과 허용 출처 목록이 운영 배포와 맞는지, `Origin`이 비는 요청(일부 브라우저·직접 호출)이 `Referer`로 처리되는지 확인. 운영 설정값은 배포 담당 확인 (운영 접속 금지) |
 | Frontend | 결과와 관계없이 화면 정리. 서버 무효화가 확인되지 않으면 안내하고 다시 시도 (Q5-1) |
-| Test | AUTH-1 V1-N-01~12 |
+| Test | AUTH-1 V1-N-01~13 (TEST-INVENTORY V1 AUTH-1 절) |
+| 구현 (2026-10-28) | Issue #62 `feat/auth-server-logout`은 Backend PR #74 병합 후 종료됐다. Frontend는 PR #76에서 병합됐다. 경로 `POST /auth/logout` 확정, 성공 200 `"로그아웃되었습니다"`·`data: null`. 허용 목록은 `custom.cors.allowed-origins` 재사용 (`application.yml` 변경 없음). **허용 안 된 Origin·`Origin: null`은 기존 CORS가 먼저 403 `Invalid CORS request`(JSON 아님)**, Origin 없음 + Referer 실패·둘 다 없음은 403 `AUTH-007`. 세부는 AUTH-1 "Backend 구현 기록" 절. 병합은 배포 환경 검증 완료를 뜻하지 않는다. |
 
 ### 5-2. 기존 API 동작 변경 (모두 승인 대상, Migration 후 Improvement)
 
@@ -271,7 +272,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | CHG-03 | SUB-07 `GET /substitute-requests/accepted` | User 기준, `c.member.leftAt` 조건 없음 | 현재 소속 조건 추가 (방어) | G03-D-22 §6-4 |
 | CHG-04 | `GET /shifts/{shiftId}` | 공개·SCHEDULED·담당 **User** = 나 확인. 담당 소속이 현재 소속인지는 확인 안 함 | 담당 소속이 현재 소속인지 확인 (재가입자가 이전 소속 근무를 ID로 보지 못하게). CANCELLED 거부는 유지 | ML-4 §8 ① |
 | CHG-05 | 대타 승인 `PATCH .../approve`, 후보 응답 `PATCH .../response` | 시작한 근무에서 승인 `SFT-006`, 응답 `SUB-012` (요청 문구) | 잘못된 안내 정정 (T1-01·02). **P1** | G03-D-03 §3-1 |
-| CHG-06 | 대타 승인 `PATCH .../approve` | **Request를 `FOR UPDATE`로 잠그고 상태를 검사한 뒤에 관리자 권한을 검사한다** (`SubstituteRequestService` L236 → L241 → L247). 그래서 그 근무지 관리자가 아닌 인증 사용자도 임의 `requestId`로 존재·상태(404 / `SUB-002` 400 / 403)를 구분할 수 있고 Row Lock을 잠깐 잡게 된다 | M3 선검사 (§5-5) | **사용자 잠정 결정 2026-10-25: 대타 P0 정합성 묶음에 포함 (§5-4 (나))** |
+| CHG-06 | 대타 승인 `PATCH .../approve` | **Request를 `FOR UPDATE`로 잠그고 상태를 검사한 뒤에 관리자 권한을 검사한다** (`SubstituteRequestService` L236 → L241 → L247). 그래서 그 근무지 관리자가 아닌 인증 사용자도 임의 `requestId`로 존재·상태(404 / `SUB-002` 400 / 403)를 구분할 수 있고 Row Lock을 잠깐 잡게 된다 | M3 선검사 (§5-5) | **사용자 잠정 결정 2026-10-25: 대타 P0 정합성 묶음에 포함 (§5-4 (나))**. 2026-10-28 구현 PR #83 (DECISION-LOG §4-6) |
 | CHG-07 | M3 선검사를 다른 ID 직접 지정 API에도 | §5-5 표 | §5-5 | **사용자 잠정 결정 2026-10-25: (가) 같은 원칙 적용 (§5-6)** |
 
 **등급 (Improvement 기준, Kotlin Migration은 모두 기존 동작 보존):**
@@ -303,6 +304,8 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 ### 5-4. CHG-06 결정 (사용자 잠정 결정 2026-10-25: (나))
 
 대타 승인의 권한 검사 순서 개선을 **대타 P0 정합성 묶음**에 넣는다. 이유: 안내 문구가 아니라 권한 경계 문제이고, ML-5의 승인 Lock 순서 변경 후보(Shift → Request)와 같은 흐름을 고치게 되므로 한 번에 정리한다. Kotlin Migration은 기존 동작을 그대로 옮기고 이 위험을 알려진 이슈로 기록한다. 실행으로 확인하기 전이므로 **"취약점 확정"이 아니라 "정적 확인한 위험"**이다.
+
+**구현 (2026-10-28, PR #83, DECISION-LOG §4-6):** 대타 승인(SUB-04)만 §5-5 "역할 먼저 검사"와 ML-5 순서로 바꿨다 — 역할 확인 → Lock 없는 근무·근무지 ID 조회 → Shift `FOR UPDATE` → Request `FOR UPDATE` → Lock 뒤 근무 동일성·상태·관리자 재확인. §5-5 "고칠 방향" 4단계의 수락자 소속 `FOR SHARE`는 퇴사 기능과 함께 묶음 C에서 추가한다. §5-5 표의 대타 종료·후보 응답·근무 상세·알림 읽음은 AS-IS다.
 
 ### 5-5. M3 선검사 — 현재 코드와 고칠 방향
 
@@ -417,3 +420,5 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | S3-A: 대타 승인·종료의 "역할 먼저 검사"(W안), M3-T1·T5 기대값 갱신, 새 API-SB-02 (관리자 끝난 대타 요청, P0 후보) — 사용자 잠정 결정, 팀 `PENDING` |
 | 2026-10-25 | S3-B: W안 3단계에 Lock 후 권한 재확인과 1단계가 최종 인가가 아님을 명시, API-SB-02에 경계(`startAt == now`)·`Clock`·DB 식·ID 비노출·만료 비저장·`/api/v1`·ID 혼동 주의 추가 (정적 확인 근거 포함) |
 | 2026-10-25 | S3 Commit 전: W안·M3와 G03-D-04 연결 명시, API-SB-02 DB 식의 적용 전제(대상 필터 후, APPROVED 제외), `hasNewerActiveRequest`의 진행 중 정의, 이름 스냅샷 사실 |
+| 2026-10-28 | API-AU-01 구현 행 추가 (경로·응답 확정, 출처 검사와 CORS 거부 관계), Test ID V1-N-13 추가 |
+| 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |

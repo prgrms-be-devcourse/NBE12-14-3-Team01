@@ -8,6 +8,7 @@ import {
   apiFetch,
   clearToken,
   getToken,
+  refreshAccessToken,
   UnexpectedResponseError,
 } from "@/lib/api";
 
@@ -31,6 +32,8 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
   const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [status, setStatus] = useState<CurrentUserStatus>("loading");
+  // 연결 오류 화면에서 다시 시도 누르면 올라감
+  const [reloadKey, setReloadKey] = useState(0);
 
   // 로그인한 사람 정보 한 번만 불러옴
   useEffect(() => {
@@ -45,6 +48,8 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
       }
 
       try {
+        // accessToken만 남고 쿠키는 없어진 경우(브라우저 재시작 등) 로그인처럼 보이다 끊기지 않게 재발급으로 먼저 확인
+        await refreshAccessToken();
         const data = await apiFetch<CurrentUser>("/auth/me");
         if (ignore) {
           return;
@@ -65,7 +70,7 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
           return;
         }
 
-        // 서버 꺼짐 등은 로그인 화면으로 안 보내고 이름 자리만 비움
+        // 서버 꺼짐 등은 만료라고 단정 못 하니까 로그인 화면으로 안 보내고 연결 오류 화면 (토큰 유지)
         if (
             !(error instanceof ApiError) &&
             !(error instanceof UnexpectedResponseError) &&
@@ -84,11 +89,34 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
     return () => {
       ignore = true;
     };
-  }, [router]);
+  }, [router, reloadKey]);
 
   // 로그인 확인 끝날 때까지 화면 안 그림
   if (status === "loading") {
     return null;
+  }
+
+  if (status === "error") {
+    return (
+        <main className="flex min-h-screen items-center justify-center bg-[#f5faf7] px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#dce8e2] bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-bold text-[#d95555]">
+              서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.
+            </p>
+
+            <button
+                type="button"
+                onClick={() => {
+                  setStatus("loading");
+                  setReloadKey((prev) => prev + 1);
+                }}
+                className="mt-6 w-full rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52]"
+            >
+              다시 시도
+            </button>
+          </div>
+        </main>
+    );
   }
 
   return (

@@ -20,7 +20,7 @@
 | DL-001 | Cross-Workplace: 다른 근무지 공식 Shift와 겹치는 Pattern·DRAFT를 허용하는가 (A 등록부터 차단 / B 허용+경고, Publish 차단 / C 현행 유지+Publish 차단) | 신규 정책 제안 | 현행 보존 (CB-SCH-01~04). 제안: C + 선택 P1 boolean 표시 (IMP-05) | Migration 중 | 팀 | PENDING | |
 | DL-002 | develop의 전역 READ COMMITTED (`application.yml`, 모든 Profile)를 유지하는가 | DISCREPANCY (Original ↔ develop, 근거 Evidence 없음) | develop 설정 보존. Kotlin 이식 기준도 RC | H6 재현 결과 후 | 팀 / H6 총괄 | PENDING | |
 | DL-003 | Kotlin Gradle Plugin Version (2.3.21 / 2.4.20~21)과 그에 맞는 Gradle Wrapper Version | 기술 환경 | M0 시작 불가 → **PR #1로 적용됨. 현행 유지, 추가 변경 금지** | M0-2 전 | 공통 설정 Owner | PENDING (PR #1로 적용됨, 승인 기록 대기) | **적용 사실 (PR #1 `chore/kotlin-setup`, 2026-10-22 병합 → `develop` `cdaaa13`):** Kotlin 2.3.21 (`jvm`·`plugin.spring`·`plugin.jpa`·`plugin.lombok`), Gradle Wrapper 9.7.1 → **9.3.0**. **변경 이유 (사용자 확인, 2026-10-23):** Kotlin Migration 환경 구성 시 Kotlin과 Gradle 버전 호환성 문제가 없도록 조정해 달라는 요청에 따라, Kotlin 2.3.21의 공식 완전 지원 범위에 Gradle을 맞춤. **공식 근거:** Kotlin Gradle 호환표 — KGP 2.3.20–2.3.21의 Gradle min–max 7.6.3–9.3.0 (https://kotlinlang.org/docs/gradle-configure-project.html, 2026-10-23 확인). **Test 근거:** CI Suite success만 (EV-008). 개별 Test 결과·Build 경고 목록은 미기록. **승인자·일자:** 미기록 (사람이 기입). PR 리뷰 Approve 2건은 PR 승인이며 이 행의 결정 기록이 아님. 상세: `TECH-STACK-DECISIONS` §1-A·§1-B |
-| DL-004 | Lombok 상호운용 (`kotlin("plugin.lombok")` Alpha / 순서 조정·delombok) | 기술 환경 | M0-3 시작 불가 → **PR #1로 적용됨. 현행 유지** | M0-3 전 | 공통 설정 Owner | PENDING (PR #1로 적용됨, 승인 기록 대기) | **적용 사실 (PR #1, `cdaaa13`):** `kotlin("plugin.lombok") version "2.3.21"`. 기존 Java Lombok 설정(`compileOnly`/`annotationProcessor`) 유지. **검증:** Kotlin → Java Lombok 멤버 참조 Test(M0-3 계획)는 기록 없음. 환경 검증 Test `KotlinEnvironmentTest`는 Lombok을 참조하지 않음. **승인자·일자:** 미기록 (사람이 기입) |
+| DL-004 | Lombok 상호운용 (`kotlin("plugin.lombok")` Alpha / 순서 조정·delombok) | 기술 환경 | M0-3 시작 불가 → **PR #1로 적용됨. 현행 유지** | M0-3 전 | 공통 설정 Owner | PENDING (PR #1로 적용됨, 승인 기록 대기) | **적용 사실 (PR #1, `cdaaa13`):** `kotlin("plugin.lombok") version "2.3.21"`. 기존 Java Lombok 설정(`compileOnly`/`annotationProcessor`) 유지. **검증:** Kotlin → Java Lombok 멤버 참조 Test(M0-3 계획)는 기록 없음. 환경 검증 Test `KotlinEnvironmentTest`는 Lombok을 참조하지 않음. **제거 사실 (2026-10-28, PR #81):** PR #77·#79로 Java 소스가 0개가 되어 Kotlin이 참조할 Java Lombok 멤버가 없어졌으므로 `kotlin("plugin.lombok")`와 Lombok 의존성 4개를 제거했다 (develop `92dcdfa` 대비 Test 515/515 이름·결과 동일, 근거 TECH-STACK-DECISIONS §1). 실행 이력이며 상태·승인 칸은 바꾸지 않는다. **승인자·일자:** 미기록 (사람이 기입) |
 | DL-005 | 외부 분석 자료(G-0x, A-0x, 2차 명세 PDF) 공유 위치 | 문서 | ID 참조 기본. 검토 후 선별 공유한 자료만 `docs/references/` | 10/22 | 팀 | PENDING | **사실 (D0-E-2B, 2026-10-23, 사용자 지시):** G-03 원문을 참고 공유본으로 첫 docs PR에 포함 (`docs/references/G-03-contract-review.md`, 개인 경로 1줄만 바꿈, SHA-256은 `docs/references/README.md` §3). → G-03 **원문 접근성**은 해결. **미해결:** G-01·G-02·G-04·G-05·A-0x·2차 명세 PDF의 공유 위치, 참고 자료 공유 기준의 팀 승인, G-03 계약 후보를 Kotlin 비교 기준으로 승인할지 (G03-OQ-02). **승인자·일자:** 미기록 |
 | DL-006 | `docs/` 구조, SoT 분담 (기술 상태 = Matrix, 일정 = Notion) | 문서 | 이 PR은 초안 | D0-B 리뷰 | 팀 | PENDING | |
 | DL-007 | "Migration은 develop 현재 동작 보존 (정답 판정 아님)" 원칙 | 작업 규칙 | AI-RULES 초안대로 운용 | D0-B 리뷰 | 팀 | PENDING | |
@@ -104,7 +104,7 @@ G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있
 | [`G03-D-05`](proposals/G03-D-05-confirmation-response.md) 경고 후 확인 응답 계약 | G03-D-05 (주), G03-D-21·03 | 사용자 잠정 결정 (2026-10-25) / ② `PROPOSED` / ③ `DRAFT`. S05-a: 겹침 구간만 표시 | G03-D-05 `PENDING` | 새 Command만: 확정 요청 → 409 CONFIRM_REQUIRED + 충돌 목록 → 확인 목록과 함께 같은 API 재요청, 현재 충돌 ⊆ 확인 범위면 진행. 계획 불일치는 409 STALE. 기존 DRAFT·Publish·불가능 시간 등록 형식은 유지 |
 | [`API-CATALOG`](../contract/API-CATALOG.md) B1 퇴사·공개 후 변경 API | G03-D-04 (새 API 범위), ML-2 D27-5 해석 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | 새 API는 대상 없음·다른 근무지를 404로 통일 (기존 API 400/404 유지). 대타가 있는 근무도 상태별 처리(OPEN·ACCEPTED → `SHIFT_CHANGED`, APPROVED 이력 보존)를 보장하면 취소·담당자 변경 가능 |
 | [`USER-PATH-REVIEW`](../contract/USER-PATH-REVIEW.md) S3 사용자 경로 검증 (S3-A 결정) | CHG-06·07 (M3), G03-D-10 (연결), G03-D-22 (관리자 대체 화면) | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-10 `PENDING` (`DEFER` 유지) | A: 대타 승인·종료는 역할 먼저 검사 (비관리자 403 조회 전, 범위 밖 관리자 404). B: 알림 읽음 응답 code는 G03-D-10 대기, Lock 전 확인·Frontend 복구는 별도. C: 관리자 끝난 대타 요청 API-SB-02 (종료+만료, 사실 Field, 7일 기본 필터) P0 후보. X-4: 실행한 관리자는 관리자 수신에서만 제외. B2·Frontend·ErrorCode·NotificationType·우선순위·검증 전략 행은 S3-B에서 추가 (아래) |
-| [`API-CATALOG`](../contract/API-CATALOG.md) B2 새 API·기존 API 변경 (CHG-01~07, M3) | **G03-D-04 (연결, `DEFER`)**, ML-H2, ML-4, G03-D-22 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | CHG-06 (나) 대타 승인 권한 검사 순서 P0, CHG-07 (가) ID 직접 지정 API 전체에 M3 선검사, S3-A W안. **M3·W안은 G03-D-04(다른 근무지·User 자원 접근 노출 정책)의 답에 해당한다 → 팀이 함께 승인해야 함** (S3-B 발견, 결정 아님) |
+| [`API-CATALOG`](../contract/API-CATALOG.md) B2 새 API·기존 API 변경 (CHG-01~07, M3) | **G03-D-04 (연결, `DEFER`)**, ML-H2, ML-4, G03-D-22 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | CHG-06 (나) 대타 승인 권한 검사 순서 P0, CHG-07 (가) ID 직접 지정 API 전체에 M3 선검사, S3-A W안. **M3·W안은 G03-D-04(다른 근무지·User 자원 접근 노출 정책)의 답에 해당한다 → 팀이 함께 승인해야 함** (S3-B 발견, 결정 아님). 대타 승인(SUB-04) 부분만 §4-6에서 채택 (2026-10-28, PR #83) |
 | [`FRONTEND-CONTRACT`](../contract/FRONTEND-CONTRACT.md) §9 화면 계약 | G03-D-05, ML-4 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | — | 인계 대상이 확정 전 소속 종료 → 409 STALE, 빠진 근무에 새 담당자 이름 없음, 이전 소속 데이터 폐기 원칙. S3-A: 알림 읽음 실패 복구, 관리자 끝난 요청 탭 |
 | [`ERROR-CODES`](../contract/ERROR-CODES.md) §6 | G03-D-03 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-03 `PENDING` | 목록 확인 경고는 새 code `WPL-011`·`SFT-021` (공통 `data` 형식), T1-04 `SUB-006`은 code 유지·문구만 중립화 |
 | [`NOTIFICATION-TYPES`](../contract/NOTIFICATION-TYPES.md) §6 | G03-D-22, **G03-D-16 (연결)**, **G03-D-20 (연결)** | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-16·20 `PENDING` | 종료 알림 사유별 Type, 받는 사람별 합치기 세 조건, `SHIFT_CHANGED`의 PENDING 후보 제외, 실행 관리자는 관리자 수신에서만 제외 (S3-A X-4). 과거 소속 알림 읽음(B-2)은 G03-D-16과 같은 질문, 관리자 만료 조회(API-SB-02)는 만료 알림(G03-D-20) 없이 대체 화면만 제공 |
@@ -162,3 +162,29 @@ G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있
 5. 화면은 STALE이면 미리보기와 비교 정보를 함께 새로 받는다. 여전히 유효한 인계·취소 선택만 복구하고 바뀐 영향을 다시 보여 준다. 변경 요청을 자동 재전송하지 않는다.
 
 **문서 1차본의 경계:** 정책 방향은 이 절로 확정한다. API의 `previewContext`와 신규 추가의 `newShiftKey`는 구현을 위한 1차 계약 후보이며 필드·무결성 방식·유효기간은 해당 Command의 구현 착수 시 V2/공통/Frontend가 확정한다. 서버가 미리보기의 원본 범위를 검증할 수 없으면 그 Command 구현을 완료로 처리하지 않는다. 이 기술 착수 조건은 J4 제출이나 AS-IS Kotlin Migration 전체의 차단 조건이 아니다. 상세 보장과 검증 항목은 G03-D-05 §5-4 및 DOMAIN-DEVELOPMENT-GUIDE §7-4를 따른다.
+
+### 4-5. AUTH-1 Backend 구현 세부 (2026-10-28, V1 Owner 결정)
+
+G03-D-23(§4-2) 범위 안에서 V1 Owner가 Issue #62 구현 중 이 대화의 선택 질문에 답한 내용이다. **팀 승인 기록이 아니다.** 팀 확인은 PR 리뷰로 하며, 승인되면 이 절에 승인자·일자를 적는다. AI가 승인 범위를 넓히지 않는다.
+
+| 항목 | 결정 | 근거 |
+|---|---|---|
+| `AUTH-007` | 403, 문구 "허용되지 않은 요청 출처입니다." | ERROR-CODES §4 예약 번호, G03-D-03 §5-2 (403 = 행위자 권한 부족) |
+| 로그아웃 성공 응답 | 200, "로그아웃되었습니다", `data: null` | AUTH-1 §8 응답 형식 |
+| `jti` 형식 | `UUID.randomUUID()` (AUTH-1 §8 예시) | 64바이트 이상 비밀키 + id 8자리부터 255자 초과는 배포 확인 항목으로 넘김 (EV-032) |
+| 허용 안 된 Origin의 응답 | 기존 CORS 거부(403 `Invalid CORS request`)를 그대로 둠. `AUTH-007`은 Referer 실패·둘 다 없음에서 사용 | 보안 결과 같음, 브라우저는 그 응답을 읽지 못함. 보안 필터 순서 변경 없음 (AUTH-1 "Backend 구현 기록" 절) |
+
+### 4-6. 대타 승인 응답·Lock 순서 (B', 2026-10-28, PR #83 리뷰 승인)
+
+USER-PATH-REVIEW 결정 A(W안)와 ML-5의 승인 Lock 순서를 **대타 승인 API(SUB-04)에 한해** 채택한다.
+
+- 근거: [PR #83](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/83) Head `03a4bcc`의 abcdeghi·dewyflowers Approve (2026-10-28). dewyflowers 리뷰가 "이 PR 승인을 결정 A 수용으로 기록"을 요청했고, V4 Owner가 이 리뷰 승인으로 팀 승인을 갈음한다고 전달했다 (2026-10-28). §4-1의 "PR Approve만으로는 정책 승인으로 읽지 않는다" 규칙의 예외이며 이 절의 범위에만 적용한다.
+- abcdeghi 리뷰는 이 응답이 G03-D-04 미결정 사항과 관련돼 "나중에 충돌하면 합의해서 맞출 수 있다"는 여지를 남겼다. G03-D-04가 다르게 결정되면 이 절을 다시 연다.
+
+| 항목 | 결정 | 근거 |
+|---|---|---|
+| 승인 실패 응답 (결정 A) | 어느 근무지에서도 현재 MANAGER가 아니면 Request 조회 전 403 `WPL-004`. 다른 근무지 요청과 없는 ID는 같은 404 `SUB-001` | API-CATALOG §5-5, USER-PATH-REVIEW §9-0 |
+| 승인 Lock 순서 | Lock 없는 ID 조회 → Shift `FOR UPDATE` → Request `FOR UPDATE` → Lock 뒤 근무 동일성·상태·관리자 재확인 → 수락자 User | ML-5 §5-1 승인 행. ML5-T3이 이전 코드에서 Deadlock으로 실패(ML5-R2 재현), 바꾼 코드에서 통과 (EV-035) |
+| 기존 Test 기대값 | V4-T-26을 둘로 나눔 (403 `WPL-004` / 404 `SUB-001`), V4-T-74는 code 그대로·조회 전 거절 확인 추가 | TEST-INVENTORY §5-4 |
+
+**이 절로 정하지 않은 것:** G03-D-04 전체(다른 API의 범위 밖 응답), 대타 종료(SUB-08)의 W안과 후보 응답·알림 읽음 선검사(CHG-07), 수락자 소속 `FOR SHARE` 재확인(묶음 C), Lock 뒤 근무 동일성 불일치 응답(지금 500, ML-5 §6 기준이면 409 후보로 ErrorCode 추가 필요), 다른 Command의 Lock 순서와 RC/RR·교착/timeout 응답 매핑.

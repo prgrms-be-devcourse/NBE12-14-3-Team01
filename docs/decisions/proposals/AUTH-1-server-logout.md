@@ -7,8 +7,8 @@
 | 결정 단계 | **사용자 잠정 결정** (Q1·S1·S2·Q2·Q3·Q5, 2026-10-23). 팀 승인 전 |
 | ② 정책 | 카드 `PROPOSED`. `DECISION-LOG` G03-D-23 `PENDING`, G03-D-24 `PENDING` |
 | ③ 문서 | `DRAFT` (저장소 Proposal 문서. 2026-10-25 이관, 원본 로컬 `drafts/D2-AUTH-1/`) |
-| 구현 | 없음 |
-| ④ / ⑤ | Backend·Frontend 검증 전부 `SPECIFIED` / `NOT_RUN` |
+| 구현 | **Backend PR #74 병합 (2026-10-28), Frontend PR #76 병합 (2026-10-28), Issue #62 종료**. 세부 구현은 끝의 "Backend 구현 기록" 절. 병합은 배포 환경 통합 검증 완료를 뜻하지 않는다. |
+| ④ / ⑤ | Backend V1-N-01~13 `IMPLEMENTED` / `LOCAL_PASSED` (EV-032, TEST-INVENTORY V1 AUTH-1 절). PR #74 Backend/Docker CI 성공. Frontend 구현은 PR #76에서 병합됐으며 FE-AUTH-01~09의 실제 브라우저 통합 검증은 별도 확인 대상이다. |
 | 기준 코드 | 3차 `develop` `c0427c2` (Production Java = `cdaaa13` = 2차 `8da2bec`). 정적 확인 |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
@@ -221,9 +221,26 @@ F-INV-02가 필요한 이유: 서버 로그아웃이 실패한 뒤 같은 브라
 |---|---|---|
 | §ErrorCode 행 (새 code 후보 `AUTH-007` / 403) | [G03-D-03](G03-D-03-error-code.md) §4·§5-2 | 새 code는 `{DOMAIN}-{NNN}` 다음 순번, 공통 목록에 먼저 예약 (S2-4). 403 = 행위자 권한 부족 기준과 맞는지 S2-4에서 확인 |
 
+## Backend 구현 기록 (2026-10-28)
+
+V1 Owner가 구현 중 정한 세부다. 정책 방향은 §4·DECISION-LOG §4-2 그대로이며, 아래는 그 범위 안의 구현 선택이다 (DECISION-LOG §4-5).
+
+| 항목 | 구현 | 근거·이유 |
+|---|---|---|
+| `jti` | `UUID.randomUUID()` (§8 예시 그대로) | 운영 비밀키가 64바이트 이상(HS512)이면 사용자 id 8자리(1,000만)부터 Refresh Token이 256자로 `VARCHAR(255)`를 넘음 (실측, EV-032. V1-N-08은 7자리 255자 이하를 확인). 배포 담당 확인 항목 |
+| 경로·응답 | `POST /auth/logout` (실제 `/api/v1/auth/logout`), 200 `"로그아웃되었습니다"`, `data: null` | §8 형식 |
+| 출처 검사 | 새 `RequestOriginValidator`가 `custom.cors.allowed-origins` 값을 재사용 (`application.yml` 변경 없음). Origin이 있으면 Origin만 비교, 없으면 Referer 출처(scheme·host·port, 기본 포트 80·443 제거), 둘 다 없거나 읽을 수 없으면 거부. **비교는 Spring CORS의 `CorsConfiguration.checkOrigin`과 같은 규칙** (목록 끝의 `/`·대소문자 무시). 와일드카드 패턴은 쓰지 않고 목록에 `*`가 있어도 거부 | S2, §8 (정확한 주소·와일드카드 없음). 규칙이 다르면 운영 목록을 `https://app.example.com/`처럼 적었을 때 CORS는 통과하는데 로그아웃만 403이 됨 (코드 검토에서 발견·재현, V1-N-14) |
+| 허용 안 된 Origin·`Origin: null` | 기존 CORS 설정이 먼저 403 `Invalid CORS request`(JSON 아님)로 거부. 우리 검사도 Origin을 직접 비교해 CORS 설정이 바뀌어도 `AUTH-007`로 거부 (V1-N-13) | 브라우저는 CORS 허가 헤더 없는 응답을 읽지 못하므로 `AUTH-007` JSON으로 통일해도 화면 결과가 같음. 보안 필터 순서를 바꾸지 않음 |
+| `AUTH-007` | 403 `"허용되지 않은 요청 출처입니다."` — Origin 없음 + Referer 실패, 둘 다 없음 | ERROR-CODES §4 예약 |
+| 검사 위치 | Controller 맨 앞. 실패하면 DB·쿠키 변경 전에 멈춤 | INV-03 |
+| `modifyDate` | 로그아웃(조건부 UPDATE)은 Auditing을 거치지 않아 `modifyDate`를 바꾸지 않음 | 요구 없음, 기록만 |
+| 직접 호출 | Postman·curl처럼 Origin·Referer가 없으면 403 `AUTH-007` | S2 |
+
 ## 14. 변경 이력
 
 | 일자 | 내용 |
 |---|---|
 | 2026-10-23 | 초안. Q1·S1·S2·Q2·Q3·Q5 사용자 잠정 결정 통합. 교차 검토 의견 반영 (§4) |
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
+| 2026-10-28 | Backend 구현 반영: 머리 표 구현·④/⑤ 행, "Backend 구현 기록" 절 (jti UUID와 길이 경계, 출처 검사와 CORS 관계, `AUTH-007` 문구) |
+| 2026-10-28 | 코드 검토 반영: 출처 비교를 Spring CORS와 같은 규칙으로 (끝의 `/`·대소문자, Referer 기본 포트), `*` 거부 |

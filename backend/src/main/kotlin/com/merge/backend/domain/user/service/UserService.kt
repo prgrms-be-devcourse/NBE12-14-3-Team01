@@ -74,6 +74,18 @@ class UserService(
         return authTokenService.genAccessToken(user)
     }
 
+    // 쿠키가 없거나 이미 쓸 수 없는 토큰이면 아무것도 안 바꾸고 성공으로 끝냄 (여러 번 불러도 같음)
+    @Transactional
+    fun logout(refreshToken: String?) {
+        if (refreshToken.isNullOrBlank()) {
+            return
+        }
+
+        val userId = authTokenService.refreshTokenUserIdOrNull(refreshToken) ?: return
+
+        userRepository.clearRefreshTokenIfMatches(userId, refreshToken)
+    }
+
     fun payloadOrNull(jwt: String?): Map<String, Any>? {
         return authTokenService.payloadOrNull(jwt)
     }

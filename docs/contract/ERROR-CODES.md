@@ -176,7 +176,7 @@
 
 | 예약 | HTTP | 종류 | 상황 | 사용 API | 근거 |
 |---|---|---|---|---|---|
-| `AUTH-007` | 403 | PERMISSION | 로그아웃 요청의 출처(`Origin`·`Referer`) 검증 실패 | API-AU-01 | AUTH-1 S2 |
+| `AUTH-007` | 403 | PERMISSION | 로그아웃 요청의 출처(`Origin`·`Referer`) 검증 실패 | API-AU-01 | AUTH-1 S2. **적용 (2026-10-28, Backend PR #74 병합, Issue #62 종료):** `UserErrorCode.INVALID_REQUEST_ORIGIN`, 문구 "허용되지 않은 요청 출처입니다." (V1 Owner 결정, DECISION-LOG §4-5). Origin 없음 + Referer 실패·둘 다 없음에서 나옴. 허용 안 된 Origin·`null`은 기존 CORS가 먼저 403 `Invalid CORS request`(이 code 아님) |
 | `WPL-006` | 404 | NOT_FOUND | 퇴사 대상·인계 대상 소속이 없거나 다른 근무지 (구별하지 않음) | API-LV-01·02 | API-CATALOG §1 |
 | `WPL-007` | 409 | STATE_CONFLICT | 퇴사 대상이 MANAGER | API-LV-01·02 | ML-H2 H2-9 |
 | `WPL-008` | 409 | STATE_CONFLICT | 퇴사 대상이 이미 종료된 소속 | API-LV-01·02 | ML-4 §5 |
@@ -252,3 +252,4 @@
 | 2026-10-25 | 질문 2개 사용자 잠정 결정 반영 (§6). 정정 범위·우선순위·영향 Test 표(§2-7), 범위 밖 404 응답이 없는 ID와 같은지 정적 확인, `WPL-011`·`SFT-021`의 공통 형식, `SUB-006` 두 사용처 대조 |
 | 2026-10-25 | S2-5B: Test 0 code 11개를 TEST-INVENTORY §5-3에 연결 |
 | 2026-10-26 | `COM-500` 행에 R1 관찰 기록 (Controller 없는 URL → 500, 최종 계약 아님, 405 경로 미검증). 정상 정책으로 확정하지 않음 |
+| 2026-10-28 | §4 `AUTH-007` 적용 기록 (Enum 이름·문구·나오는 경우, CORS가 먼저 거부하는 경우). §3 AS-IS 목록은 그대로 |

@@ -32,15 +32,15 @@
 | JWT | JJWT 0.13.0 (`jjwt-api` / `jjwt-impl` / `jjwt-jackson`) | BUILD, RESOLVED |
 | SpringDoc | `springdoc-openapi-starter-webmvc-ui` 3.1.0, swagger-ui 5.32.11 | BUILD, RESOLVED |
 | REST Docs | 없음 | BUILD |
-| Lombok | 1.18.46 (Boot 관리), `compileOnly` + `annotationProcessor` (main/test) | BUILD, RESOLVED |
+| Lombok | **없음** (2026-10-28 PR #81에서 제거, Java 소스 0개 이후 사용 0건). 이전 (develop `92dcdfa`까지): 1.18.46 (Boot 관리), `compileOnly` + `annotationProcessor` (main/test) | BUILD |
 | MapStruct / QueryDSL / kapt | 없음 | BUILD, 코드 검색 0건 |
 | DB Driver | `mysql-connector-j` 9.7.0, H2 2.4.240 | RESOLVED |
 | Testcontainers | 2.0.5 (`testcontainers-mysql`) | RESOLVED, BOM |
-| Test DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true`, `ddl-auto: create` | BUILD (`application-test.yml`) |
+| Test DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true&TC_MY_CNF=testcontainers/mysql`, `ddl-auto: create`. 테스트 Container만 `max_connections = 500` (`src/test/resources/testcontainers/mysql/my.cnf`, 2026-10-28). Spring 테스트 Context마다 연결 Pool(최대 10)이 캐시되어 기본 151로는 Context 17개부터 `Too many connections`가 났고, Pool을 줄이면 10스레드 동시성 테스트가 약해져 서버 한도를 올림 | BUILD (`application-test.yml`) |
 | Test | JUnit Jupiter 6.0.3, Mockito 5.23.0, AssertJ 3.27.7 | RESOLVED |
 | Isolation | 전역 `spring.datasource.hikari.transaction-isolation: TRANSACTION_READ_COMMITTED` (모든 Profile) | BUILD (`application.yml`) |
 | Profile | `dev` (기본, H2 file, `ddl-auto: update`) / `test` (Testcontainers MySQL) / `prod` (MySQL, `ddl-auto: update`) / `init-data` | BUILD |
-| Code Style | Checkstyle (`config/checkstyle/checkstyle.xml`), `check`에 포함 — **Java만 검사, `.kt`는 대상 아님** | BUILD |
+| Code Style | **없음.** Checkstyle(Java만 검사)은 Java 소스 0개가 되어 2026-10-28 PR #81에서 Plugin·`config/checkstyle/checkstyle.xml` 제거 (`check`에서 `checkstyleMain`·`checkstyleTest`만 빠짐). 이전 (develop `92dcdfa`까지): Checkstyle, `check`에 포함. Kotlin 검사(ktlint/detekt)는 TS-16, 미적용 (2026-10-28 일회성 측정만) | BUILD |
 | CI | `Backend CI`: `./gradlew check --no-daemon` / `Docker Build CI Test`: `./gradlew bootJar` + `docker build` | CI |
 | Boot BOM의 Kotlin 관리값 | `kotlin.version` 2.3.21, `kotlin-coroutines.version` 1.10.2 | BOM |
 
@@ -55,7 +55,7 @@
 | `kotlin("plugin.spring")` | 2.3.21 | TS-02 `REQUIRED` | 같음 | — |
 | `kotlin("plugin.jpa")` | 2.3.21 | TS-03 `REQUIRED` | 같음 | — |
 | `allOpen { annotation(Entity / MappedSuperclass / Embeddable) }` | 명시 설정 | TS-03: 2.3.20+는 JPA preset all-open 자동 적용으로 조사 (명시 설정 불필요) | 명시 설정 추가 (자동 적용과 중복인지는 미확인) | DL-014 |
-| `kotlin("plugin.lombok")` | 2.3.21 (Alpha) | TS-08 `CONDITIONAL` | 적용됨 | DL-004 |
+| `kotlin("plugin.lombok")` | 2.3.21 (Alpha) | TS-08 `CONDITIONAL` | 적용됨 → 2026-10-28 PR #81에서 제거 (Java Lombok 참조 대상 0개) | DL-004 |
 | `org.jetbrains.kotlin:kotlin-reflect` | `implementation`, Version 생략 | TS-04 `REQUIRED` | 같음 | — |
 | `tools.jackson.module:jackson-module-kotlin` | `implementation`, Version 생략 (Jackson 3 좌표) | TS-06 `REQUIRED` | 같음 | — |
 | `org.jetbrains.kotlin:kotlin-test-junit5` | `testImplementation` | TS-12 `NOT_NEEDED (M0)` | 추가됨. `KotlinEnvironmentTest`가 `kotlin.test.assertEquals` 사용 | DL-014 |
