@@ -138,14 +138,6 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         @Param("from") from: LocalDateTime,
     ): List<SubstituteCandidate>
 
-    // SUB-03
-    // 현재 Candidate를 제외하고 다른 PENDING Candidate가 남아 있는지 확인
-    fun existsByRequest_IdAndStatusAndIdNot(
-        requestId: Long,
-        status: CandidateStatus,
-        candidateId: Long,
-    ): Boolean
-
     // 특정 Request에 대해 상태가 ACCEPTED인 Candidate 단건 조회
     fun findByRequestIdAndStatus(
         requestId: Long,
@@ -190,4 +182,42 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         @Param("requestIds") requestIds: List<Long>,
         @Param("status") status: CandidateStatus,
     ): List<SubstituteCandidate>
+
+    // 퇴사 처리: 그 요청에서 이 소속의 후보 상태를 DB 값으로 확인 (Lock 전에 읽힌 Entity는 옛 값일 수 있음)
+    @Query(
+        """
+        SELECT c.status
+        FROM SubstituteCandidate c
+        WHERE c.request.id = :requestId
+          AND c.member.id = :memberId
+        """,
+    )
+    fun findStatusByRequestIdAndMemberId(
+        @Param("requestId") requestId: Long,
+        @Param("memberId") memberId: Long,
+    ): CandidateStatus?
+
+    fun findByRequestIdAndMemberId(requestId: Long, memberId: Long): SubstituteCandidate?
+
+    // 퇴사·거절 공통: 이 소속을 빼고 응답 가능한 후보가 남아 있는지 (ML-3-P1)
+    // 응답 가능 = 수락·거절할 수 있는 후보 (같은 근무지의 현재 EMPLOYEE 소속, PENDING). 퇴사 미리보기와 같은 조건
+    @Query(
+        """
+        SELECT COUNT(c) > 0
+        FROM SubstituteCandidate c
+        WHERE c.request.id = :requestId
+          AND c.member.id <> :memberId
+          AND c.member.leftAt IS NULL
+          AND c.member.role = com.merge.backend.domain.workplace.entity.WorkplaceRole.EMPLOYEE
+          AND c.member.workplace.id = c.request.shift.schedule.workplace.id
+          AND c.status = com.merge.backend.domain.substitute.entity.CandidateStatus.PENDING
+        """,
+    )
+    fun existsRespondableCandidateExcept(
+        @Param("requestId") requestId: Long,
+        @Param("memberId") memberId: Long,
+    ): Boolean
+
+    // 거절 처리: 이 Candidate를 빼고 REJECTED가 아닌 후보가 있는지 (있으면 자격 상실이 종료 원인)
+    fun existsByRequest_IdAndIdNotAndStatusNot(requestId: Long, candidateId: Long, status: CandidateStatus): Boolean
 }
