@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -324,6 +325,28 @@ class SubstituteRequestService(
 
         return request
     }
+
+    // 공개 근무 취소·담당자 변경 Command 안에서 호출. 그 근무의 진행 중 요청을 SHIFT_CHANGED로 종료 (ML-3-Q1)
+    // 호출하는 쪽이 먼저 Shift를 잠가야 함 (Lock 순서 Shift → Request, ML-5)
+    // 따로 Commit하지 않고 호출한 Transaction에 합류. Transaction 없이 부르면 예외
+    // 알림은 근무 변경 알림과 합쳐야 해서 여기서 발행하지 않고 받는 사람을 정할 정보만 돌려줌 (NOTIFICATION-TYPES §3-3)
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun closeActiveRequestsByShiftChange(shiftId: Long, now: LocalDateTime): List<ShiftChangeClosedRequest> =
+        substituteRequestRepository.findActiveByShiftIdForUpdate(shiftId).map { request ->
+            val requestId = requireNotNull(request.id)
+
+            // 수락한 후보는 종료 알림 대상이라 같이 알려 줌 (PENDING 후보는 대상 아님)
+            // Lock 전에 읽힌 Entity면 status가 옛 값일 수 있어 보지 않고 ACCEPTED 후보를 직접 찾음
+            // (진행 중 요청에 ACCEPTED 후보가 있으면 그 요청은 ACCEPTED)
+            val acceptedMemberId = substituteCandidateRepository
+                .findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED)
+                ?.member
+                ?.id
+
+            request.closeByShiftChange(now)
+
+            ShiftChangeClosedRequest(requestId, requireNotNull(request.requesterMember.id), acceptedMemberId)
+        }
 
     private fun validateNotStarted(shift: Shift, now: LocalDateTime) {
         if (shift.startAt <= now) {

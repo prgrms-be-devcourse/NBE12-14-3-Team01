@@ -443,6 +443,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-26 | V5-J2: §5-4에 알림 Test 6행 (V5-N-28·29·23 변경 후보, V5-N-27·성공 code·읽음 동시성 연관만)과 구분·운영 규칙, §6-1에 V5-N-21~30 (PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN`) |
 | 2026-10-28 | AUTH-1 코드 검토 반영: V1-N-03 확인 방법 보강, V1-N-13 Method 2개 추가, V1-N-14 추가 (EV-033) |
 | 2026-10-28 | AUTH-1: 끝에 "V1 AUTH-1 서버 로그아웃" 절 신설. 예약 V1-N-01~12 등록, 범위 다음 번호 V1-N-13 추가 (출처 검사 단위 Test). ④ `IMPLEMENTED`, ⑤ `LOCAL_PASSED` (EV-032) |
+| 2026-10-28 | ML-3 근무 변경 시 대타 종료: 끝에 "V4 근무 변경 시 대타 종료" 절 신설. 예약 V4-N-08~11·17·19·20 등록 (08·09는 V4 함수 부분만), 범위 다음 번호 V4-N-55~59 추가 (EV-034) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
 | 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
@@ -501,3 +502,28 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
 - 회귀 (기대값 변경 0): `UserServiceTest`, `ApiV1UserControllerTest`, `RqTest` test1~5, `CustomAuthenticationFilterTest` 그대로 통과 (EV-032).
 - 범위 밖: Frontend 로그아웃·다시 시도 (FE-AUTH-01~09, 별도 Issue), 운영 CORS Origin·쿠키 SameSite·비밀키 길이 (배포 담당 확인).
+
+## V4 근무 변경 시 대타 종료 (V4-N-08~11·17·19·20, V4-N-55~59, 2026-10-28)
+
+[ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) §11의 예약 번호(V4-N-08~22)를 그대로 쓴다. V4-N-55~59는 V4에서 이미 쓴 번호(V4-N-54) 다음이다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-15 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — `feat/v4-shift-change-close-requests` (**PR 전, `develop` 미반영**). 모두 `SubstituteShiftChangeCloseTest` (MySQL Testcontainers, 실제 Commit). V3 근무 취소·담당자 변경 Command가 아직 없어서 "Shift를 `FOR UPDATE`로 잠근 Transaction 안에서 `SubstituteRequestService.closeActiveRequestsByShiftChange` 호출"로 흉내 낸다.
+
+| Test ID | Method | 확인하는 것 | 종류 · 환경 | ⑤ 실행 |
+|---|---|---|---|---|
+| V4-N-08 (V4 함수 부분) | `closesOpenRequestAndKeepsCandidates` | OPEN + PENDING 후보 2명 → `CLOSED / SHIFT_CHANGED`, `closedAt = now`, 후보 PENDING 그대로, 반환 1건 (요청자 소속, 수락 후보 없음). 배정 이력 연결·근무 담당 변경·종료 알림은 V3·V5 몫이라 이 Test 범위 밖 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-09 (V4 함수 부분) | `closesAcceptedRequestAndKeepsAcceptedRecord` | ACCEPTED → `CLOSED / SHIFT_CHANGED`, 수락 후보 ACCEPTED와 응답 시각(`respondedAt`, 종료 1시간 전) 그대로, 반환에 수락 후보 소속 포함. 근무 취소·알림은 V3·V5 몫 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-10 | `requesterCanCreateNewRequestAfterClose` | 종료 뒤 같은 근무로 새 대타 요청 생성 성공 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-11 | `pendingCandidateCannotAcceptAfterClose` | 종료 뒤 대기 후보 수락 → `REQUEST_NOT_OPEN`, 요청 상태 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-17 | `leavesApprovedRequestAsIs` | APPROVED 요청은 그대로 (`closeReason` null, `approvedAt` 유지), 반환 0건, `Shift.member` = 수락자 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-19 | `closedRequestCannotBeReopened` | 종료된 요청에 수락·거절·승인·관리자 종료 → 모두 `BusinessException`, `CLOSED / SHIFT_CHANGED`와 후보 상태 그대로 | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-20 | `publishesNoSubstituteEvent` | 종료 함수가 대타 이벤트를 발행하지 않음 (`MANAGER_CLOSED` 알림 0). 앞선 수락 이벤트가 세어지는지로 셈 자체를 확인 (`@RecordApplicationEvents`, `stream(Any::class.java)`) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-55 | `leavesClosedRequestAndClosesOnlyActive` | 하루 전 `MANAGER_CLOSED`된 요청은 사유·`closedAt` 그대로, 그 뒤 만든 진행 중 요청만 종료 (API-CATALOG §4 CLOSED 행) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-56 | `closesAllActiveRequestsInIdOrder` | 진행 중 요청 2건(서비스 검사로는 생기지 않는 데이터) → 모두 종료, 반환 ID 오름차순 (API-CATALOG §4 "모든 OPEN·ACCEPTED". G03-D-15의 2건 이상 처리 미결정 → 팀 확인 대상) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-57 | `requiresCallerTransaction` | Transaction 없이 호출 → `IllegalTransactionStateException`, 요청 OPEN 그대로 (`Propagation.MANDATORY`) | INTEGRATION · MYSQL_TC | LOCAL_PASSED |
+| V4-N-58 | `waitsForAcceptInProgress` | 후보 수락이 Request를 잡고 Commit 전 → Shift를 잡은 종료 함수가 기다림(1초 Timeout 확인) → 수락 Commit 후 ACCEPTED 상태로 종료, 수락 후보 반환 (`runSecondWhileFirstHoldsLock`) | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
+| V4-N-59 | `reportsAcceptedCandidateEvenIfRequestWasReadBeforeLock` | Lock 없이 요청을 먼저 읽어 둔(OPEN) Transaction에서 그사이 수락이 Commit돼도 수락 후보를 놓치지 않음 (1차 캐시의 옛 status를 보지 않음, ML-5 §4-3) | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
+
+**⑤ 상태의 뜻 (섞지 않는다):**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 `77bae13` 전체 500/500, develop 병합 `22a5a2e` 전체 527/527 (EV-034). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
+- 회귀 (기대값 변경 0): 기존 대타 Test 전체 그대로 통과 (EV-034).
+- 범위 밖: V3 근무 취소·담당자 변경 Command와 그 경로 Test (V3-N-33, H6-C1~C4), 종료 알림 Type·받는 사람·합치기 (V5, NOTIFICATION-TYPES §3-3), 퇴사 시 후보 처리 (V4-N-12~16·22), 종료 원인 연결 (V4-N-18), 운영 `close_reason` ENUM 변경 (배포 담당, ML-3 §9).
