@@ -176,7 +176,7 @@
 
 | 예약 | HTTP | 종류 | 상황 | 사용 API | 근거 |
 |---|---|---|---|---|---|
-| `AUTH-007` | 403 | PERMISSION | 로그아웃 요청의 출처(`Origin`·`Referer`) 검증 실패 | API-AU-01 | AUTH-1 S2. **적용 (2026-10-28, Issue #62, `develop` 미반영):** `UserErrorCode.INVALID_REQUEST_ORIGIN`, 문구 "허용되지 않은 요청 출처입니다." (V1 Owner 결정, DECISION-LOG §4-5). Origin 없음 + Referer 실패·둘 다 없음에서 나옴. 허용 안 된 Origin·`null`은 기존 CORS가 먼저 403 `Invalid CORS request`(이 code 아님) |
+| `AUTH-007` | 403 | PERMISSION | 로그아웃 요청의 출처(`Origin`·`Referer`) 검증 실패 | API-AU-01 | AUTH-1 S2. **적용 (2026-10-28, Backend PR #74 병합, Issue #62 종료):** `UserErrorCode.INVALID_REQUEST_ORIGIN`, 문구 "허용되지 않은 요청 출처입니다." (V1 Owner 결정, DECISION-LOG §4-5). Origin 없음 + Referer 실패·둘 다 없음에서 나옴. 허용 안 된 Origin·`null`은 기존 CORS가 먼저 403 `Invalid CORS request`(이 code 아님) |
 | `WPL-006` | 404 | NOT_FOUND | 퇴사 대상·인계 대상 소속이 없거나 다른 근무지 (구별하지 않음) | API-LV-01·02 | API-CATALOG §1 |
 | `WPL-007` | 409 | STATE_CONFLICT | 퇴사 대상이 MANAGER | API-LV-01·02 | ML-H2 H2-9 |
 | `WPL-008` | 409 | STATE_CONFLICT | 퇴사 대상이 이미 종료된 소속 | API-LV-01·02 | ML-4 §5 |
