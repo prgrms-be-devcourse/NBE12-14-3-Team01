@@ -24,7 +24,11 @@ import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.global.config.TestClock
 import com.merge.backend.global.config.TestTimeConfig
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
+import com.merge.backend.global.dto.ValidationErrorResponse
 import com.merge.backend.global.exception.BusinessException
+import com.merge.backend.global.exception.GlobalExceptionHandler
+import com.merge.backend.global.exception.GlobalErrorCode
+import com.merge.backend.global.rq.Rq
 import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
 import java.time.DayOfWeek
@@ -45,6 +49,7 @@ import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.support.StaticListableBeanFactory
@@ -59,6 +64,12 @@ import org.springframework.test.util.AopTestUtils
 import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -330,6 +341,80 @@ class LeaveConfirmServiceIntegrationTest {
         assertThat(context.getBeansOfType(LeaveConfirmationIntegration::class.java)).hasSize(1)
         assertThat(context.getBeansOfType(LeaveConfirmationReadiness::class.java)).isEmpty()
         assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+    }
+
+    @Test
+    fun standaloneHttpRequestCommitsRealV2V3V4TransactionWithoutRegisteringPost() {
+        val (requestId, candidateId) = addCandidacy()
+        val rq = mock<Rq>()
+        whenever(rq.actorId).thenReturn(actorUser)
+        // 테스트에서만 Controller 객체를 직접 연결한다. 운영 Readiness Bean이나 경로는 등록하지 않는다.
+        val mvc = MockMvcBuilders.standaloneSetup(LeaveConfirmController(service, rq))
+            .setControllerAdvice(GlobalExceptionHandler()).build()
+        val body = jacksonObjectMapper().writeValueAsString(command())
+        mvc.perform(post("/workplaces/{workplaceId}/members/{memberId}/leave", wp, leaving)
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("200"))
+            .andExpect(jsonPath("$.data.closedRequests.byReason.SHIFT_CHANGED").value(1))
+            .andExpect(jsonPath("$.data.closedRequests.byReason.CANDIDATE_INELIGIBLE").value(1))
+            .andExpect(jsonPath("$.data.ineligibleCandidacies").value(1))
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(WorkplaceMember::class.java, leaving).leftAt).isEqualTo(now)
+            assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.INELIGIBLE)
+            assertThat(entityManager.find(SubstituteRequest::class.java, requestId).closeReason)
+                .isEqualTo(RequestCloseReason.CANDIDATE_INELIGIBLE)
+        }
+    }
+
+    @Test
+    fun standaloneHttpConfirmationWarningLeavesDatabaseUnchanged() {
+        tx.executeWithoutResult {
+            persist(UnavailableTime(entityManager.find(User::class.java, targetUser),
+                now.plusDays(1).minusHours(1), now.plusDays(1).plusHours(1)))
+        }
+        val rq = mock<Rq>()
+        whenever(rq.actorId).thenReturn(actorUser)
+        val mvc = MockMvcBuilders.standaloneSetup(LeaveConfirmController(service, rq))
+            .setControllerAdvice(GlobalExceptionHandler()).build()
+        mvc.perform(post("/workplaces/{workplaceId}/members/{memberId}/leave", wp, leaving)
+            .contentType(MediaType.APPLICATION_JSON).content(jacksonObjectMapper().writeValueAsString(command())))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.code").value("WPL-011"))
+            .andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+            .andExpect(jsonPath("$.data.unavailableConflicts[0].targetMemberId").value(target))
+            .andExpect(jsonPath("$.data.unavailableConflicts[0].overlaps[0].startAt").value("2026-10-30T12:00:00"))
+            .andExpect(jsonPath("$.data.unavailableConflicts[0].unavailableTimeId").doesNotExist())
+        assertUnchanged()
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+    }
+
+    @Test
+    fun invalidHandoverIsRejectedBeforeWaitingForAnExistingScheduleLock() {
+        val original = command()
+        val decisions = requireNotNull(original.decisions)
+        val invalid = original.copy(decisions = decisions.map {
+            if (it?.action == "REASSIGN") it.copy(targetMemberId = null) else it
+        })
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val holder = executor.submit { tx.executeWithoutResult {
+            entityManager.find(Schedule::class.java, published, LockModeType.PESSIMISTIC_WRITE)
+            held.countDown()
+            check(release.await(10, TimeUnit.SECONDS))
+        } }
+        try {
+            check(held.await(10, TimeUnit.SECONDS))
+            val attempted = executor.submit<BusinessException> {
+                assertThrows<BusinessException> { service.confirm(actorUser, wp, leaving, invalid) }
+            }
+            val failure = attempted.get(3, TimeUnit.SECONDS)
+            assertThat(failure.errorCode).isEqualTo(GlobalErrorCode.VALIDATION_ERROR)
+            val details = failure.data as ValidationErrorResponse
+            assertThat(details.fieldErrors.map { it.field }).contains("decisions[0].targetMemberId")
+        } finally { release.countDown() }
+        holder.get(10, TimeUnit.SECONDS)
+        assertUnchanged()
     }
 
     @Test

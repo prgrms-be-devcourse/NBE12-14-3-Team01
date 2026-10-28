@@ -9,10 +9,12 @@ import com.merge.backend.domain.workplace.dto.response.LeaveConfirmResponse
 import com.merge.backend.domain.workplace.dto.response.LeavePreviewResponse
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
+import com.merge.backend.global.dto.ValidationErrorResponse
 import com.merge.backend.global.exception.BusinessException
 import com.merge.backend.global.exception.GlobalErrorCode
 import java.time.Clock
 import java.time.LocalDateTime
+import jakarta.validation.Validator
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
@@ -28,12 +30,15 @@ class LeaveConfirmService(
     private val shifts: ShiftService,
     private val writer: LeaveMembershipWriter,
     private val integration: ObjectProvider<LeaveConfirmationIntegration>,
-    private val clock: Clock
+    private val clock: Clock,
+    private val validator: Validator
 ) {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun confirm(actorUserId: Long, workplaceId: Long, memberId: Long, request: LeaveConfirmRequest): LeaveConfirmResponse {
         val actor = members.requireManager(actorUserId, workplaceId)
         members.requireLeaveTarget(actorUserId, workplaceId, memberId)
+        // Controller를 거치지 않는 내부 호출도 동일한 입력 검증을 Lock 획득 전에 수행한다.
+        validateRequest(request)
         val context = contexts.verify(request.previewContext.orEmpty(), actorUserId, workplaceId, memberId, clock.instant())
             ?: throw BusinessException(WorkplaceErrorCode.STALE_LEAVE_PLAN)
         val locked = locks.acquire(context.facts, requireNotNull(actor.id), workplaceId, memberId,
@@ -91,5 +96,14 @@ class LeaveConfirmService(
             LeaveConfirmResponse.ClosedRequests.from(shiftResult.closedRequests.map { it.requestId }.toSet(),
                 candidateResult.closedRequestIds), candidateResult.ineligibleCandidacies, completed.newInviteCode
         )
+    }
+
+    private fun validateRequest(request: LeaveConfirmRequest) {
+        val errors = validator.validate(request).map {
+            ValidationErrorResponse.FieldErrorDetail(it.propertyPath.toString(), it.message)
+        }.sortedWith(compareBy({ it.field }, { it.message }))
+        if (errors.isNotEmpty()) {
+            throw BusinessException(GlobalErrorCode.VALIDATION_ERROR, ValidationErrorResponse(errors))
+        }
     }
 }

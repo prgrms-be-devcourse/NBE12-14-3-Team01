@@ -87,3 +87,16 @@ V3는 기존 공식 충돌·불가능 시간 구간 병합/포함 비교를 재�
 - Request 범위 밖 Row가 다른 Transaction의 쓰기 Lock에 잡혀 있어도 Adapter는 기다리지 않고 WPL-010으로 끝나는 것을 확인했다. Request Lock 대기 중 다른 Transaction이 수락한 경우 STALE이고, 상대 Commit은 보존하면서 이번 퇴사 쓰기는 0이다.
 - 실제 V4 정리 후 마지막 V2 단계 실패 시 후보 INELIGIBLE·Request 종료·근무/이력/DRAFT 변경까지 모두 Rollback되는 것을 확인했다. V4의 실제 결과와 V2의 예상 효과 집계도 일치했다.
 - POST 활성화/MVC 성공 경로는 검증 완료로 표시하지 않는다. 이번 범위는 실제 V4 연동과 원자성·기존 Row 경합 검증이며, 위 Guard/HTTP 계약/V5 미완료 항목은 그대로 남는다.
+
+## V2 요청 검증·HTTP 후속 (2026-10-29)
+
+- 기준 `9c62d53` + 이번 V2 변경. 중단 당시 수정된 네 파일을 보존하고 기존 테스트를 삭제·약화·비활성화하지 않았다.
+- `REASSIGN`의 인계 대상 누락과 결정·확인 항목·확인 구간의 null 원소를 기존 Bean Validation / `COM-001`로 거부한다. Controller를 거치지 않는 Service 호출도 현재 관리자·대상 검증 후, 업무 Lock 획득 전에 동일한 필드 오류를 반환한다. 미확정 `CANCEL` 추가 필드 및 400/409 정책은 정하지 않았다.
+- `LeaveConfirmControllerTest`: 독립 MockMvc **15/15 PASS**. 응답 요약·입력 오류·기존 오류 Envelope·WPL-009/WPL-011 충돌 데이터 확인.
+- `LeaveConfirmServiceIntegrationTest`: **24/24 PASS**. 기존 21개를 보존하고 테스트 전용 MockMvc → 실제 V2·V3·V4 MySQL Transaction 성공, WPL-011 발생 시 DB 변경 0, 다른 Transaction이 Schedule Lock을 보유해도 잘못된 인계 입력이 Lock을 기다리기 전에 COM-001로 거부되는 경우를 추가했다.
+- MockMvc는 테스트에서 Controller 객체와 Rq를 직접 구성한다. **Readiness Bean이나 실제 운영 POST를 등록하지 않으며 Security Filter 전체 검증을 대체하지 않는다.** 기존 Spring Context의 Controller 미등록 검증도 유지했다.
+- 환경: Windows / Temurin JDK 25.0.1 / Gradle 9.3.0 / test Profile Testcontainers MySQL 9.7.2 / READ_COMMITTED. 운영 DB 접근 없음.
+- 최종 명령 (backend): `.\gradlew.bat clean check --console=plain` — **BUILD SUCCESSFUL (3m 24s)**. JUnit XML 전체 집계 **96 Suite / 753 실행 / 753 PASS / FAIL 0 / ERROR 0 / SKIP 0**. XML `backend/build/test-results/test/*.xml` (`__TEST-…xml` 포함), HTML `backend/build/reports/tests/test/index.html`.
+- POST 활성화와 전체 Lock·동시성 검증은 미완료다. V3의 `ScheduleService.createDraftSchedule` 및 `ShiftService.create`·`modify`에서 새 DRAFT 소속 Guard가 필요하고, V4의 `SubstituteRequestService.create` / `SubstituteCandidateService.findCandidates`·`createCandidates`에서 새 후보 소속 Guard가 필요하다. 생성/수정 직전 소속 FOR SHARE 후 최신 `leftAt`을 재확인해야 한다.
+- `ScheduleService.publishSchedule`, `SubstituteCandidateService.acceptCandidate`, `SubstituteRequestService.approve`도 User Lock 이후 소속 FOR SHARE/최신 재확인이 없으므로 담당자 검토가 필요하다. 이미 포착된 대상은 공통 Schedule 또는 Request Lock으로 직렬화되는 경로가 있어, 추가 Lock의 독립적 필요성과 전체 순서는 실제 경합 테스트로 확인한다. 공개 후 추가·재배정에는 이미 소속 FOR SHARE가 있으나 퇴사와의 통합 경합 검증은 별도다.
+- DL-016의 공식 근무 충돌 400/409 및 유효하지 않은 Context의 오류 분기는 여전히 PENDING이다. V5 알림·Frontend는 이번 범위 밖이다.
