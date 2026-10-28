@@ -1,6 +1,11 @@
 package com.merge.backend.domain.shift.service
 
 import com.merge.backend.domain.shift.dto.ShiftRequest
+import com.merge.backend.domain.shift.dto.ShiftReassignRequest
+import com.merge.backend.domain.shift.dto.AcknowledgedUnavailableConflict
+import com.merge.backend.domain.shift.dto.UnavailableOverlap
+import com.merge.backend.domain.shift.entity.ShiftAssignmentHistory
+import com.merge.backend.domain.shift.entity.ShiftAssignmentReason
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.ScheduleStatus
 import com.merge.backend.domain.shift.entity.Shift
@@ -8,15 +13,18 @@ import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ScheduleRepository
+import com.merge.backend.domain.shift.repository.ShiftAssignmentHistoryRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
 import com.merge.backend.domain.substitute.service.ShiftChangeClosedRequest
 import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.domain.user.entity.User
+import com.merge.backend.domain.user.repository.UserRepository
 import com.merge.backend.domain.workplace.entity.Workplace
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberScope
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
@@ -69,6 +77,10 @@ class ShiftServiceTest {
     private lateinit var unavailableTimeRepository: UnavailableTimeRepository
     @Mock
     private lateinit var substituteRequestService: SubstituteRequestService
+    @Mock
+    private lateinit var shiftAssignmentHistoryRepository: ShiftAssignmentHistoryRepository
+    @Mock
+    private lateinit var userRepository: UserRepository
 
     @Mock
     private lateinit var clock: Clock
@@ -539,6 +551,531 @@ class ShiftServiceTest {
 
         assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
         verifyNoInteractions(shiftRepository)
+    }
+
+    @Test
+    @DisplayName("공개 Shift 담당자 변경은 활성 대타를 종료하고 이력을 같은 순서로 저장한다")
+    fun reassignPublishedShift_ReassignsAndSavesHistory() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val targetUserId = 30L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+        val targetMember = mock<WorkplaceMember>()
+        val targetUser = mock<User>()
+        val targetScope = mock<WorkplaceMemberScope>()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        val request = ShiftReassignRequest(
+            targetMemberId,
+            listOf(
+                AcknowledgedUnavailableConflict(
+                    shiftId,
+                    targetMemberId,
+                    listOf(
+                        UnavailableOverlap(now.plusHours(2), now.plusHours(2).plusMinutes(30)),
+                        UnavailableOverlap(now.plusHours(2).plusMinutes(30), now.plusHours(3)),
+                    ),
+                ),
+            ),
+        )
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.endAt).willReturn(now.plusHours(9))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+        given(workplaceMemberRepository.findScopeById(targetMemberId)).willReturn(targetScope)
+        given(targetScope.workplaceId).willReturn(workplaceId)
+        given(targetScope.userId).willReturn(targetUserId)
+        given(substituteRequestService.closeActiveRequestsByShiftChange(shiftId, now)).willReturn(
+            listOf(ShiftChangeClosedRequest(1L, 10L, null)),
+        )
+        given(userRepository.findByIdForUpdate(targetUserId)).willReturn(Optional.of(targetUser))
+        given(workplaceMemberRepository.findByIdForShare(targetMemberId)).willReturn(Optional.of(targetMember))
+        given(targetMember.workplace).willReturn(workplace)
+        given(targetMember.leftAt).willReturn(null)
+        given(targetMember.user).willReturn(targetUser)
+        given(targetMember.id).willReturn(targetMemberId)
+        given(targetUser.id).willReturn(targetUserId)
+        given(unavailableTime.startAt).willReturn(now.plusHours(2))
+        given(unavailableTime.endAt).willReturn(now.plusHours(3))
+        given(unavailableTimeRepository.findByUserId(targetUserId)).willReturn(listOf(unavailableTime))
+        given(shiftRepository.existsOverlappingInSchedule(
+            scheduleId, targetMemberId, now.plusHours(1), now.plusHours(9), shiftId,
+        )).willReturn(false)
+        given(shiftRepository.existsOverlappingOfficialShift(
+            targetUserId, ScheduleStatus.PUBLISHED, now.plusHours(1), now.plusHours(9), shiftId,
+        )).willReturn(false)
+
+        val result = shiftService.reassignPublishedShift(
+            workplaceId, scheduleId, shiftId, request, actorId,
+        )
+
+        assertThat(result.shift).isSameAs(shift)
+        assertThat(result.closedSubstituteRequests).isEqualTo(1)
+        verify(shift).changeMember(targetMember)
+        val historyCaptor = argumentCaptor<ShiftAssignmentHistory>()
+        verify(shiftAssignmentHistoryRepository).save(historyCaptor.capture())
+        assertThat(historyCaptor.firstValue.shift).isSameAs(shift)
+        assertThat(historyCaptor.firstValue.previousMember).isSameAs(previousMember)
+        assertThat(historyCaptor.firstValue.newMember).isSameAs(targetMember)
+        assertThat(historyCaptor.firstValue.reason).isEqualTo(ShiftAssignmentReason.MANAGER_REASSIGNED)
+        assertThat(historyCaptor.firstValue.actorMember).isSameAs(actorMember)
+        inOrder(
+            scheduleRepository,
+            shiftRepository,
+            substituteRequestService,
+            userRepository,
+            workplaceMemberRepository,
+        ) {
+            verify(scheduleRepository).findByIdForUpdate(scheduleId)
+            verify(shiftRepository).findByIdForUpdate(shiftId)
+            verify(substituteRequestService).closeActiveRequestsByShiftChange(shiftId, now)
+            verify(userRepository).findByIdForUpdate(targetUserId)
+            verify(workplaceMemberRepository).findByIdForShare(targetMemberId)
+        }
+    }
+
+    @Test
+    @DisplayName("불가능 시간 충돌이 없으면 빈 확인 목록으로 공개 Shift 담당자를 변경한다")
+    fun reassignPublishedShift_ReassignsWithEmptyAcknowledgementWhenNoConflict() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val targetUserId = 30L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val startAt = now.plusHours(1)
+        val endAt = now.plusHours(9)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+        val targetMember = mock<WorkplaceMember>()
+        val targetUser = mock<User>()
+        val targetScope = mock<WorkplaceMemberScope>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(startAt)
+        given(shift.endAt).willReturn(endAt)
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+        given(workplaceMemberRepository.findScopeById(targetMemberId)).willReturn(targetScope)
+        given(targetScope.workplaceId).willReturn(workplaceId)
+        given(targetScope.userId).willReturn(targetUserId)
+        given(substituteRequestService.closeActiveRequestsByShiftChange(shiftId, now)).willReturn(emptyList())
+        given(userRepository.findByIdForUpdate(targetUserId)).willReturn(Optional.of(targetUser))
+        given(workplaceMemberRepository.findByIdForShare(targetMemberId)).willReturn(Optional.of(targetMember))
+        given(targetMember.workplace).willReturn(workplace)
+        given(targetMember.leftAt).willReturn(null)
+        given(targetMember.user).willReturn(targetUser)
+        given(targetMember.id).willReturn(targetMemberId)
+        given(targetUser.id).willReturn(targetUserId)
+        given(shiftRepository.existsOverlappingInSchedule(
+            scheduleId, targetMemberId, startAt, endAt, shiftId,
+        )).willReturn(false)
+        given(shiftRepository.existsOverlappingOfficialShift(
+            targetUserId, ScheduleStatus.PUBLISHED, startAt, endAt, shiftId,
+        )).willReturn(false)
+        given(unavailableTimeRepository.findByUserId(targetUserId)).willReturn(emptyList())
+
+        shiftService.reassignPublishedShift(
+            workplaceId,
+            scheduleId,
+            shiftId,
+            ShiftReassignRequest(targetMemberId, emptyList()),
+            actorId,
+        )
+
+        verify(shift).changeMember(targetMember)
+        verify(shiftAssignmentHistoryRepository).save(any())
+    }
+
+    @Test
+    @DisplayName("동일한 담당자로 공개 Shift를 재배정할 수 없다")
+    fun reassignPublishedShift_FailsWhenTargetIsCurrentMember() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val currentMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(currentMember)
+        given(currentMember.id).willReturn(targetMemberId)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(targetMemberId, emptyList()),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.SAME_SHIFT_MEMBER_REASSIGNMENT)
+        verifyNoInteractions(substituteRequestService, userRepository, shiftAssignmentHistoryRepository)
+        verify(shift, never()).changeMember(any())
+    }
+
+    @Test
+    @DisplayName("대타 요청 종료에 실패하면 공개 Shift 담당자를 변경하거나 이력을 저장하지 않는다")
+    fun reassignPublishedShift_DoesNotChangeMemberWhenClosingSubstituteRequestsFails() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+        val targetScope = mock<WorkplaceMemberScope>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+        given(workplaceMemberRepository.findScopeById(targetMemberId)).willReturn(targetScope)
+        given(targetScope.workplaceId).willReturn(workplaceId)
+        doThrow(IllegalStateException("V4 종료 실패"))
+            .whenever(substituteRequestService)
+            .closeActiveRequestsByShiftChange(shiftId, now)
+
+        assertThatThrownBy {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(targetMemberId, emptyList()),
+                actorId,
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(shiftAssignmentHistoryRepository)
+        verifyNoInteractions(userRepository)
+    }
+
+    @Test
+    @DisplayName("다른 담당자의 확인 목록은 입력 오류로 거부하고 변경 작업을 시작하지 않는다")
+    fun reassignPublishedShift_RejectsDifferentTargetMemberAcknowledgement() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId,
+                            targetMemberId + 1,
+                            listOf(UnavailableOverlap(now.plusHours(2), now.plusHours(3))),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(
+            substituteRequestService,
+            userRepository,
+            shiftAssignmentHistoryRepository,
+        )
+    }
+
+    @Test
+    @DisplayName("확인 목록 중 하나라도 요청 대상과 다르면 입력 오류로 거부한다")
+    fun reassignPublishedShift_RejectsAnyMismatchedAcknowledgement() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId,
+                            targetMemberId,
+                            listOf(UnavailableOverlap(now.plusHours(2), now.plusHours(3))),
+                        ),
+                        AcknowledgedUnavailableConflict(
+                            shiftId + 1,
+                            targetMemberId,
+                            listOf(UnavailableOverlap(now.plusHours(2), now.plusHours(3))),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(
+            substituteRequestService,
+            userRepository,
+            shiftAssignmentHistoryRepository,
+        )
+    }
+
+    @Test
+    @DisplayName("확인 구간이 현재 충돌 범위를 모두 포함하지 않으면 재확인을 요구한다")
+    fun reassignPublishedShift_RequiresConfirmationForInsufficientAcknowledgement() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val targetUserId = 30L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val startAt = now.plusHours(1)
+        val endAt = now.plusHours(9)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+        val targetMember = mock<WorkplaceMember>()
+        val targetUser = mock<User>()
+        val targetScope = mock<WorkplaceMemberScope>()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(startAt)
+        given(shift.endAt).willReturn(endAt)
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+        given(workplaceMemberRepository.findScopeById(targetMemberId)).willReturn(targetScope)
+        given(targetScope.workplaceId).willReturn(workplaceId)
+        given(targetScope.userId).willReturn(targetUserId)
+        given(substituteRequestService.closeActiveRequestsByShiftChange(shiftId, now)).willReturn(emptyList())
+        given(userRepository.findByIdForUpdate(targetUserId)).willReturn(Optional.of(targetUser))
+        given(workplaceMemberRepository.findByIdForShare(targetMemberId)).willReturn(Optional.of(targetMember))
+        given(targetMember.workplace).willReturn(workplace)
+        given(targetMember.leftAt).willReturn(null)
+        given(targetMember.user).willReturn(targetUser)
+        given(targetMember.id).willReturn(targetMemberId)
+        given(targetUser.id).willReturn(targetUserId)
+        given(shiftRepository.existsOverlappingInSchedule(
+            scheduleId, targetMemberId, startAt, endAt, shiftId,
+        )).willReturn(false)
+        given(shiftRepository.existsOverlappingOfficialShift(
+            targetUserId, ScheduleStatus.PUBLISHED, startAt, endAt, shiftId,
+        )).willReturn(false)
+        given(unavailableTime.startAt).willReturn(now.plusHours(2))
+        given(unavailableTime.endAt).willReturn(now.plusHours(3))
+        given(unavailableTimeRepository.findByUserId(targetUserId)).willReturn(listOf(unavailableTime))
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId,
+                            targetMemberId,
+                            listOf(UnavailableOverlap(now.plusHours(2), now.plusHours(2).plusMinutes(30))),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode)
+            .isEqualTo(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    @DisplayName("다른 Shift의 확인 목록은 입력 오류로 거부하고 변경 작업을 시작하지 않는다")
+    fun reassignPublishedShift_RejectsDifferentShiftAcknowledgement() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val shiftStartAt = now.plusHours(1)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(shiftStartAt)
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId + 1,
+                            targetMemberId,
+                            listOf(UnavailableOverlap(shiftStartAt, now.plusHours(3))),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(
+            substituteRequestService,
+            userRepository,
+            shiftAssignmentHistoryRepository,
+        )
     }
 
 }
