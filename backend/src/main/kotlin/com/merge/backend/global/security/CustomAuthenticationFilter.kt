@@ -35,8 +35,8 @@ class CustomAuthenticationFilter(
             return
         }
 
-        // 회원가입/로그인/리프레시는 인증 없이 호출되는 Public API라서 필터 검증 대상에서 제외
-        if (listOf("/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/refresh")
+        // 회원가입/로그인/리프레시/로그아웃은 인증 없이 호출되는 Public API라서 필터 검증 대상에서 제외
+        if (listOf("/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
                 .contains(request.requestURI)
         ) {
             filterChain.doFilter(request, response)
