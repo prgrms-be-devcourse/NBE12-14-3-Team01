@@ -11,6 +11,7 @@ import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
 import com.merge.backend.domain.substitute.event.SubstituteAllCandidatesRejectedEvent
 import com.merge.backend.domain.substitute.event.SubstituteCandidateAcceptedEvent
+import com.merge.backend.domain.substitute.event.SubstituteCandidateIneligibleEvent
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository
@@ -24,6 +25,7 @@ import java.time.LocalDateTime
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -257,13 +259,68 @@ class SubstituteCandidateService(
             )
 
         // 다른 PENDING 후보가 없다면 마지막 후보가 거절한 것
+        // 퇴사로 INELIGIBLE이 된 후보가 섞여 있으면 CANDIDATE_INELIGIBLE (ML-3-P1, 퇴사 처리와 같은 종료 판정)
         if (!hasOtherPendingCandidate) {
-            request.closeAllCandidatesRejected(now)
+            val hasIneligibleCandidate = substituteCandidateRepository.existsByRequest_IdAndStatus(
+                requireNotNull(request.id),
+                CandidateStatus.INELIGIBLE,
+            )
 
-            publishSubstituteAllCandidatesRejectedEvent(request)
+            if (hasIneligibleCandidate) {
+                request.closeByCandidateIneligible(now)
+
+                publishSubstituteCandidateIneligibleEvent(request)
+            } else {
+                request.closeAllCandidatesRejected(now)
+
+                publishSubstituteAllCandidatesRejectedEvent(request)
+            }
         }
 
         return candidate
+    }
+
+    // 퇴사 확정(V2)이 같은 Transaction 안에서 부름. 퇴사자 소속이 후보로 걸린 진행 중 요청을 정리한다 (ML-3-P·P1·A)
+    // 알림은 내지 않고 결과만 돌려줌. 받는 사람은 퇴사 확정 결과로 V5가 정함 (#80 근무 변경 종료와 같은 방식)
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun closeCandidaciesByMemberLeave(memberId: Long, now: LocalDateTime): MemberLeaveCandidacyResult {
+        val closedRequests = mutableListOf<CandidateIneligibleClosedRequest>()
+        var ineligibleCandidacies = 0
+
+        substituteRequestRepository.findActiveByCandidateMemberIdForUpdate(memberId, now).forEach { request ->
+            val requestId = requireNotNull(request.id)
+
+            // Lock 전에 읽힌 Entity면 상태가 옛 값일 수 있어 DB 값으로 판단
+            val requestStatus = substituteRequestRepository.findStatusById(requestId)
+            val candidateStatus = substituteCandidateRepository.findStatusByRequestIdAndMemberId(requestId, memberId)
+
+            when (candidateStatus) {
+                // 수락자가 퇴사: 요청 종료, 수락 기록은 그대로 (ML-3-A)
+                CandidateStatus.ACCEPTED -> {
+                    request.closeByCandidateIneligible(now)
+                    closedRequests += CandidateIneligibleClosedRequest(requestId, requireNotNull(request.requesterMember.id))
+                }
+
+                // 대기 후보가 퇴사: INELIGIBLE (ML-3-P). OPEN이고 응답 가능한 후보가 없으면 요청 종료 (ML-3-P1)
+                CandidateStatus.PENDING -> {
+                    requireNotNull(substituteCandidateRepository.findByRequestIdAndMemberId(requestId, memberId))
+                        .markIneligible()
+                    ineligibleCandidacies++
+
+                    if (
+                        requestStatus == RequestStatus.OPEN &&
+                        !substituteCandidateRepository.existsRespondableCandidateExcept(requestId, memberId)
+                    ) {
+                        request.closeByCandidateIneligible(now)
+                        closedRequests += CandidateIneligibleClosedRequest(requestId, requireNotNull(request.requesterMember.id))
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+
+        return MemberLeaveCandidacyResult(closedRequests, ineligibleCandidacies)
     }
 
     private fun publishSubstituteCandidateAcceptedEvent(candidate: SubstituteCandidate) {
@@ -284,6 +341,25 @@ class SubstituteCandidateService(
     }
 
     private fun publishSubstituteAllCandidatesRejectedEvent(request: SubstituteRequest) {
+        applicationEventPublisher.publishEvent(
+            SubstituteAllCandidatesRejectedEvent(
+                requestId = requireNotNull(request.id),
+                recipientMemberIds = requesterAndManagerMemberIds(request),
+            ),
+        )
+    }
+
+    // 받는 사람은 거절 종료와 같은 요청자 + 현재 관리자 (NOTIFICATION-TYPES SUBSTITUTE_CANDIDATE_INELIGIBLE)
+    private fun publishSubstituteCandidateIneligibleEvent(request: SubstituteRequest) {
+        applicationEventPublisher.publishEvent(
+            SubstituteCandidateIneligibleEvent(
+                requestId = requireNotNull(request.id),
+                recipientMemberIds = requesterAndManagerMemberIds(request),
+            ),
+        )
+    }
+
+    private fun requesterAndManagerMemberIds(request: SubstituteRequest): List<Long> {
         val workplaceId = request.shift.schedule.workplace.id
 
         val requesterMemberId = requireNotNull(request.requesterMember.id)
@@ -292,13 +368,6 @@ class SubstituteCandidateService(
             .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(workplaceId, WorkplaceRole.MANAGER)
             .map { member -> requireNotNull(member.id) }
 
-        val recipientMemberIds = (listOf(requesterMemberId) + managerMemberIds).distinct()
-
-        applicationEventPublisher.publishEvent(
-            SubstituteAllCandidatesRejectedEvent(
-                requestId = requireNotNull(request.id),
-                recipientMemberIds = recipientMemberIds,
-            ),
-        )
+        return (listOf(requesterMemberId) + managerMemberIds).distinct()
     }
 }

@@ -87,6 +87,13 @@ class SubstituteRequest(
         approvedAt = null
     }
 
+    // 후보의 자격 상실(퇴사)로 진행할 수 있는 후보가 없어 요청 종료 (수락 기록은 그대로)
+    fun closeByCandidateIneligible(now: LocalDateTime) {
+        status = RequestStatus.CLOSED
+        closeReason = RequestCloseReason.CANDIDATE_INELIGIBLE
+        closedAt = now
+    }
+
     // 근무가 취소·인계되어 요청 종료 (후보 상태와 수락 기록은 그대로)
     fun closeByShiftChange(now: LocalDateTime) {
         status = RequestStatus.CLOSED

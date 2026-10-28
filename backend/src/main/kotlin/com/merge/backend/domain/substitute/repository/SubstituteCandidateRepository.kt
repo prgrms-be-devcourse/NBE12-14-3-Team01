@@ -157,4 +157,38 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         @Param("requestIds") requestIds: List<Long>,
         @Param("status") status: CandidateStatus,
     ): List<SubstituteCandidate>
+
+    // 퇴사 처리: 그 요청에서 이 소속의 후보 상태를 DB 값으로 확인 (Lock 전에 읽힌 Entity는 옛 값일 수 있음)
+    @Query(
+        """
+        SELECT c.status
+        FROM SubstituteCandidate c
+        WHERE c.request.id = :requestId
+          AND c.member.id = :memberId
+        """,
+    )
+    fun findStatusByRequestIdAndMemberId(
+        @Param("requestId") requestId: Long,
+        @Param("memberId") memberId: Long,
+    ): CandidateStatus?
+
+    fun findByRequestIdAndMemberId(requestId: Long, memberId: Long): SubstituteCandidate?
+
+    // 퇴사 처리: 이 소속을 빼고 응답 가능한 후보(현재 소속의 PENDING)가 남아 있는지
+    @Query(
+        """
+        SELECT COUNT(c) > 0
+        FROM SubstituteCandidate c
+        WHERE c.request.id = :requestId
+          AND c.member.id <> :memberId
+          AND c.member.leftAt IS NULL
+          AND c.status = com.merge.backend.domain.substitute.entity.CandidateStatus.PENDING
+        """,
+    )
+    fun existsRespondableCandidateExcept(
+        @Param("requestId") requestId: Long,
+        @Param("memberId") memberId: Long,
+    ): Boolean
+
+    fun existsByRequest_IdAndStatus(requestId: Long, status: CandidateStatus): Boolean
 }
