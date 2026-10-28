@@ -55,7 +55,7 @@ ID 규칙: `G-<분류><번호>`는 **공백 ID**다. Test를 만들 때는 TEST-
 | ID | 공백 | 근거 | Domain | 우선 | 시점 | 관련 Test ID |
 |---|---|---|---|---|---|---|
 | G-A1 | **HTTP 계약 Snapshot** (Status, `ApiResponse` 형식, Field 이름·자료형, null 포함 여부, 날짜 형식, ErrorCode·문구) — HTTP Test가 없는 Controller 6개. **한 번에 전부 만들지 않는다:** 순서 = G-A2 공통 → 알림 핵심 → 대타 핵심 → Shift·불가능 시간 (각 Domain 전환 직전). Endpoint마다 대표 성공·대표 실패·Validation 실패부터 | §2: Controller 10개 중 6개 HTTP 0. DTO record → `data class` 전환에서 JSON이 바뀌어도 지금 Test는 모른다 (KOTLIN-REVIEW-CHECKLIST §1) | V4 (3), V5, V3 (Shift·UnavailableTime) | **최우선** | 그 Domain 전환 **전** | V4-N-01 (명세됨). V5-N-21~30은 PR #16에서 추가·병합됐고 PR #60에서 Kotlin으로 전환됐다. CI는 Suite 성공, 개별 XML 근거는 보존되지 않음. V3는 등록 필요 |
-| G-A2 | **공통 응답·예외 형식** (`ApiResponse`의 `success` Field 이름, `GlobalExceptionHandler` 매핑, Validation 실패 `COM-001`). **→ Java 기준선 계약은 2026-10-26 PR #15에서 고정·병합 (CM-N-01~06, LOCAL_PASSED·Suite CI 성공). Kotlin 대응 Test는 PR #79에서 전환 중이며 현재 Head CI는 Suite 성공, 개별 XML 근거는 없음. 남은 공백은 §4-1** | `ApiResponse.success`의 Java 접근자 `isSuccess()`와 JSON 이름이 전환에서 갈릴 수 있음 (S2-6B) | 공통 | **최우선** | `global` 전환 전 | `ApiResponseTest`·`GlobalExceptionHandlerTest` 보강 (JSON 수준) |
+| G-A2 | **공통 응답·예외 형식** (`ApiResponse`의 `success` Field 이름, `GlobalExceptionHandler` 매핑, Validation 실패 `COM-001`). **→ Java 기준선 계약은 2026-10-26 PR #15에서 고정·병합 (CM-N-01~06, LOCAL_PASSED·Suite CI 성공). Kotlin 대응 Test는 PR #79에서 전환 (Kotlin `LOCAL_PASSED`, 로컬 JUnit XML 근거, TEST-INVENTORY §7; PR CI Suite 성공). 남은 공백은 §4-1** | `ApiResponse.success`의 Java 접근자 `isSuccess()`와 JSON 이름이 전환에서 갈릴 수 있음 (S2-6B) | 공통 | **최우선** | `global` 전환 전 | `ApiResponseTest`·`GlobalExceptionHandlerTest` 보강 (JSON 수준) |
 | G-A3 | **Commit 후 알림 생성 통합 Test (현재 Java 동작 고정)** — **지금 Java에 있는** 대타 6개 Event (요청 생성 `SUBSTITUTE_REQUEST_RECEIVED`, 후보 없음 `SUBSTITUTE_NO_CANDIDATE`, 수락 `SUBSTITUTE_ACCEPTED`, 전원 거절 `SUBSTITUTE_ALL_REJECTED`, 승인 `SUBSTITUTE_APPROVED`, 관리자 종료 `SUBSTITUTE_MANAGER_CLOSED`). 확인할 경우: ① 업무 Commit → 받는 사람·Type·Row 수 ② **업무 Rollback → 그 업무의 알림 0건** ③ **알림 저장 실패 → 업무 Commit은 유지** (AFTER_COMMIT 이후라 되돌릴 수 없음, Listener가 예외를 잡아 로그만) ④ 받는 사람 조회 실패 시 그 사건 알림 전체 누락 (AS-IS 한계). V3 새 Type(`SUBSTITUTE_SHIFT_CHANGED` 등)·받는 사람 규칙(R1~R5, X-4)·퇴사자 필터는 **C (Improvement)**이며 여기 기대값으로 넣지 않는다 | §2: Unit(Mock)만. Kotlin 전환에서 Listener Proxy·`REQUIRES_NEW`·phase가 바뀌어도 Unit Test는 모른다 | V5 (+V4 Event) | **최우선** | V4·V5 전환 전 | V4-N-04 (명세됨). **범위 확인 필요 (2026-10-26):** Listener는 7개(대타 6 + 근무표 공개 1). 근무표 공개 알림의 Rollback·알림 실패 경우를 이 항목에 넣을지는 V5-J3 분석에서 정한다 — 기존 `SchedulePublishedEventListenerIntegrationTest`는 Service를 Mock으로 둬 Commit 후 호출 시점만, V3 `ShiftScheduleConcurrencyTest.publishAndModifyKeepAssigneeAndNotificationConsistent`가 공개 알림 Row 수를 일부 확인 (중복 작성 주의) |
 | G-A4 | **Transaction Rollback·원자성** — 대타 승인 실패 시 Request·Candidate·Shift 불변 | 근무표·근무지는 Rollback Test 있음, 대타는 없음 | V4 | 높음 | V4 전환 전 | V4-N-02 (명세됨) |
 | G-A5 | **실제 Security Filter 경계** — 대타·알림·근무 API의 무토큰 401, 다른 근무지 403/404 (현재 값 그대로) | §2의 실제 인증 경계 근거를 참조. Pattern은 토큰 검사 근거에서 제외. G03-OQ-01 (`/workplaces/**` permitAll) | 각 Domain | 높음 | 그 Domain 전환 전 | AUTH-EV-01 (IMP-01) |
@@ -125,7 +125,7 @@ Frontend에 Test 체계가 없다 (`eslint`만). **이 공백은 해소되지 �
 
 **V5-J2 — Java 기준선 알림 HTTP 계약 고정 (2026-10-26; Java Test PR #16 병합, Kotlin 전환 PR #60 병합)**
 
-V5-N-21~30의 Java 기준선 로컬 실행은 EV-017·018, PR #16 CI Suite는 EV-020이다. PR #60은 해당 HTTP Test Class를 Kotlin으로 전환했고 Backend/Docker CI Suite가 성공했다. Kotlin 개별 Test XML은 보존되지 않아 Test별 실행 상태는 `UNKNOWN`이다.
+V5-N-21~30의 Java 기준선 로컬 실행은 EV-017·018, PR #16 CI Suite는 EV-020이다. PR #60은 해당 HTTP Test Class를 Kotlin으로 전환했고 Backend/Docker CI Suite가 성공했다. PR #60 시점의 Test별 XML은 없고, 이후 develop `0aec24f` 로컬 통합 실행에서 10 / 10 PASS (Kotlin `LOCAL_PASSED`, TEST-INVENTORY §7 ②).
 
 | 해결 (Test로 고정) | Test ID | 근거 |
 |---|---|---|
@@ -147,12 +147,12 @@ V5-N-21~30의 Java 기준선 로컬 실행은 EV-017·018, PR #16 CI Suite는 EV
 |---|---|---|
 | R1 | 현재 Java MockMvc에서 **Controller가 없는 URL** 요청이 404가 아니라 **500 `COM-500`**으로 처리되는 것을 관찰 (`NoResourceFoundException` 처리 없음 → 마지막 `Exception` 처리). 의도된 최종 오류 계약이 아니며 **Test로 고정하지 않는다.** 올바른 Status·ErrorCode는 별도 결정 후 수정 (MIGRATION-MATRIX §4 공통, ERROR-CODES `COM-500`). 지원하지 않는 HTTP Method(405 예상) 경로가 500이 되는지는 **미검증 (추정)** | Known Limitation |
 | R2 | 날짜 문자열의 소수 초 길이가 매번 다를 수 있다 (`…:00`, `….5`, `….123456`). Frontend의 해석 방식은 Node v24(V8)에서만 세 형식 모두 올바름을 확인. **Safari 등 다른 브라우저는 미검증** (ECMAScript 표준 형식은 소수 초 3자리) | 미검증 (Frontend 통합 과제) |
-| C5 | G-A2(PR #15)와 V5-J2(PR #16)는 병합됐고, PR #79 검증 Head `2af320c…`에서 둘을 포함한 Backend/Docker CI Suite가 성공했다. 최신 develop `0aec24f…` 기준 임시 통합 `clean check`도 514/514 PASS였다. GitHub CI Artifact에 JUnit XML이 없어 개별 Test 결과는 확인할 수 없다. 과거 예상 410건은 현재 실행 건수로 사용하지 않는다. | Suite 통합 확인 완료; Test별 결과 `UNKNOWN` |
+| C5 | G-A2(PR #15)와 V5-J2(PR #16)는 모두 병합됐다. 둘을 포함한 develop `0aec24f`에 PR #79 Kotlin Test를 얹은 로컬 `clean check`에서 **515 / 515 PASS** (JUnit XML 71개, Test별 결과 확인 가능, TEST-INVENTORY §7). PR #79 Head `2af320c`의 Backend/Docker CI도 Suite 성공. 과거 예상 410건은 현재 실행 건수로 쓰지 않는다. | 해소 (로컬 Test별 + CI Suite) |
 
 ## 5. Kotlin 전환 전 최우선 회귀 Test (요약)
 
 1. **G-A1 HTTP 계약 Snapshot** — 대타·알림부터 (HTTP Test 0인 Domain)
-2. **G-A2 공통 응답·예외 형식** — 모든 Domain의 기반. 대표 Java 계약은 PR #15에서 고정·병합됐고, Kotlin 대응 Test는 PR #79에서 전환 중이다. Suite는 성공했으나 개별 Test 결과는 `UNKNOWN`; 남은 계약 공백은 §4-1
+2. **G-A2 공통 응답·예외 형식** — 모든 Domain의 기반. 대표 Java 계약은 PR #15에서 고정·병합됐고, Kotlin 대응 Test는 PR #79에서 전환했다 (Kotlin `LOCAL_PASSED`, CI Suite 성공). 남은 계약 공백은 §4-1
 3. **G-A3 Commit 후 알림 생성 통합** — 대타 6개 Event
 4. **G-A4 대타 승인 Rollback**, **G-A5 Security Filter 경계**
 5. G-A6~A8
