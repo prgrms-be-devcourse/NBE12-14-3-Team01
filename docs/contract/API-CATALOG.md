@@ -225,6 +225,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | DTO 출처 | 수락자 = Candidate. `SubstituteRequestResponse.from`(현재 `Shift.member`를 읽음)을 재사용하지 않는다 |
 | 상태 변경 | 없음. 이 목록의 항목에 수락·거절 Command는 기존 검사로 거부 |
 | Test | G03-D-22 D22-T2~T12, D22-T4b |
+| 구현 (2026-10-28) | `feat/v4-accepted-closed-requests` `36c51d2`, Test V4-N-27~35·38·60 (EV-037). 문서에 없어 V4 Owner가 정한 것: 정렬 = 효력 종료 시각 최신순·같으면 요청 ID 최신순 (API-SB-02와 같음), 응답의 효력 종료 시각 필드 이름 `closedAt` (SUB-05와 같음), 7일 경계 포함 (`>= now - 7일`). 계산된 만료는 SUB-05처럼 `CLOSED` / `EXPIRED`. `closedAt`이 없는 옛 CLOSED·APPROVED Row는 목록에서 빠진다 |
 
 #### API-SB-02 관리자 — 끝난 대타 요청 (종료·만료) (S3-A, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`)
 
@@ -421,4 +422,5 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | S3-B: W안 3단계에 Lock 후 권한 재확인과 1단계가 최종 인가가 아님을 명시, API-SB-02에 경계(`startAt == now`)·`Clock`·DB 식·ID 비노출·만료 비저장·`/api/v1`·ID 혼동 주의 추가 (정적 확인 근거 포함) |
 | 2026-10-25 | S3 Commit 전: W안·M3와 G03-D-04 연결 명시, API-SB-02 DB 식의 적용 전제(대상 필터 후, APPROVED 제외), `hasNewerActiveRequest`의 진행 중 정의, 이름 스냅샷 사실 |
 | 2026-10-28 | API-AU-01 구현 행 추가 (경로·응답 확정, 출처 검사와 CORS 거부 관계), Test ID V1-N-13 추가 |
+| 2026-10-28 | API-SB-01 구현 행 추가 (경로 확정, 정렬·필드 이름·7일 경계) |
 | 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |

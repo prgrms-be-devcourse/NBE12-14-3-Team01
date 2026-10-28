@@ -267,7 +267,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | D21-T9 = D05-T6 | **V2-N-43** | V2 | PROPOSED_IMPROVEMENT | §5-2 실제 중복 (D05-T6의 "DB 변경 0"까지 확인) |
 | D21-R1~R5 | 보류 (H6) | ML-5 | H6 | `BLOCKED` |
 | D22-T1 | **V5-N-17** | V5 | MIGRATION | 알림 저장 실패가 업무에 영향 없음 (현재 동작 고정) |
-| D22-T2·T3·T4·T4b·T5·T6·T7·T8·T9·T10·T11·T12 | **V4-N-27·28·29·30·31·32·33·34·35·36·37·38** (순서대로) | V4 | PROPOSED_IMPROVEMENT | 종료된 대타 조회. D22-T4b는 독립 번호 V4-N-30 |
+| D22-T2·T3·T4·T4b·T5·T6·T7·T8·T9·T10·T11·T12 | **V4-N-27·28·29·30·31·32·33·34·35·36·37·38** (순서대로) | V4 | PROPOSED_IMPROVEMENT | 종료된 대타 조회. D22-T4b는 독립 번호 V4-N-30. **2026-10-28 API-SB-01 구현: V4-N-27~35·38 + 새 V4-N-60 작성·`LOCAL_PASSED` (EV-037, 아래 "V4 종료된 대타 조회" 절). V4-N-36·37(SUB-07·05 현재 소속)은 묶음 D** |
 | D03-T1 | 참조: V4-N-01 (V4) + 각 Domain의 Migration Controller Slice | 각 Domain | MIGRATION | Domain마다 V4-N-01 방식으로 작성 |
 | D03-T2 | **V4-N-40** | V4 | PROPOSED_IMPROVEMENT | 기존 V4-T-25·V4-T-81 기대값 변경 (§5-4) |
 | D03-T3 | **V4-N-41** | V4 | PROPOSED_IMPROVEMENT | 기존 V4-T-64·65·72 기대값 변경 (§5-4) |
@@ -445,6 +445,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | AUTH-1: 끝에 "V1 AUTH-1 서버 로그아웃" 절 신설. 예약 V1-N-01~12 등록, 범위 다음 번호 V1-N-13 추가 (출처 검사 단위 Test). ④ `IMPLEMENTED`, ⑤ `LOCAL_PASSED` (EV-032) |
 | 2026-10-28 | ML-3 근무 변경 시 대타 종료: 끝에 "V4 근무 변경 시 대타 종료" 절 신설. 예약 V4-N-08~11·17·19·20 등록 (08·09는 V4 함수 부분만), 범위 다음 번호 V4-N-55~59 추가 (EV-034) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
+| 2026-10-28 | API-SB-01 종료된 대타 조회: §5-1 D22 행에 구현 표시, 끝에 "V4 종료된 대타 조회" 절 신설 (V4-N-27~35·38, 새 V4-N-60) |
 | 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 
@@ -527,3 +528,26 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
 - 회귀 (기대값 변경 0): 기존 대타 Test 전체 그대로 통과 (EV-034).
 - 범위 밖: V3 근무 취소·담당자 변경 Command와 그 경로 Test (V3-N-33, H6-C1~C4), 종료 알림 Type·받는 사람·합치기 (V5, NOTIFICATION-TYPES §3-3), 퇴사 시 후보 처리 (V4-N-12~16·22), 종료 원인 연결 (V4-N-18), 운영 `close_reason` ENUM 변경 (배포 담당, ML-3 §9).
+
+## V4 종료된 대타 조회 (API-SB-01, V4-N-27~35·38·60, 2026-10-28)
+
+[G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) §9의 D22-T2~T9·T12와 새 V4-N-60. Class: `SubstituteAcceptedClosedRequestTest` (MySQL Testcontainers, test Profile)
+
+| Test ID | Method | 확인하는 것 | ⑤ 실행 |
+|---|---|---|---|
+| V4-N-27 (D22-T2) | `managerClosedRequestIsListed` | 관리자 종료 → 1건 `MANAGER_CLOSED`, 종료 시각 = DB `closedAt` | `LOCAL_PASSED` |
+| V4-N-28 (D22-T3) | `expiredRequestIsListedWithShiftStart` | 근무 시작 1초 전 0건, 시작 시각부터 계산 만료 `CLOSED/EXPIRED`, 종료 시각 = `startAt`, DB 상태 그대로 | `LOCAL_PASSED` |
+| V4-N-29 (D22-T4) | `approvedRequestIsListedForSevenDays` | 승인 당일 1건 APPROVED, 8일 뒤 0건 (근무 전이어도). "예정 근무에 보임"은 V3 근무표라 제외 | `LOCAL_PASSED` |
+| V4-N-30 (D22-T4b) | `approvedRequestHidesCurrentAssignee` | 승인 뒤 담당자 변경(V3 인계 대신 `Shift.changeMember`로 흉내) → APPROVED 그대로, 응답 필드에 현재 담당자 없음. "빠진 근무"(API-SC-01)는 제외 | `LOCAL_PASSED` |
+| V4-N-31 (D22-T5) | `closedRequestDisappearsAfterSevenDays` | 정확히 7일 1건, 7일 + 1초·8일 0건, DB Row 그대로 | `LOCAL_PASSED` |
+| V4-N-32 (D22-T6) | `rejoinedMemberSeesOnlyCurrentMembershipRecords` | 퇴사 후 같은 근무지 재가입 → 이전 소속 기록 0건, 새 소속 기록만 1건 (PR #82 재가입 구조 사용) | `LOCAL_PASSED` |
+| V4-N-33 (D22-T7) | `respondingToClosedRequestIsRejected` | 종료된 요청에 수락·거절 → `CANDIDATE_ALREADY_RESPONDED`·`REQUEST_NOT_OPEN`, 상태 그대로 | `LOCAL_PASSED` |
+| V4-N-34 (D22-T8) | `pendingCandidateSeesNothing` | 대기 후보에게는 0건 | `LOCAL_PASSED` |
+| V4-N-35 (D22-T9) | `shiftChangedRequestIsListed` | 근무 변경 종료(`closeActiveRequestsByShiftChange`) → `SHIFT_CHANGED` | `LOCAL_PASSED` |
+| V4-N-38 (D22-T12) | `onlyMyAcceptedRequestsInLatestOrder` | 내 Candidate만, 효력 종료 시각 최신순, 다른 후보 정보 없음 | `LOCAL_PASSED` |
+| V4-N-60 (새 ID) | `endedMembershipRecordsAreHidden` | 수락 뒤 그 근무지를 퇴사한 소속(`leftAt` 있음)의 기록 0건 (G03-D-22 §6-1 현재 소속 조건) | `LOCAL_PASSED` |
+
+**⑤ 상태의 뜻:**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `55b1ac3` 위 전체 553/553 (EV-037). CI는 PR 생성 후 기록
+- 회귀 (기대값 변경 0): 기존 Test 542개 목록 그대로 통과
+- 범위 밖: V4-N-36·37 (D22-T10·T11, SUB-07·SUB-05 현재 소속 = CHG-02·03, 묶음 D. SUB-07 조건은 PR #82가 추가). Frontend "수락한 요청 — 종료" 화면
