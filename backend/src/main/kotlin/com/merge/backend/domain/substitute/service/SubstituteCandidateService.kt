@@ -5,6 +5,7 @@ import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.dto.AcceptedClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
@@ -108,6 +109,21 @@ class SubstituteCandidateService(
             userId, // 내가 수락한 Candidate인지 확인할 User ID
             now, // 아직 시작하지 않은 Shift인지 판단할 기준 시간
         )
+    }
+
+    @Transactional(readOnly = true)
+    fun findAcceptedClosedRequests(
+        userId: Long, // 현재 로그인한 User의 ID
+    ): List<AcceptedClosedSubstituteRequestResponse> {
+        val now = LocalDateTime.now(clock) // 현재 서버 시간
+
+        // 효력 종료 시각 기준 최근 7일만 보여 줌 (API-CATALOG API-SB-01 조회 범위). DB Row는 그대로
+        return substituteCandidateRepository.findAcceptedClosedRequests(userId, now, now.minusDays(7))
+            .map { AcceptedClosedSubstituteRequestResponse.from(it, now) }
+            .sortedWith(
+                compareByDescending<AcceptedClosedSubstituteRequestResponse> { it.closedAt }
+                    .thenByDescending { it.requestId },
+            )
     }
 
     private fun validateRespondableCandidate(
