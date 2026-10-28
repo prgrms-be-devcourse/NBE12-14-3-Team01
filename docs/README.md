@@ -47,6 +47,7 @@
 | `docs/delivery/TEMPLATE.md` | Domain Delivery Sheet 템플릿 | 공통 설정 Owner | 양식 | 양식 변경 승인 시 | 읽기 전용 |
 | `docs/delivery/V4-substitute.md` | V4 Substitute Delivery Sheet (시범) | V4 Owner | Domain 현황 요약 (계약·결정은 ID 참조만) | Domain PR과 함께 | 요청 시 수정 (근거 위치 필수) |
 | `docs/delivery/DOMAIN-DEVELOPMENT-GUIDE.md` | Domain별 개발 순서·Test 규칙·증거 형식 (팀 제안) | 팀 합의 | 없음 (③ `DRAFT`, 팀 합의 전. 팀원에게 강제하지 않음) | 팀 합의 시 | 초안 작성. 강제·승인 표시 금지 |
+| [`RELEASE-READINESS-PLAN.md`](delivery/RELEASE-READINESS-PLAN.md) | Migration 종료·A~F 목표·사용자 경로·격리 배포 검증 실행 계획 | 도메인 Owner 검토 → 팀 합의 | 없음 (③ `DRAFT`; 정책·테스트 결과의 원본 아님) | 목표·담당·검증 Gate 합의 시 | 초안 작성 가능. 구현·정책 승인 표시 금지 |
 | `docs/delivery/TASK-OPS-01-prod-config-failfast.md` | Task Card 초안 (운영 설정 fail-fast) | 담당자 지정 전 | 없음 (초안) | Task 진행 시 | 작성 가능 |
 | `docs/evidence/TEST-INVENTORY.md` | Test 목록·준비·실행 상태 | 각 V Owner | Test 목록 | Test 추가·실행 시 | 요청 시 수정. 실행 결과는 EV-ID로만 연결 |
 | `docs/evidence/TEST-EVIDENCE.md` | 실행 근거 | 실행한 사람 | 실행 결과 | 실행할 때마다 (append-only) | 실제 실행한 결과만 추가 |
