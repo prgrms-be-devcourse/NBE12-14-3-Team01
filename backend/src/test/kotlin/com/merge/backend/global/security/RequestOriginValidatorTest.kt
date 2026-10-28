@@ -32,6 +32,29 @@ class RequestOriginValidatorTest {
     }
 
     @Test
+    @DisplayName("허용 목록을 Spring CORS와 같은 규칙으로 비교한다 (끝의 /, 대소문자, 기본 포트)")
+    fun isAllowedMatchesCorsRules() {
+        // 운영에서 끝에 /를 붙이거나 대문자로 적어도 CORS를 통과한 Origin은 허용
+        val validator = RequestOriginValidator(listOf("https://app.example.com/", "https://Shop.Example.com"))
+
+        assertThat(validator.isAllowed("https://app.example.com", null)).isTrue()
+        assertThat(validator.isAllowed("https://shop.example.com", null)).isTrue()
+        assertThat(validator.isAllowed(null, "https://app.example.com:443/page")).isTrue()
+        assertThat(validator.isAllowed(null, "https://SHOP.example.com/page")).isTrue()
+        assertThat(validator.isAllowed(null, "https://app.example.com:8443/page")).isFalse()
+        assertThat(validator.isAllowed(null, "http://app.example.com/page")).isFalse()
+    }
+
+    @Test
+    @DisplayName("허용 목록에 *가 있어도 아무 Origin이나 허용하지 않는다")
+    fun isAllowedRejectsWildcardEntry() {
+        val validator = RequestOriginValidator(listOf("*"))
+
+        assertThat(validator.isAllowed("http://evil.example", null)).isFalse()
+        assertThat(validator.isAllowed(null, "http://evil.example/page")).isFalse()
+    }
+
+    @Test
     @DisplayName("Origin과 Referer가 둘 다 없거나 Referer를 읽을 수 없으면 거부한다")
     fun isAllowedRejectsMissingOrBrokenHeaders() {
         assertThat(validator.isAllowed(null, null)).isFalse()
