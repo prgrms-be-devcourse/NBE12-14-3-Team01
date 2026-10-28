@@ -106,4 +106,23 @@ interface ShiftRepository : JpaRepository<Shift, Long> {
         @Param("startAt") startAt: LocalDateTime,
         @Param("endAt") endAt: LocalDateTime
     ): Boolean
+
+    // API-SC-01 - 나의 현재 소속이 담당이던 근무 중 공개 후 취소된 것 (원래 시작 시각이 :from 이후)
+    @Query(
+        """
+        SELECT s
+        FROM Shift s
+        JOIN FETCH s.schedule sc
+        JOIN FETCH sc.workplace
+        WHERE s.member.user.id = :userId
+          AND s.member.leftAt IS NULL
+          AND s.status = ShiftStatus.CANCELLED
+          AND s.cancelledAt IS NOT NULL
+          AND s.startAt >= :from
+        """
+    )
+    fun findCancelledShiftsOfCurrentMembers(
+        @Param("userId") userId: Long,
+        @Param("from") from: LocalDateTime
+    ): List<Shift>
 }
