@@ -206,9 +206,28 @@ class SubstituteRequestService(
 
     @Transactional
     fun approve(requestId: Long, actorId: Long): SubstituteRequest {
-        // 대체 근무 요청이 존재하는지
+        // 어느 근무지에서도 매니저가 아니면 요청을 조회하기 전에 거절 (API-CATALOG §5-5 역할 먼저 검사)
+        val managedWorkplaceIds = workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)
+            .filter { it.role == WorkplaceRole.MANAGER }
+            .map { it.workplace.id }
+
+        if (managedWorkplaceIds.isEmpty()) {
+            throw BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED)
+        }
+
+        // Lock 없이 ID만 조회. 없는 요청과 다른 근무지 요청은 같은 응답
+        val scope = substituteRequestRepository.findScopeById(requestId)
+            ?.takeIf { it.workplaceId in managedWorkplaceIds }
+            ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+
+        // Lock 순서 Shift → Request (ML-5). Entity는 Lock 조회로 처음 읽어야 최신 상태가 보인다
+        shiftRepository.findByIdForUpdate(scope.shiftId)
+
         val request = substituteRequestRepository.findByIdForUpdate(requestId)
             ?: throw BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+
+        // ID 조회와 Lock 사이에 요청의 근무가 바뀌지 않았는지
+        check(request.shift.id == scope.shiftId) { "대체 근무 요청의 근무가 Lock 전후로 다릅니다." }
 
         // request == ACCEPTED 여부 검사
         if (request.status != RequestStatus.ACCEPTED) {
@@ -216,7 +235,7 @@ class SubstituteRequestService(
         }
         // 근무지 ID 뽑아오기
         val workplaceId = requireNotNull(request.shift.schedule.workplace.id)
-        // 매니저 인가 확인
+        // 매니저 인가 확인 (Lock 뒤 최종 확인)
         workplaceMemberService.requireManager(actorId, workplaceId)
 
         // 요청의 스케줄이 공개되지 않았을 때

@@ -29,6 +29,19 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
     )
     fun findByIdForUpdate(@Param("requestId") requestId: Long): SubstituteRequest?
 
+    // Lock 없이 ID만 조회 (Entity를 영속성 Context에 올리지 않음)
+    @Query(
+        """
+        SELECT new com.merge.backend.domain.substitute.repository.SubstituteRequestScope(sh.id, w.id)
+        FROM SubstituteRequest r
+        JOIN r.shift sh
+        JOIN sh.schedule sc
+        JOIN sc.workplace w
+        WHERE r.id = :requestId
+        """,
+    )
+    fun findScopeById(@Param("requestId") requestId: Long): SubstituteRequestScope?
+
     // 해당 근무지의 모든 대체근무 요청 조회
     // 근무 시간 순으로 정렬하되, 시간이 같으면 id 기준으로 정렬
     @Query(
