@@ -32,7 +32,7 @@
 | JWT | JJWT 0.13.0 (`jjwt-api` / `jjwt-impl` / `jjwt-jackson`) | BUILD, RESOLVED |
 | SpringDoc | `springdoc-openapi-starter-webmvc-ui` 3.1.0, swagger-ui 5.32.11 | BUILD, RESOLVED |
 | REST Docs | 없음 | BUILD |
-| Lombok | 1.18.46 (Boot 관리), `compileOnly` + `annotationProcessor` (main/test) | BUILD, RESOLVED |
+| Lombok | develop `92dcdfa`까지: 1.18.46 (Boot 관리), `compileOnly` + `annotationProcessor` (main/test), 소스 사용 0건. **Branch `chore/remove-java-build-tools`에서 제거 (2026-10-28, 병합 전·로컬 검증 완료)** | BUILD |
 | MapStruct / QueryDSL / kapt | 없음 | BUILD, 코드 검색 0건 |
 | DB Driver | `mysql-connector-j` 9.7.0, H2 2.4.240 | RESOLVED |
 | Testcontainers | 2.0.5 (`testcontainers-mysql`) | RESOLVED, BOM |
@@ -40,7 +40,7 @@
 | Test | JUnit Jupiter 6.0.3, Mockito 5.23.0, AssertJ 3.27.7 | RESOLVED |
 | Isolation | 전역 `spring.datasource.hikari.transaction-isolation: TRANSACTION_READ_COMMITTED` (모든 Profile) | BUILD (`application.yml`) |
 | Profile | `dev` (기본, H2 file, `ddl-auto: update`) / `test` (Testcontainers MySQL) / `prod` (MySQL, `ddl-auto: update`) / `init-data` | BUILD |
-| Code Style | Checkstyle (`config/checkstyle/checkstyle.xml`), `check`에 포함 — **Java만 검사, `.kt`는 대상 아님** | BUILD |
+| Code Style | develop `92dcdfa`까지: Checkstyle (`config/checkstyle/checkstyle.xml`), `check`에 포함 — **Java만 검사, `.kt`는 대상 아님** (Java 소스 0개라 `NO-SOURCE`). **Branch `chore/remove-java-build-tools`에서 Plugin·설정 파일 제거 (2026-10-28, 병합 전).** 병합되면 `check`에서 `checkstyleMain`·`checkstyleTest`만 빠진다. Kotlin 검사(ktlint/detekt)는 TS-16, 미적용 | BUILD |
 | CI | `Backend CI`: `./gradlew check --no-daemon` / `Docker Build CI Test`: `./gradlew bootJar` + `docker build` | CI |
 | Boot BOM의 Kotlin 관리값 | `kotlin.version` 2.3.21, `kotlin-coroutines.version` 1.10.2 | BOM |
 
@@ -55,7 +55,7 @@
 | `kotlin("plugin.spring")` | 2.3.21 | TS-02 `REQUIRED` | 같음 | — |
 | `kotlin("plugin.jpa")` | 2.3.21 | TS-03 `REQUIRED` | 같음 | — |
 | `allOpen { annotation(Entity / MappedSuperclass / Embeddable) }` | 명시 설정 | TS-03: 2.3.20+는 JPA preset all-open 자동 적용으로 조사 (명시 설정 불필요) | 명시 설정 추가 (자동 적용과 중복인지는 미확인) | DL-014 |
-| `kotlin("plugin.lombok")` | 2.3.21 (Alpha) | TS-08 `CONDITIONAL` | 적용됨 | DL-004 |
+| `kotlin("plugin.lombok")` | 2.3.21 (Alpha) | TS-08 `CONDITIONAL` | 적용됨 (develop `92dcdfa`까지). Branch `chore/remove-java-build-tools`에서 제거 (2026-10-28, 병합 전. Java Lombok 참조 대상 0개) | DL-004 |
 | `org.jetbrains.kotlin:kotlin-reflect` | `implementation`, Version 생략 | TS-04 `REQUIRED` | 같음 | — |
 | `tools.jackson.module:jackson-module-kotlin` | `implementation`, Version 생략 (Jackson 3 좌표) | TS-06 `REQUIRED` | 같음 | — |
 | `org.jetbrains.kotlin:kotlin-test-junit5` | `testImplementation` | TS-12 `NOT_NEEDED (M0)` | 추가됨. `KotlinEnvironmentTest`가 `kotlin.test.assertEquals` 사용 | DL-014 |
