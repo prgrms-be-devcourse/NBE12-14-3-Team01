@@ -192,7 +192,9 @@ class MembershipRejoinCompatibilityIntegrationTest {
 
         assertThatThrownBy {
             requestService.create(requireNotNull(oldShift.id), requireNotNull(employee.id))
-        }.isInstanceOf(BusinessException::class.java)
+        }.isInstanceOfSatisfying(BusinessException::class.java) {
+            assertThat(it.errorCode).isEqualTo(SubstituteRequestErrorCode.NOT_OWN_SHIFT)
+        }
     }
 
     @Test
@@ -202,6 +204,8 @@ class MembershipRejoinCompatibilityIntegrationTest {
         assertThat(shiftService.list(week, employee.id)).isEmpty()
         assertThatThrownBy {
             shiftService.detail(oldShift.id, employee.id)
-        }.isInstanceOf(BusinessException::class.java)
+        }.isInstanceOfSatisfying(BusinessException::class.java) {
+            assertThat(it.errorCode).isEqualTo(ShiftErrorCode.FORBIDDEN_ACCESS)
+        }
     }
 }
