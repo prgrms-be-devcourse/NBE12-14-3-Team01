@@ -90,7 +90,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-T-23 | V4-P07, C-48 | `$ApproveTest.approve_success` | UNIT · MOCK | NORMAL | APPROVED | **STRENGTHEN: DB에서 `Shift.member` 재조회 (V4-N-02)** |
 | V4-T-24 | V4-P07 | `.approve_fail_invalid_request_status` (PR #5에서 `@ParameterizedTest` 3건: OPEN·APPROVED·CLOSED) | UNIT · MOCK | FAILURE | SUB-002 | SUFFICIENT |
 | V4-T-25 | V4-P07, P09 | `.approve_fail_past_shift_start_time` | UNIT · MOCK | BOUNDARY | 예외 | SUFFICIENT |
-| V4-T-26 | V4-P07 | `.approve_fail_actor_not_in_workplace` | UNIT · MOCK | FAILURE | 예외 | SUFFICIENT |
+| V4-T-26 | V4-P07 | `.approve_fail_actor_not_in_workplace` (PR #83에서 둘로 나눔: 어디서도 MANAGER 아님 → 이 Method, 다른 근무지 MANAGER → `.approve_fail_actor_manager_of_other_workplace`) | UNIT · MOCK | FAILURE | WPL-004 / SUB-001 (PR #83, 전: WPL-003) | SUFFICIENT |
 | V4-T-27 | V4-P07 | `.approve_fail_candidate_not_employee` | UNIT · MOCK | FAILURE | SFT-004 | SUFFICIENT |
 | V4-T-28 | V4-P07, C-48, C-30 | `.approve_fail_conflicting_shift` | UNIT · MOCK | FAILURE | SUB-005 | SUFFICIENT |
 | V4-T-29 | V4-P07, C-40 | `.approve_fail_conflicting_unavailable_time` | UNIT · MOCK | FAILURE | SUB-006 | SUFFICIENT |
@@ -145,7 +145,7 @@ Domain 요약은 [`docs/delivery/V4-substitute.md`](../delivery/V4-substitute.md
 | V4-T-71 | S2-6 연결 | `SubstituteCandidateServiceTest$RejectTest.rejectCandidate_RequestNotOpen` L615 (실패 - 다른 후보가 이미 수락한 Request는 거절할 수 없다) | UNIT · MOCK | FAILURE | SUB-023 (`REQUEST_NOT_OPEN`) | 미판정 |
 | V4-T-72 | S2-6 연결 | `SubstituteCandidateServiceTest$RejectTest.rejectCandidate_ShiftAlreadyStarted` L627 (실패 - 이미 시작된 Shift는 거절할 수 없다) | UNIT · MOCK | FAILURE | SUB-012 (`SHIFT_ALREADY_STARTED`) | 미판정 |
 | V4-T-73 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_request_not_found` L381 (실패: 존재하지 않는 요청이면 예외가 발생한다) | UNIT · MOCK | FAILURE | SUB-001 (`SUBSTITUTE_REQUEST_NOT_FOUND`) | 미판정 |
-| V4-T-74 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_actor_not_manager` L428 (실패: 승인 요청자가 MANAGER가 아니면 예외가 발생한다) | UNIT · MOCK | FAILURE | WPL-004 (`MANAGER_REQUIRED`) | 미판정 |
+| V4-T-74 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_actor_not_manager` L371 (실패: 승인 요청자가 MANAGER가 아니면 요청을 조회하기 전에 예외가 발생한다, PR #83에서 이름·조회 전 거절 확인 추가) | UNIT · MOCK | FAILURE | WPL-004 (`MANAGER_REQUIRED`) | 미판정 |
 | V4-T-75 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_schedule_not_published` L443 (실패: 근무표가 공개 전(DRAFT)이면 승인할 수 없다) | UNIT · MOCK | FAILURE | SCH-012 (`NOT_PUBLISHED`) | 미판정 |
 | V4-T-76 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_shift_cancelled` L456 (실패: Shift가 취소됐으면 승인할 수 없다) | UNIT · MOCK | FAILURE | SFT-013 (`IS_CANCELED_SHIFT`) | 미판정 |
 | V4-T-77 | S2-6 연결 | `SubstituteRequestServiceTest$ApproveTest.approve_fail_shift_member_changed` L470 (실패: 요청 이후 Shift 담당자가 바뀌었으면 승인할 수 없다) | UNIT · MOCK | FAILURE | SUB-004 (`INVALID_MEMBER`) | 미판정 |
@@ -279,13 +279,13 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | D05-T4·T5·T5b·T5c·T7·T8·T9·T11 | **V2-N-45·46·47·48·49·50·51·52** (순서대로) | V2 | PROPOSED_IMPROVEMENT | 퇴사 확정(API-LV-02)의 확인 응답 |
 | D05-T10 | **V3-N-22** | V3 | MIGRATION | 기존 DRAFT 생성·Publish·불가능 시간 경고 형식 회귀 |
 | D05-R1~R3 | 보류 (H6) | ML-5 | H6 | `BLOCKED` |
-| M3-T1 | **V4-N-44** | V4 | PROPOSED_IMPROVEMENT | 승인 범위 밖 = 없는 ID와 같은 404 |
-| M3-T2·T3 | **V4-N-45·46** | V4 | PROPOSED_IMPROVEMENT · H6 | ④ `BLOCKED` (H6 Harness) |
+| M3-T1 | **V4-N-44** | V4 | PROPOSED_IMPROVEMENT | 승인 범위 밖 = 없는 ID와 같은 404. PR #83 `SubstituteApprovePermissionLockTest``.outOfScopeApproveGetsSameResponseRegardlessOfRequest` (W안: 어디서도 MANAGER 아님 403 `WPL-004`, 다른 근무지 MANAGER 404), `LOCAL_PASSED` |
+| M3-T2·T3 | **V4-N-45·46** | V4 | PROPOSED_IMPROVEMENT · H6 | PR #83 `SubstituteApprovePermissionLockTest``.outOfScopeApproveDoesNotWaitForLocks`·`.approveRechecksStatusAfterLock`, 기존 `runSecondWhileFirstHoldsLock` 방식 (H6 Harness 대신), `LOCAL_PASSED` |
 | M3-T4 | **V3-N-23** | V3 | PROPOSED_IMPROVEMENT | 근무 상세 |
 | M3-T5 | **V4-N-47** (후보 응답·대타 종료) + **V5-N-18** (알림 읽음) | V4 / V5 | PROPOSED_IMPROVEMENT | Domain별로 나눔 |
 | M3-T6 | 참조: 기존 BASELINE (V4-T-23·36 등, 각 API의 정상 경로 Test) | 각 Domain | BASELINE | 회귀 |
 | NT-T1~T16 | **V5-N-01~16** (번호 그대로) | V5 | T3·T8·T12는 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | §6 |
-| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존) | ML-5 | H6 | `BLOCKED` |
+| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면 | ML-5 | H6 | `BLOCKED` (ML5-T3·T13은 `LOCAL_PASSED`) |
 | ErrorCode Test 0 (11개) | **V3-N-24~32**, **V4-N-48** | V3 / V4 | MIGRATION | §5-3 |
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
@@ -350,10 +350,10 @@ Kotlin Migration PR에서는 아래 **모든** 기존 Test의 기대값을 현�
 | SUB-05·`ShiftService.detail` 관련 (대상 Method는 ML-4 §8 승인 때 특정) | 현재 소속 확인 없음 | 현재 소속 기준 | ML-4 §8 | ML-4 승인 후 |
 | SUB-006 문구 (T1-04) | — | — | message를 확인하는 Test 없음 → 기대값 변경 0 | — |
 | Pattern `SHIFT-004`·`SHIFT-005` 4개 (`RegularShiftPatternControllerTest` L812·857·1449·1505) | 대상 직원 의미 | 그대로 (실행자 쪽 M-01 정정은 새 Test만) | ERROR-CODES M-01 | — |
-| V4-T-26 `approve_fail_actor_not_in_workplace` (L413) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 실행자가 어디서도 MANAGER가 아니면 403 `WPL-004` (Request 조회 전, 없는 ID와 같은 응답), 다른 근무지 MANAGER면 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일). Unit Fixture를 실행자의 MANAGER 소속 유무로 나눈다. (S2-6A 안: 404 일괄) | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 (V4-N-44) | CHG-06 승인 후 |
+| V4-T-26 `approve_fail_actor_not_in_workplace` (L413, PR #83 뒤 L345) (S2-6A 발견). 실행자 = 그 근무지 구성원 아님 → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 실행자가 어디서도 MANAGER가 아니면 403 `WPL-004` (Request 조회 전, 없는 ID와 같은 응답), 다른 근무지 MANAGER면 404 `SUB-001` "존재하지 않는 대체근무 요청입니다." (없는 ID와 Status·code·message·`data` 동일). Unit Fixture를 실행자의 MANAGER 소속 유무로 나눈다. (S2-6A 안: 404 일괄) | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 (V4-N-44) | **변경됨: PR #83 (2026-10-28, DECISION-LOG §4-6)** |
 | V4-T-39 `close_NotManager_ThrowsException` (L1099) (S2-6A 발견). 이름과 달리 Mock은 `NOT_WORKPLACE_MEMBER` → **범위 밖** | `WPL-003` 403 | **S3-A (W안) 갱신:** 위 V4-T-26과 같음 (어디서도 MANAGER 아님 → 403 `WPL-004`, 다른 근무지 MANAGER → 404 `SUB-001`) | 같음, M3-T5 (V4-N-47) | CHG-07 승인 후 |
 | V4-T-58 `acceptCandidate_NotOwnCandidate` (L348), V4-T-68 `rejectCandidate_NotOwnCandidate` (L577) (S2-6A 발견). Candidate는 본인만 볼 수 있음 → **범위 밖** | `SUB-020` 403 | 404 `SUB-019` "해당 대타 후보를 찾을 수 없습니다." (없는 Candidate ID와 동일) | M3-T5 (V4-N-47) | CHG-07 승인 후 |
-| V4-T-74 `approve_fail_actor_not_manager` (L428) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **S3-A 결정 (W안, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`): 어디서도 MANAGER가 아니면 403 `WPL-004` — 지금 code와 같고 검사 순서만 바뀐다 (Request 조회·Lock 전). 다른 근무지 MANAGER면 404 `SUB-001`.** (S3 검토 기록:) 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 | CHG-06 승인 후 |
+| V4-T-74 `approve_fail_actor_not_manager` (L428, PR #83 뒤 L371) (S2-6A 발견). 실행자 = 같은 근무지 현재 구성원, **역할만 부족** | `WPL-004` 403 | **S3-A 결정 (W안, 사용자 잠정 결정 2026-10-25, 팀 `PENDING`): 어디서도 MANAGER가 아니면 403 `WPL-004` — 지금 code와 같고 검사 순서만 바뀐다 (Request 조회·Lock 전). 다른 근무지 MANAGER면 404 `SUB-001`.** (S3 검토 기록:) 현재 잠정 규칙(§5-5 "근무지 ID가 Path에 없는 API에서 관리자 아님 → 404", M3-T1 "같은 근무지 직원")대로면 404 `SUB-001`. 그러나 실행자가 그 요청의 요청자·후보라 이미 볼 수 있는 자원이면 §5-5의 "볼 수 있는 Resource → 상태에 맞는 응답" 원칙과 어긋나 403이 일관될 수 있다. 관계없는 직원이면 다른 사람 요청의 존재·상태를 알아내지 못하게 하는 404가 의미 있다 | API-CATALOG §5-5 "역할 먼저 검사", M3-T1 | **변경됨: PR #83 (2026-10-28, DECISION-LOG §4-6)** |
 | `NotificationServiceTest` "다른 사용자의 알림은 읽음 처리할 수 없다" (L187, 확인 L232) (S2-6A 발견) | `NOT-002` 403 | M3-T5를 따르면 404. **단 G03-D-10 (`DEFER`)과 같은 질문이라 팀 결정 전에는 변경 대상으로 확정하지 않는다.** S3-A: 권한 확인 전 Lock 제거(CHG-07)는 응답 code와 별도로 진행 가능 | M3-T5 (V5-N-18), G03-D-10 | 팀 결정 후 |
 | V4-T-35 `list_NotManager_ThrowsException` | `WPL-004` | 그대로 (근무지 ID가 Path에 있음) | API-CATALOG §5-5 | — |
 | `NotificationServiceTest` "퇴사한 근무지의 알림" (L240) — B-2 내 과거 소속 알림 (S3-B 분리) | `NOT-002` 403 | **미정 — G03-D-16 (`PENDING`) 결정 대기.** 현재 잠정 규칙(§5-5 "실행자 자신의 소속 종료 → 403")대로면 그대로, USER-PATH-REVIEW §9-2 선택지 B'면 404. 결정 전에는 변경 대상으로 확정하지 않는다 | G03-D-16, USER-PATH-REVIEW §9-2 | 팀 결정 후 |
@@ -445,6 +445,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | AUTH-1: 끝에 "V1 AUTH-1 서버 로그아웃" 절 신설. 예약 V1-N-01~12 등록, 범위 다음 번호 V1-N-13 추가 (출처 검사 단위 Test). ④ `IMPLEMENTED`, ⑤ `LOCAL_PASSED` (EV-032) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
 | 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
+| 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
