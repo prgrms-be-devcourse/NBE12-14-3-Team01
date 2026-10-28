@@ -38,7 +38,7 @@
 - Notification Production Kotlin은 15개, Test Kotlin은 9개다. 이전 로컬 V5 최종 감사 RESULT.md의 Production 16개 표기는 오기이며 정정 대상으로 기록한다. #53은 새 회귀 테스트 17건이 아니라 변경 경로 17개와 신규 테스트 1건이었다.
 - Issue #62 AUTH-1과 #69 H2 Membership는 OPEN이고 체크리스트가 남아 있다. 사용자는 담당자가 작업 중이라고 전달했지만 GitHub assignee는 두 Issue 모두 비어 있고, 구현 PR·최종 테스트 완료는 확인되지 않았다. #69는 초대코드 재발급·기존 코드 무효화도 범위에 포함한다. 상위 #32 Notification과 #63 Schedule Controller Test도 OPEN이다. #63은 대응 Kotlin 파일 존재와 이슈 범위가 일치하는지 확인한다. Migration Matrix §2의 현재 진행 행은 실제 병합 상태와 대조해야 한다.
 - Frontend 헤더 로그아웃은 현재 clearToken만 호출하고 서버 로그아웃 API 호출이 없다. 대타 일부 목록은 workplaceId로 화면 필터링한다. 재가입 뒤 과거 소속과 현재 소속의 분리 근거가 되지 않는다.
-- Checkstyle은 Java 검사다. ktlint/detekt는 현재 Gradle Gate에 없다. 현재 CI 성공을 Kotlin 린트 PASS로 표현하지 않는다. 현재 develop의 main Kotlin 소스에서 `fun <Receiver>.<name>` 형식의 확장 함수 선언은 정적 탐색으로 찾지 못했다. 공식 과제의 함수·확장 함수 적용 근거는 최종 제출 전에 실제 코드로 다시 확인해야 한다.
+- Checkstyle(Java 전용)은 Java 소스 0개 이후 제거했다 (2026-10-28, `chore/remove-java-build-tools`). ktlint/detekt는 현재 Gradle Gate에 없다 (2026-10-28 일회성 측정만). 현재 CI 성공을 Kotlin 린트 PASS로 표현하지 않는다. 현재 develop의 main Kotlin 소스에서 `fun <Receiver>.<name>` 형식의 확장 함수 선언은 정적 탐색으로 찾지 못했다. 공식 과제의 함수·확장 함수 적용 근거는 최종 제출 전에 실제 코드로 다시 확인해야 한다.
 
 이 스냅샷은 작업 착수 시 최신 GitHub와 다시 대조한다. 사용자 제공 공식 과제의 추가 기능은 선택 사항이지만, 팀이 이번 출시 범위에 넣기로 한 기능은 아래 P0 완료 조건으로 판단한다.
 
@@ -102,7 +102,7 @@ E/F는 별도 기능 한 명에게 몰기보다 해당 Backend Command Owner가 
 1. Event 담당자는 PR #73의 SchedulePublishedEvent.java record와 Kotlin class의 필드·생성·발행 위치·Listener 수신·record 접근자·값 동등성·방어 복사·JVM 타입 변경 영향을 대조한다. Backend·Docker CI 성공과 리뷰 대기 상태를 별도로 기록하고, 승인·병합 후 현재 develop과 다시 확인한다. Notification Listener 7개는 이미 Kotlin이다.
 2. Global 담당자는 Java Test 17개를 실제 테스트 클래스와 보조 Fixture로 나눈다. ApiResponse/예외/날짜/감사/설정의 Java→Kotlin 사례·Assertion·Spring 설정 동등성을 보존한다. Security 테스트는 이미 Kotlin인 파일을 중복 전환하지 않는다.
 3. V3 담당자는 PR #72의 ShiftModifyIntegrationTest.java→.kt 6건을 기존 Fixture·Transaction·Latch·Assertion과 대조한다. 현재 Head의 CI 성공과 실제 JUnit XML·최신 develop 통합은 구분한다. PR 본문의 Issue·Task Card 연결과 미완료 확인 체크박스를 정리하고 리뷰·병합 후 남은 Java 수를 다시 센다. 이미 병합된 PR #71의 ShiftServiceTest.kt 근거도 연결한다. BackendApplication.java는 범위 결정을 기록한다.
-4. 각 변경은 별도 PR에서 관련 테스트, 전체 clean check, JUnit XML 사례 키, Main/Test Checkstyle, 현재 Head CI를 확인한다. 마지막 병합 이후 새 develop에서 다시 통합 검증한다.
+4. 각 변경은 별도 PR에서 관련 테스트, 전체 clean check, JUnit XML 사례 키, 현재 Head CI를 확인한다 (Checkstyle은 Java 소스 0개 이후 제거되어 해당 없음). 마지막 병합 이후 새 develop에서 다시 통합 검증한다.
 5. Migration Matrix 현재 진행 행과 #32·#63 등 Issue 상태를 실제 PR·Evidence에 맞춘다. 과거 Snapshot 수치를 최신 수치로 덮어쓰지 않는다.
 
 **종료 기준:** 전환 대상 누락 0 또는 이유가 적힌 의도적 잔존, 기존 사례·중요 Assertion 소실 0, 최종 develop 개별 결과와 CI 연결, 문서/Issue 현재 상태 일치. 기준이 맞지 않으면 M은 HOLD다.
@@ -154,7 +154,7 @@ Migration M과 A~F 구현은 도메인별로 병렬 진행할 수 있다. 각 PR
 1. **정적·단위:** Java/Kotlin 호출, nullable, Validation 위치, Entity/Query/Lock/Event annotation, 기존 테스트 Assertion을 대조한다. 공식 과제의 Kotlin 함수·확장 함수 적용과 코드 개선 효과는 실제 사용처, 전후 코드, 측정 방법으로 설명한다. 의미 없는 확장 함수를 숫자 맞추기로 추가하지 않는다. Kotlin 린트 도구를 채택하면 별도 승인된 작은 PR의 Gate로 추가한다.
 2. **관련 통합:** Spring Bean, 실제 Security Filter, Service·Repository, MySQL Testcontainers, flush/clear 또는 새 Transaction의 DB 재조회로 API·ErrorCode·권한·Rollback을 확인한다. Mock 경계는 실제 검증 범위라고 주장하지 않는다.
 3. **MySQL SQL·경합:** 최소 두 독립 DB 세션/Transaction으로 순서를 통제한다. 실행한 SELECT/UPDATE와 FOR UPDATE, 현재 격리수준, 첫 요청의 Lock 보유, 두 번째 요청의 대기, timeout/Deadlock의 예외·Rollback, 최종 Row와 이력·알림을 기록한다. CountDownLatch/Future의 worker 예외와 timeout도 회수한다. 가능하면 performance_schema 관찰을 보조 근거로 쓴다. 우연한 PASS나 NOT_REPRODUCED를 결함 부재로 바꾸지 않는다.
-4. **최종 통합:** 포함한 PR을 최신 develop과 결합한 Tree에서 clean check, JUnit XML 사례 누락/추가/Skip, Checkstyle, Backend/Docker CI를 연결한다. 이전 488건은 f19e996…의 역사적 값이며 영구 합격 숫자가 아니다.
+4. **최종 통합:** 포함한 PR을 최신 develop과 결합한 Tree에서 clean check, JUnit XML 사례 누락/추가/Skip, Backend/Docker CI를 연결한다 (Checkstyle은 제거되어 해당 없음, Java 소스 0개 확인으로 대체). 이전 488건은 f19e996…의 역사적 값이며 영구 합격 숫자가 아니다.
 5. **격리 배포:** 이미지 빌드 뒤 실제 컨테이너 시작, Healthcheck, 승인된 테스트 MySQL Schema, 환경 설정, Cookie/CORS, 생성한 OpenAPI/Swagger 또는 REST Docs, Frontend 연결을 확인한다. 대표 사용자 Flow와 실패 후 재조회 Smoke를 수행한다. 기동 결과·응답·배포 Commit/Image Digest·DB 버전·Rollback 방법을 남긴다. 운영 DB/Railway/prod Profile에서의 실험은 이 문서가 허용하지 않는다.
 
 각 단계 Evidence는 **Commit SHA와 Tree, OS/JDK/DB/격리수준/Profile, 정확한 명령, 실행 N·PASS·FAIL·ERROR·SKIP, XML/SQL/CI 링크, 검증되지 않은 부분**을 포함한다. 로그에는 Secret·Cookie·Token 값과 개인정보를 남기지 않는다.

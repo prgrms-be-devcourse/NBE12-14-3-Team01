@@ -199,5 +199,5 @@ Domain 검증 상태 (Matrix 전용): `MIGRATION_CODE_COMPLETE`, `KOTLIN_QUALITY
 
 Java 25 Toolchain, **Gradle 9.3.0** (PR #1에서 9.7.1 → 9.3.0, Kotlin 2.3.21 공식 호환 범위에 맞춘 조정), Spring Boot 4.1.1. Library 해석 값 (Hibernate 7.4.5, Jackson 3.1.5 `tools.jackson`, Testcontainers 2.0.5 + MySQL 9.7.2)은 2차 `243f77c`·Gradle 9.7.1 기준 EV-007이며 3차에서 재해석하지 않았다 (M0-FOLLOWUP-02).
 **Kotlin 2.3.21** (`jvm`, `plugin.spring`, `plugin.jpa`, `plugin.lombok`) 적용됨. Domain 코드의 Kotlin 전환은 0건.
-2026-10-28 현재 (develop `92dcdfa`): Backend Java 소스 0개 (PR #77·#79). Java 전용 빌드 설정(`plugin.lombok`, Lombok 의존성, Checkstyle)은 이 시점 develop에 남아 있으며, 제거는 Branch `chore/remove-java-build-tools`에서 진행 (병합 전).
+2026-10-28 현재 (develop `92dcdfa`): Backend Java 소스 0개 (PR #77·#79). Java 전용 빌드 설정(`plugin.lombok`, Lombok 의존성, Checkstyle)은 `chore/remove-java-build-tools`에서 제거.
 상세, 적용 사실과 D0-B 조사 판단의 차이, M0 계획은 `docs/migration/TECH-STACK-DECISIONS.md`. 승인 기록은 `DECISION-LOG` DL-003·004·014 (모두 `PENDING`).
