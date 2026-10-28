@@ -5,6 +5,7 @@ import com.merge.backend.domain.shift.dto.ShiftCancelResponse
 import com.merge.backend.domain.shift.dto.ShiftDetailResponse
 import com.merge.backend.domain.shift.dto.ShiftListResponse
 import com.merge.backend.domain.shift.dto.ShiftModifyResponse
+import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
 import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.dto.ShiftReassignRequest
 import com.merge.backend.domain.shift.dto.ShiftReassignResponse
@@ -82,6 +83,23 @@ class ShiftController(
                 "근무가 추가되었습니다.",
                 ShiftCreateResponse.from(shift)
             )
+        )
+    }
+
+    @PostMapping("/workplaces/{workplaceId}/schedules/{scheduleId}/published-shifts")
+    fun createPublishedShift(
+        @PathVariable workplaceId: Long?,
+        @PathVariable scheduleId: Long?,
+        @Valid @RequestBody request: PublishedShiftCreateRequest,
+    ): ResponseEntity<ApiResponse<ShiftCreateResponse>> {
+        val shift = shiftService.createPublishedShift(workplaceId, scheduleId, request, rq.actorId)
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            ApiResponse.success(
+                "201",
+                "공개 근무가 추가되었습니다.",
+                ShiftCreateResponse.from(shift),
+            ),
         )
     }
 
