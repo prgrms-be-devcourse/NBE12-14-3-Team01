@@ -46,7 +46,7 @@ class WorkplaceService(
         return workplaceMemberRepository.save(member)
     }
 
-    private fun createInviteCode(previousInviteCode: String? = null): String {
+    internal fun createInviteCode(previousInviteCode: String? = null): String {
         var inviteCode: String
         do {
             inviteCode = UUID.randomUUID().toString().substring(0, 8)

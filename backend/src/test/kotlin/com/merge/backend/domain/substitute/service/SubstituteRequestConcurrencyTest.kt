@@ -430,7 +430,7 @@ class SubstituteRequestConcurrencyTest {
         requireNotNull(
             TransactionTemplate(transactionManager).execute {
                 substituteRequestRepository
-                    .findAllByRequesterMember_User_IdOrderByCreateDateDesc(fixture.requesterUserId)
+                    .findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(fixture.requesterUserId)
                     .filter { it.shift.id == fixture.shiftId }
                     .count { it.status == RequestStatus.OPEN || it.status == RequestStatus.ACCEPTED }
                     .toLong()

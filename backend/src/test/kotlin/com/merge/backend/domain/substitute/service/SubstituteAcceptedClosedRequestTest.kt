@@ -1,10 +1,12 @@
 package com.merge.backend.domain.substitute.service
 
+import com.merge.backend.domain.shift.dto.ShiftReassignRequest
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.repository.ScheduleRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
+import com.merge.backend.domain.shift.service.ShiftService
 import com.merge.backend.domain.substitute.dto.AcceptedClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.substitute.entity.RequestCloseReason
@@ -62,6 +64,9 @@ class SubstituteAcceptedClosedRequestTest {
 
     @Autowired
     private lateinit var shiftRepository: ShiftRepository
+
+    @Autowired
+    private lateinit var shiftService: ShiftService
 
     @Autowired
     private lateinit var scheduleRepository: ScheduleRepository
@@ -173,6 +178,47 @@ class SubstituteAcceptedClosedRequestTest {
         assertThat(responses[0].requestStatus).isEqualTo(RequestStatus.APPROVED)
         assertThat(responses[0].requesterName).isEqualTo(f.requesterName)
         assertOnlyAllowedFields()
+    }
+
+    @Test
+    @DisplayName("승인된 요청의 ACCEPTED 후보는 정확히 1명이고, 근무를 다른 후보에게 재배정해도 승인 기록은 수락자에게만 보인다")
+    fun approvedRequestKeepsExactlyOneAcceptedCandidate() {
+        // given: 승인 (Request에 승인 대상 FK가 없어 ACCEPTED 1명은 로직으로만 보장, ML-3 §3)
+        val f = createAcceptedRequest(daysUntilShift = 21)
+        substituteRequestService.approve(f.requestId, f.managerUserId)
+
+        // when & then: 승인 뒤 대기 후보의 수락은 거부
+        assertBusinessError(SubstituteRequestErrorCode.REQUEST_NOT_OPEN) {
+            substituteCandidateService.acceptCandidate(f.otherCandidateId, f.otherCandidateUserId)
+        }
+
+        // when: 관리자가 그 대기 후보에게 공개 근무 재배정 (V3 재배정 Command)
+        val (workplaceId, scheduleId) = requireNotNull(
+            TransactionTemplate(transactionManager).execute {
+                val schedule = shiftRepository.findById(f.shiftId).orElseThrow().schedule
+                Pair(schedule.workplace.id, schedule.id)
+            }
+        )
+        val result = shiftService.reassignPublishedShift(
+            workplaceId, scheduleId, f.shiftId, ShiftReassignRequest(f.otherCandidateMemberId, emptyList()), f.managerUserId,
+        )
+
+        // then: 승인된 요청은 닫을 대상이 아니고, 이 요청의 후보는 Fixture의 2명뿐이며 ACCEPTED는 수락자 1명
+        assertThat(result.closedSubstituteRequests).isZero()
+        assertThat(storedStatus(f.requestId)).isEqualTo(RequestStatus.APPROVED)
+        inTransaction {
+            assertThat(shiftRepository.findById(f.shiftId).orElseThrow().member.id).isEqualTo(f.otherCandidateMemberId)
+            assertThat(listOf(candidateStatus(f.accepterCandidateId), candidateStatus(f.otherCandidateId)))
+                .containsExactly(CandidateStatus.ACCEPTED, CandidateStatus.PENDING)
+        }
+
+        // then: 승인 기록은 수락자에게만 보이고, 현재 담당자가 된 후보에게는 보이지 않음 (ML-3-H)
+        val responses = closedRequestsOf(f.accepterUserId)
+        assertThat(responses).hasSize(1)
+        assertThat(responses[0].requestId).isEqualTo(f.requestId)
+        assertThat(responses[0].requestStatus).isEqualTo(RequestStatus.APPROVED)
+        assertThat(responses[0].candidateStatus).isEqualTo(CandidateStatus.ACCEPTED)
+        assertThat(closedRequestsOf(f.otherCandidateUserId)).isEmpty()
     }
 
     @Test

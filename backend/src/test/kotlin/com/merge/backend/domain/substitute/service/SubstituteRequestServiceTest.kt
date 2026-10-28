@@ -1273,7 +1273,7 @@ class SubstituteRequestServiceTest {
                 ReflectionTestUtils.setField(this, "createDate", now)
             }
 
-            given(substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(REQUESTER_USER_ID))
+            given(substituteRequestRepository.findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(REQUESTER_USER_ID))
                 .willReturn(listOf(expiredRequest, openRequest))
 
             val responses = substituteRequestService.getSentRequests(REQUESTER_USER_ID)
@@ -1290,7 +1290,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("SUB-05 - 보낸 요청이 없으면 빈 리스트를 반환한다")
         fun getSentRequests_NoRequests_ReturnsEmptyList() {
-            given(substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(REQUESTER_USER_ID))
+            given(substituteRequestRepository.findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(REQUESTER_USER_ID))
                 .willReturn(listOf())
 
             val responses = substituteRequestService.getSentRequests(REQUESTER_USER_ID)

@@ -104,7 +104,7 @@ class SubstituteRequestService(
         val now = LocalDateTime.now(clock)
 
         val requests =
-            substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(
+            substituteRequestRepository.findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(
                 actorUserId,
             )
 
