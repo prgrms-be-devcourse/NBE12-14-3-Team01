@@ -451,6 +451,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
 | 2026-10-29 | 퇴사자 후보 처리: 끝에 "V4 퇴사자 후보 처리" 절 신설 (V4-N-13~16·22, H6-C5·C6, 새 V4-N-65~71), V4-N-06 행·§5-1 H6 행에 연결 (EV-038) |
 | 2026-10-29 | PR #92 리뷰 반영: "V4 퇴사자 후보 처리" 절에 V4-N-72~74 추가 (거절 경로 응답 가능 판정), ⑤ 상태 갱신 (EV-038) |
+| 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
 | 2026-10-29 | 공개 근무 변경 연결: 끝에 "V4 공개 근무 변경 연결" 절 신설 (V4-N-61·62, V4-N-39, H6-C1~C3, ML5-T1·T2), D21-T6·§5-1 H6·V3-N-33 행에 연결 (EV-039) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
@@ -533,9 +534,9 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - 회귀 (기대값 변경 0): 기존 대타 Test 전체 그대로 통과 (EV-034).
 - 범위 밖: V3 근무 취소·담당자 변경 Command와 그 경로 Test (V3-N-33, H6-C1~C4), 종료 알림 Type·받는 사람·합치기 (V5, NOTIFICATION-TYPES §3-3), 퇴사 시 후보 처리 (V4-N-12~16·22), 종료 원인 연결 (V4-N-18), 운영 `close_reason` ENUM 변경 (배포 담당, ML-3 §9).
 
-## V4 종료된 대타 조회 (API-SB-01, V4-N-27~35·38·60, 2026-10-28)
+## V4 종료된 대타 조회 (API-SB-01, V4-N-21·27~35·38·60, 2026-10-28)
 
-[G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) §9의 D22-T2~T9·T12와 새 V4-N-60. Class: `SubstituteAcceptedClosedRequestTest` (MySQL Testcontainers, test Profile)
+[G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) §9의 D22-T2~T9·T12와 새 V4-N-60. Class: `SubstituteAcceptedClosedRequestTest` (MySQL Testcontainers, test Profile). V4-N-21은 ML-3 §11의 예약 번호 (이력 화면 = API-SB-01: FRONTEND-CONTRACT §7, G03-D-22 §6-2 APPROVED 행, 2026-10-29 추가)
 
 | Test ID | Method | 확인하는 것 | ⑤ 실행 |
 |---|---|---|---|
@@ -543,6 +544,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | V4-N-28 (D22-T3) | `expiredRequestIsListedWithShiftStart` | 근무 시작 1초 전 0건, 시작 시각부터 계산 만료 `CLOSED/EXPIRED`, 종료 시각 = `startAt`, DB 상태 그대로 | `LOCAL_PASSED` |
 | V4-N-29 (D22-T4) | `approvedRequestIsListedForSevenDays` | 승인 당일 1건 APPROVED, 8일 뒤 0건 (근무 전이어도). "예정 근무에 보임"은 V3 근무표라 제외 | `LOCAL_PASSED` |
 | V4-N-30 (D22-T4b) | `approvedRequestHidesCurrentAssignee` | 승인 뒤 담당자 변경(V3 인계 대신 `Shift.changeMember`로 흉내) → APPROVED 그대로, 응답 필드에 현재 담당자 없음. "빠진 근무"(API-SC-01)는 제외 | `LOCAL_PASSED` |
+| V4-N-21 (실패 경로 제외, 관련: V4-N-30) | `approvedRequestKeepsExactlyOneAcceptedCandidate` | 승인 뒤 대기 후보 수락 → `REQUEST_NOT_OPEN`. 관리자가 그 후보에게 공개 근무 재배정(`ShiftService.reassignPublishedShift`, `closedSubstituteRequests = 0`) 뒤 후보 2명 = ACCEPTED(수락자)·PENDING, 담당 = 재배정 대상, API-SB-01은 수락자에게만 APPROVED 1건·현재 담당자가 된 후보에게 0건 (ML-3-H). 승인 전 ACCEPTED 1명은 기존 `SubstituteRequestConcurrencyTest.concurrentAcceptAllowsOnlyOneCandidate` 참조. ML-3 §3 "여러 명이면 이력 조회 오류" 실패 경로는 미구현 (오류 code·HTTP 상태 미정, 팀 결정 대상) | `LOCAL_PASSED` |
 | V4-N-31 (D22-T5) | `closedRequestDisappearsAfterSevenDays` | 정확히 7일 1건, 7일 + 1초·8일 0건, DB Row 그대로 | `LOCAL_PASSED` |
 | V4-N-32 (D22-T6) | `rejoinedMemberSeesOnlyCurrentMembershipRecords` | 퇴사 후 같은 근무지 재가입 → 이전 소속 기록 0건, 새 소속 기록만 1건 (PR #82 재가입 구조 사용) | `LOCAL_PASSED` |
 | V4-N-33 (D22-T7) | `respondingToClosedRequestIsRejected` | 종료된 요청에 수락·거절 → `CANDIDATE_ALREADY_RESPONDED`·`REQUEST_NOT_OPEN`, 상태 그대로 | `LOCAL_PASSED` |
@@ -552,7 +554,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | V4-N-60 (새 ID) | `endedMembershipRecordsAreHidden` | 수락 뒤 그 근무지를 퇴사한 소속(`leftAt` 있음)의 기록 0건 (G03-D-22 §6-1 현재 소속 조건) | `LOCAL_PASSED` |
 
 **⑤ 상태의 뜻:**
-- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `55b1ac3` 위 전체 553/553 (EV-037). CI는 PR 생성 후 기록
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `55b1ac3` 위 전체 553/553 (EV-037). V4-N-21은 develop `19066d3` 위 전체 681 → 682/682 (EV-040). CI는 PR 생성 후 기록
 - 회귀 (기대값 변경 0): 기존 Test 542개 목록 그대로 통과
 - 범위 밖: V4-N-36·37 (D22-T10·T11, SUB-07·SUB-05 현재 소속 = CHG-02·03, 묶음 D. SUB-07 조건은 PR #82가 추가). Frontend "수락한 요청 — 종료" 화면
 
