@@ -174,6 +174,13 @@ class SubstituteRequestServiceTest {
         given(candidate.member).willReturn(candidateMember)
     }
 
+    // 소속 Guard: 수락자 소속을 잠근 뒤 DB에서 다시 확인해도 현재 EMPLOYEE
+    private fun setupCandidateStillMember() {
+        given(candidateMember.id).willReturn(ACCEPTED_MEMBER_ID)
+        given(workplaceMemberRepository.findCurrentEmployeeIdsIn(listOf(ACCEPTED_MEMBER_ID), workplaceId))
+            .willReturn(listOf(ACCEPTED_MEMBER_ID))
+    }
+
     // 승인 실행자의 현재 소속 = 그 근무지의 MANAGER
     private fun setupActorManagerOf(managedWorkplaceId: Long) {
         val managedWorkplace = mock<Workplace>()
@@ -248,6 +255,7 @@ class SubstituteRequestServiceTest {
             setupApproveScope()
             setupValidRequestFullInfo()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
 
             val acceptedMemberId = 25L
 
@@ -504,6 +512,7 @@ class SubstituteRequestServiceTest {
             // given
             setupApprovableRequest()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
             given(shift.startAt).willReturn(now.minusHours(1))
 
             // when & then
@@ -517,6 +526,7 @@ class SubstituteRequestServiceTest {
             // given
             setupApprovableRequest()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
             given(shift.startAt).willReturn(now)
 
             // when & then
@@ -529,6 +539,7 @@ class SubstituteRequestServiceTest {
             // given
             setupApprovableRequest()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
             given(shift.startAt).willReturn(now.plusDays(1))
             given(shift.endAt).willReturn(now.plusDays(1).plusHours(8))
 
@@ -545,6 +556,7 @@ class SubstituteRequestServiceTest {
             // given
             setupApprovableRequest()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
             given(shift.startAt).willReturn(now.plusDays(1))
             given(shift.endAt).willReturn(now.plusDays(1).plusHours(8))
 
@@ -564,6 +576,7 @@ class SubstituteRequestServiceTest {
             // given
             setupApprovableRequest()
             setupValidCandidateInfo()
+            setupCandidateStillMember()
             given(shift.startAt).willReturn(now.plusDays(1))
             given(shift.endAt).willReturn(now.plusDays(1).plusHours(8))
 
@@ -1077,6 +1090,12 @@ class SubstituteRequestServiceTest {
                 )
             ).willReturn(listOf(newCandidateMember))
 
+            // 소속 Guard: 요청자·후보 소속을 잠근 뒤 DB에서 다시 확인해도 현재 소속
+            given(workplaceMemberRepository.existsCurrentMember(requireNotNull(newShift.member.id), requireNotNull(newShift.schedule.workplace.id)))
+                .willReturn(true)
+            given(workplaceMemberRepository.findCurrentEmployeeIdsIn(listOf(candidateMemberId), requireNotNull(newShift.schedule.workplace.id)))
+                .willReturn(listOf(candidateMemberId))
+
             given(substituteRequestRepository.save(any<SubstituteRequest>()))
                 .willAnswer { invocation ->
                     invocation.getArgument<SubstituteRequest>(0).apply {
@@ -1144,6 +1163,10 @@ class SubstituteRequestServiceTest {
                     newShift,
                 )
             ).willReturn(listOf())
+
+            // 소속 Guard: 요청자 소속을 잠근 뒤 DB에서 다시 확인해도 현재 소속
+            given(workplaceMemberRepository.existsCurrentMember(requireNotNull(newShift.member.id), workplaceId))
+                .willReturn(true)
 
             // Candidate가 없을 때 현재 MANAGER 조회
             given(workplaceMemberRepository.findAllByWorkplace_IdAndRoleAndLeftAtIsNull(workplaceId, WorkplaceRole.MANAGER))
@@ -1336,6 +1359,7 @@ class SubstituteRequestServiceTest {
     private fun futureStartAt(): LocalDateTime = now.plusDays(1)
 
     companion object {
+        private const val ACCEPTED_MEMBER_ID = 25L
         private const val SHIFT_ID = 1L
         private const val REQUESTER_USER_ID = 10L
         private const val OTHER_USER_ID = 20L

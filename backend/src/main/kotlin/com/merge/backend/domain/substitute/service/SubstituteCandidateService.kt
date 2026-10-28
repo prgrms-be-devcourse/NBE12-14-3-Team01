@@ -199,6 +199,18 @@ class SubstituteCandidateService(
         // 같은 User의 시간 상태를 변경하는 작업끼리 직렬화
         userService.getByIdForUpdate(candidateUserId)
 
+        // 소속 Guard: 수락자 소속을 FOR SHARE로 잠가 퇴사와 직렬화한 뒤 DB 값으로 다시 확인 (ML-5 §5 대타 수락 행, ML5-T5)
+        val memberId = requireNotNull(candidate.member.id)
+        workplaceMemberRepository.findByIdForShare(memberId)
+        if (
+            workplaceMemberRepository.findCurrentEmployeeIdsIn(
+                listOf(memberId),
+                requireNotNull(targetShift.schedule.workplace.id),
+            ).isEmpty()
+        ) {
+            throw BusinessException(SubstituteRequestErrorCode.INVALID_CANDIDATE_MEMBER)
+        }
+
         // Request/User Lock 대기 이후의 최신 시간
         val now = LocalDateTime.now(clock)
 

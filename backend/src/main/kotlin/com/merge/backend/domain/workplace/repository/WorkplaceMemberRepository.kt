@@ -44,24 +44,50 @@ interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
         @Param("memberId") memberId: Long?,
     ): Optional<WorkplaceMember>
 
-    // 소속 Guard (ML-5 §5 규칙 4): 소속 여부가 결과를 바꾸는 Command가 마지막에 소속 Row를 FOR SHARE로 잠그고 최신 leftAt을 다시 읽는다.
-    // 퇴사 확정의 소속 FOR UPDATE와 직렬화된다. 영속성 Context의 예전 값이 아니라 DB 최신 값을 읽도록 Scalar Native 조회를 쓴다.
-    // READ COMMITTED에서는 조건에 맞지 않는 Row의 Lock이 바로 풀리므로, 반드시 "현재 소속인 Row"와 일치하는 조건으로 센다 (1 = 현재 소속, Lock 유지)
+    // 대타 생성 소속 Guard: 요청자·후보 소속을 ID 오름차순으로 FOR SHARE (ML-5 §5 규칙 1·4)
+    @Lock(LockModeType.PESSIMISTIC_READ)
     @Query(
-        value = """
-        SELECT COUNT(*)
-        FROM workplace_member
-        WHERE id = :memberId
-          AND workplace_id = :workplaceId
-          AND left_at IS NULL
-        FOR SHARE
-        """,
-        nativeQuery = true,
+        """
+        SELECT wm
+        FROM WorkplaceMember wm
+        WHERE wm.id IN :memberIds
+        ORDER BY wm.id ASC
+        """
     )
-    fun countCurrentMemberForShare(
+    fun findAllByIdInForShare(
+        @Param("memberIds") memberIds: Collection<Long>,
+    ): List<WorkplaceMember>
+
+    // 소속 Guard: Lock 뒤 그 근무지의 현재 소속인지 DB 값으로 다시 확인 (1차 Cache의 옛 Entity 값을 쓰지 않음, ML-5 §5 규칙 5)
+    @Query(
+        """
+        SELECT COUNT(wm) > 0
+        FROM WorkplaceMember wm
+        WHERE wm.id = :memberId
+          AND wm.workplace.id = :workplaceId
+          AND wm.leftAt IS NULL
+        """
+    )
+    fun existsCurrentMember(
         @Param("memberId") memberId: Long,
         @Param("workplaceId") workplaceId: Long,
-    ): Long
+    ): Boolean
+
+    // 소속 Guard: 위와 같고 EMPLOYEE만 (대타 후보·수락자 조건)
+    @Query(
+        """
+        SELECT wm.id
+        FROM WorkplaceMember wm
+        WHERE wm.id IN :memberIds
+          AND wm.workplace.id = :workplaceId
+          AND wm.leftAt IS NULL
+          AND wm.role = com.merge.backend.domain.workplace.entity.WorkplaceRole.EMPLOYEE
+        """
+    )
+    fun findCurrentEmployeeIdsIn(
+        @Param("memberIds") memberIds: Collection<Long>,
+        @Param("workplaceId") workplaceId: Long,
+    ): List<Long>
 
     fun existsByWorkplaceAndUser(
         workplace: Workplace?,

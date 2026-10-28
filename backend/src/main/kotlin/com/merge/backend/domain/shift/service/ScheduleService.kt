@@ -90,15 +90,12 @@ class ScheduleService(
                     workplaceId
                 )
 
-        // 소속 Guard (ML-5 §5-1, ML-2-INV-02): Workplace Lock 뒤 대상 소속을 ID 오름차순으로 FOR SHARE로 잠그고
-        // 최신 leftAt으로 다시 거른다. 그 사이 퇴사가 Commit된 사람의 Pattern은 복사하지 않는다 ("현재 구성원의 Pattern")
-        val currentMemberIds = patterns
-            .map { requireNotNull(it.member.id) }
-            .distinct()
-            .sorted()
-            .filter { memberId ->
-                workplaceMemberRepository.countCurrentMemberForShare(memberId, requireNotNull(workplaceId)) > 0
-            }
+        // 소속 Guard (ML-5 §5-1, ML-2-INV-02): Workplace Lock 뒤 대상 소속을 ID 오름차순 FOR SHARE로 잠가 퇴사와 직렬화하고
+        // DB 값으로 다시 거른다 (대타 Guard #105와 같은 방식). 그 사이 퇴사가 Commit된 사람의 Pattern은 복사하지 않는다 ("현재 구성원의 Pattern")
+        val patternMemberIds = patterns.map { requireNotNull(it.member.id) }.distinct().sorted()
+        workplaceMemberRepository.findAllByIdInForShare(patternMemberIds)
+        val currentMemberIds = patternMemberIds
+            .filter { memberId -> workplaceMemberRepository.existsCurrentMember(memberId, requireNotNull(workplaceId)) }
             .toSet()
         val currentPatterns = patterns.filter { it.member.id in currentMemberIds }
 

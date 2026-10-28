@@ -177,9 +177,9 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | H6-C2 | ACCEPTED Request | 관리자 인계와 승인 동시 실행 | Deadlock 없이 둘 중 하나 순서로 정리. 최종 담당자 1명. 승인이 먼저면 담당자 = 수락자 → 인계가 그 상태를 다시 검사. 인계가 먼저면 승인 `INVALID_MEMBER` 또는 `INVALID_REQUEST`. 실행 (2026-10-29): 실제 V3 재배정 × 승인 양쪽 순서 `reassignWaitsForApproveInProgress`·`approveWaitsForReassignInProgress`, Deadlock 0, `LOCAL_PASSED` (EV-039) |
 | H6-C3 | 공개 근무 | 관리자 취소와 새 대타 요청 생성 동시 실행 | 취소 확정 후 그 근무에 활성 Request 0건. 실행 (2026-10-29): 실제 V3 취소 × 대타 생성 `createWaitsForCancelInProgress` → `SHIFT_CANCELLED`, `LOCAL_PASSED` (EV-039) |
 | H6-C4 | 공개 근무 | 관리자 두 명의 인계 동시 실행 | 최종 담당자 1명, 배정 이력 순서가 실제 반영 순서와 일치 |
-| H6-C5 | 후보 B PENDING | B 퇴사와 B 본인의 수락 동시 실행 | 퇴사 확정 후 B가 **유효한 수락자이거나 승인 가능한 후보로 남지 않는다.** 수락이 먼저 Commit됐다면 B `ACCEPTED` 이력 + Request `CANDIDATE_INELIGIBLE` CLOSED (A-a)가 정상 |
+| H6-C5 | 후보 B PENDING | B 퇴사와 B 본인의 수락 동시 실행 | 퇴사 확정 후 B가 **유효한 수락자이거나 승인 가능한 후보로 남지 않는다.** 수락이 먼저 Commit됐다면 B `ACCEPTED` 이력 + Request `CANDIDATE_INELIGIBLE` CLOSED (A-a)가 정상 실행 (2026-10-29): 소속 Guard `SubstituteMembershipGuardTest.acceptWaitsForLeaveOfCandidate` (EV-045) |
 | H6-C6 | 후보 B·C PENDING | B 퇴사와 C의 거절 동시 실행 | **응답 가능 후보가 실제로 0명이 된 경우에만** Request CLOSED, 사유 `CANDIDATE_INELIGIBLE`. 다른 응답 가능 후보가 남아 있으면 OPEN이 정상 |
-| H6-C7 | 후보 B (현재 소속) | B 퇴사와 B를 후보로 넣는 새 대타 요청 생성 동시 실행 | 퇴사 확정 후 B가 PENDING 후보로 남지 않음 (원문 반례 A) |
+| H6-C7 | 후보 B (현재 소속) | B 퇴사와 B를 후보로 넣는 새 대타 요청 생성 동시 실행 | 퇴사 확정 후 B가 PENDING 후보로 남지 않음 (원문 반례 A) 실행 (2026-10-29): `createWaitsForCandidateLeaveAndSkipsLeftCandidate`·`leaveWaitsForCreateInProgress` (EV-045) |
 | H6-C8 | 퇴사자 담당 근무에 ACCEPTED Request | 퇴사(인계 선택)와 승인 동시 실행 | 퇴사 후 퇴사자 담당 미래 근무 0건 (ML-2-INV-01), 모순 없음 |
 
 재현 방식: PR #5로 들어온 `ForcedOrderTest` 방식(CountDownLatch로 첫 Transaction을 Commit 전 대기)을 재사용할 수 있다. LOCAL_ONLY H6 Harness(DL-009)가 없어도 상당 부분 가능하다.
@@ -299,7 +299,7 @@ ML-3-P·P1·A의 V4 부분. V2 퇴사 확정 Command(API-LV-02)가 같은 Transa
 | 리뷰 반영 (PR #92) | 거절 경로가 퇴사 여부를 보지 않아, 퇴사했는데 PENDING으로 남은 후보가 있으면 요청이 OPEN으로 남던 문제 (리뷰어가 MySQL에서 재현) → 위 거절 경로로 수정, V4-N-72~74 추가 (EV-038) | PR #92 리뷰 (수정 요청) |
 | 원문 B+와 다른 점 (열린 항목) | 원문 B+ §2 추가 문장 "종료할 때 퇴사한 소속의 PENDING을 `INELIGIBLE`로 함께 정리"와 §6 #8 기대값("Y `INELIGIBLE`로 정리")은 이 문서에 옮겨 오지 않았다. 구현은 정리하지 않고 PENDING으로 둔다 (퇴사 경로 V4-N-71, 거절 경로 V4-N-72 같음. 관리자 종료·만료·근무 변경 종료도 PENDING을 그대로 둠). 정리가 필요하면 팀 결정 후 별도 변경 | 사용자 선택 (2026-10-29), AI-RULES §3 |
 | 운영 DB | `close_reason`·`substitute_candidate.status` ENUM에 새 값 `ALTER` 필요 (§9) | §9 |
-| 하지 않은 것 | V2 퇴사 확정 연결, 대타 생성·수락 시 소속 `FOR SHARE` 재확인(H6-C7, ML-5 Membership Guard), 승인 시 수락자 소속 재확인, 알림 Type, Frontend 새 상태·사유 표시 | — |
+| 하지 않은 것 | 알림 Type, Frontend 새 상태·사유 표시. (V2 퇴사 확정 연결은 #102, 대타 생성·수락 시 소속 `FOR SHARE` 재확인(H6-C7)과 승인 시 수락자 소속 재확인은 2026-10-29 구현 — ML-5 §5, EV-045) | — |
 
 ## 16. 변경 이력
 
@@ -315,3 +315,4 @@ ML-3-P·P1·A의 V4 부분. V2 퇴사 확정 Command(API-LV-02)가 같은 Transa
 | 2026-10-29 | PR #92 리뷰 반영: 거절 경로를 퇴사 함수와 같은 응답 가능 판정으로, 응답 가능 정의에 EMPLOYEE·같은 근무지 추가, ML-3-P1 행에 구현 정의 연결, 원문 B+ 정리 문장과의 차이를 열린 항목으로 기록, §9 ENUM 값 순서 주의 (EV-038) |
 | 2026-10-29 | §10 H6-C1·C2·C3에 실제 V3 취소·재배정 Command 실행 표시 (EV-039) |
 | 2026-10-29 | V4-N-21 실행: 이력 화면 = API-SB-01로 정함 (V4 Owner, 근거 FRONTEND-CONTRACT §7·G03-D-22 §6-2). "ACCEPTED 1명·재배정 뒤 수락자에게만 승인 기록"은 `LOCAL_PASSED` (실패 경로 제외, EV-040). §3 "여러 명이면 이력 조회 오류" 실패 경로는 미구현: 오류 code·HTTP 상태 미정, 팀 결정 대상 |
+| 2026-10-29 | V4 소속 Guard 구현: "V4 구현 기록 — 퇴사자 후보 처리"의 하지 않은 것 갱신, §10 H6-C5·C7 실행 표시 (EV-045) |

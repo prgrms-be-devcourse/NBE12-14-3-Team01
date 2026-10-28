@@ -102,7 +102,7 @@ class ShiftServiceTest {
     // 소속 Guard(FOR SHARE 재확인)는 Mock에서 기본으로 "현재 소속"으로 둔다. 실제 Lock 동작은 DraftMembershipGuardConcurrencyTest
     @BeforeEach
     fun allowCurrentMembership() {
-        Mockito.lenient().`when`(workplaceMemberRepository.countCurrentMemberForShare(any(), any())).thenReturn(1L)
+        Mockito.lenient().`when`(workplaceMemberRepository.existsCurrentMember(any(), any())).thenReturn(true)
     }
 
     @Test

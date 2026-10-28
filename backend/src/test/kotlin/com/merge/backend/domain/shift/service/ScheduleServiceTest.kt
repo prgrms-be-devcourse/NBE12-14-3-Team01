@@ -87,7 +87,7 @@ class ScheduleServiceTest {
 
     @BeforeEach
     fun allowCurrentMembership() {
-        Mockito.lenient().`when`(workplaceMemberRepository.countCurrentMemberForShare(any(), any())).thenReturn(1L)
+        Mockito.lenient().`when`(workplaceMemberRepository.existsCurrentMember(any(), any())).thenReturn(true)
     }
 
     @Mock
