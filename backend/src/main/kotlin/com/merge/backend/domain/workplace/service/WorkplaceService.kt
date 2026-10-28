@@ -4,6 +4,7 @@ import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.workplace.entity.Workplace
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.domain.workplace.entity.WorkplaceRole
+import com.merge.backend.domain.workplace.event.WorkplaceMemberJoinedEvent
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository
@@ -13,6 +14,7 @@ import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 import org.hibernate.exception.ConstraintViolationException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,7 +24,8 @@ class WorkplaceService(
     private val clock: Clock,
     private val workplaceRepository: WorkplaceRepository,
     private val workplaceMemberRepository: WorkplaceMemberRepository,
-    private val workplaceMemberService: WorkplaceMemberService
+    private val workplaceMemberService: WorkplaceMemberService,
+    private val applicationEventPublisher: ApplicationEventPublisher
 ) {
 
     @Transactional
@@ -83,9 +86,9 @@ class WorkplaceService(
             joinedAt
         )
 
-        try {
+        val joined = try {
             // MySQL의 즉시 제약 위반을 이 업무 Transaction 안에서 확인한다.
-            return workplaceMemberRepository.saveAndFlush(member)
+            workplaceMemberRepository.saveAndFlush(member)
         } catch (e: DataIntegrityViolationException) {
             val constraint = generateSequence<Throwable>(e) { it.cause }
                 .filterIsInstance<ConstraintViolationException>()
@@ -99,6 +102,11 @@ class WorkplaceService(
             }
             throw e
         }
+
+        // 현재 관리자에게 가입·재가입 알림 (WORKPLACE_MEMBER_JOINED)
+        applicationEventPublisher.publishEvent(WorkplaceMemberJoinedEvent(workplaceId, joined?.id))
+
+        return joined
     }
 
     @Transactional(readOnly = true)
