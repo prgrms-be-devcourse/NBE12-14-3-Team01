@@ -107,6 +107,16 @@ enum class ShiftErrorCode(
         HttpStatus.CONFLICT,
         "SFT-020",
         "공개 후 변경 불가 상태입니다."
+    ),
+    UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED(
+        HttpStatus.CONFLICT,
+        "SFT-021",
+        "근무 불가능 일정 충돌 확인이 필요합니다."
+    ),
+    SAME_SHIFT_MEMBER_REASSIGNMENT(
+        HttpStatus.CONFLICT,
+        "SFT-022",
+        "담당자 변경 대상이 현재 담당자와 같습니다."
     );
 
     override fun getHttpStatus(): HttpStatus = httpStatus
