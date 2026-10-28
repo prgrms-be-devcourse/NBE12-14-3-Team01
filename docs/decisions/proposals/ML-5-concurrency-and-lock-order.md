@@ -212,7 +212,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | ML5-T1 (H6-C1) | 인계 (Shift 보유) | 대타 생성 같은 근무 → 대기 | 인계 후 활성 Request 0. 실행: `SubstituteShiftChangeIntegrationTest.createWaitsForReassignInProgress` (실제 V3 재배정), `LOCAL_PASSED`. **문서 불일치:** 괄호의 "(H6-C1)"은 ML-3 §10 H6-C1(인계 × 수락)과 다르다. 이 행은 인계 × 생성이라 H6-C1과 따로 실행했다 (H6-C1 = `reassignWaitsForAcceptInProgress`·`acceptWaitsForReassignInProgress`) |
 | ML5-T2 | 대타 생성 (Shift 보유) | 인계 → 대기 | 생성된 Request가 인계 Transaction에서 `SHIFT_CHANGED`로 종료. 실행: `SubstituteShiftChangeIntegrationTest.reassignWaitsForCreateInProgress`, `LOCAL_PASSED` |
 | ML5-T3 (H6-C2) | 승인 (Shift·Request 보유) | 인계 → 대기 | Deadlock 0, 담당자 1명. 실행: PR #83 `approveAndShiftFirstHandoverDoNotDeadlock`, `LOCAL_PASSED`. 실제 V3 재배정 Command로도 실행: `SubstituteShiftChangeIntegrationTest.reassignWaitsForApproveInProgress` (H6-C2 ①) |
-| ML5-T4 | 다른 근무지 수락 (User B 보유) | B에게 인계 → 대기 | B 이중 배정 0 |
+| ML5-T4 | 다른 근무지 수락 (User B 보유) | B에게 인계 → 대기 | B 이중 배정 0. 실행: `SubstituteShiftChangeIntegrationTest.reassignWaitsForOtherWorkplaceAccept`·`otherWorkplaceAcceptWaitsForReassign` (양쪽 순서, 실제 V3 재배정), `LOCAL_PASSED` (EV-043). **해석 (V4 Owner, 2026-10-29):** "이중 배정" = 공식 배정(`Shift.member`) 두 개. 수락(ACCEPTED)은 배정이 아니라서 수락이 먼저면 재배정은 진행되고 그 대타의 승인이 `CONFLICT_SHIFT`로 막힌다. 재배정이 먼저면 수락이 `CONFLICT_SHIFT`로 거부된다. 재배정은 수락만 한 대타를 검사하지 않는다 (공식 근무만 검사). "수락한 대타와 겹치면 재배정 거부"로 읽으면 V3 재배정 규칙 변경이 필요 → 팀 확인 대상. 관찰: 수락이 먼저인 경우 그 대타 요청은 ACCEPTED로 남아 승인할 수 없고 관리자가 종료해야 한다 |
 | ML5-T5 (H6-C5) | 퇴사 (B 소속 `FOR UPDATE`) | B의 수락 → Guard 대기 후 거부 | B 유효 수락자 아님 |
 | ML5-T6 (H6-C7) | 대타 생성 (B 소속 `FOR SHARE`) | B 퇴사 → 대기 후 다시 조회 → 409 | 퇴사 미반영, B PENDING 남음 (다음 시도에서 INELIGIBLE) |
 | ML5-T7 (H6-C6) | 퇴사 (후보 Request 보유) | 다른 후보 마지막 거절 → 대기 | 응답 가능 후보 0이면 `CANDIDATE_INELIGIBLE` |
@@ -299,3 +299,4 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
 | 2026-10-28 | §5-1 대타 승인 행에 구현 표시 (PR #83, DECISION-LOG §4-6), ML5-T3·T13 실행 표시 (기존 `runSecondWhileFirstHoldsLock` 방식, `LockWaitProbe` 미도입) |
 | 2026-10-29 | §7 ML5-T1·T2 실행 표시, ML5-T3에 실제 재배정 Command 실행 추가, ML5-T1 "(H6-C1)" 표기와 ML-3 H6-C1의 불일치 기록 (EV-039) |
+| 2026-10-29 | §7 ML5-T4 실행 표시와 "이중 배정" 해석·관찰 기록 (EV-043) |

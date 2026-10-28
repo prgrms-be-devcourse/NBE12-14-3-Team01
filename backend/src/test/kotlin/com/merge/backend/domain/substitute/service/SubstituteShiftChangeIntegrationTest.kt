@@ -373,6 +373,70 @@ class SubstituteShiftChangeIntegrationTest {
         }
     }
 
+    // ===================== 다른 근무지 수락 × 재배정 (ML5-T4) =====================
+
+    @Test
+    @DisplayName("다른 근무지 대타 수락이 Commit 전이면 그 직원에게의 재배정이 기다렸다가 진행되고, 수락한 대타의 승인은 근무가 겹쳐 거부된다")
+    fun reassignWaitsForOtherWorkplaceAccept() {
+        // given: W2 대타 요청의 후보 B, W1의 같은 시간 근무를 B에게 재배정할 예정 (B는 W1에도 소속)
+        val w2 = createFixture(withRequest = true)
+        val w1 = createFixture(withRequest = false)
+        val b = w2.candidates[0]
+        val bInW1 = addEmployee(w1.workplaceId, b.userId)
+
+        // when
+        val error = runSecondWhileFirstHoldsLock(
+            first = { accept(w2, 0) },
+            second = {
+                shiftService.reassignPublishedShift(w1.workplaceId, w1.scheduleId, w1.shiftId, reassignTo(bInW1), w1.managerUserId)
+            },
+        )
+
+        // then: 수락 반영 뒤 재배정 진행 (수락은 아직 배정이 아님)
+        assertThat(error).isNull()
+        inTransaction {
+            assertThat(findRequest(w2.requestId).status).isEqualTo(RequestStatus.ACCEPTED)
+            assertThat(findCandidate(b.candidateId).status).isEqualTo(CandidateStatus.ACCEPTED)
+            assertThat(findShift(w1.shiftId).member.id).isEqualTo(bInW1)
+            assertThat(shiftAssignmentHistoryRepository.findAllByShift_IdOrderByCreateDateAsc(w1.shiftId)).hasSize(1)
+        }
+
+        // then: W2 승인은 W1 근무와 겹쳐 거부 → B의 공식 배정은 W1 하나
+        assertBusinessError(SubstituteRequestErrorCode.CONFLICT_SHIFT) {
+            substituteRequestService.approve(w2.requestId, w2.managerUserId)
+        }
+        inTransaction {
+            assertThat(findRequest(w2.requestId).status).isEqualTo(RequestStatus.ACCEPTED)
+            assertThat(findShift(w2.shiftId).member.user.id).isEqualTo(w2.requesterUserId)
+        }
+    }
+
+    @Test
+    @DisplayName("그 직원에게의 재배정이 Commit 전이면 다른 근무지 대타 수락이 기다렸다가 근무가 겹쳐 거부된다")
+    fun otherWorkplaceAcceptWaitsForReassign() {
+        // given
+        val w2 = createFixture(withRequest = true)
+        val w1 = createFixture(withRequest = false)
+        val b = w2.candidates[0]
+        val bInW1 = addEmployee(w1.workplaceId, b.userId)
+
+        // when
+        val error = runSecondWhileFirstHoldsLock(
+            first = {
+                shiftService.reassignPublishedShift(w1.workplaceId, w1.scheduleId, w1.shiftId, reassignTo(bInW1), w1.managerUserId)
+            },
+            second = { accept(w2, 0) },
+        )
+
+        // then: B의 공식 배정은 W1 하나, W2 수락은 남지 않음
+        assertBusinessError(error, SubstituteRequestErrorCode.CONFLICT_SHIFT)
+        inTransaction {
+            assertThat(findShift(w1.shiftId).member.id).isEqualTo(bInW1)
+            assertThat(findCandidate(b.candidateId).status).isEqualTo(CandidateStatus.PENDING)
+            assertThat(findRequest(w2.requestId).status).isEqualTo(RequestStatus.OPEN)
+        }
+    }
+
     // ===================== 실행 헬퍼 =====================
 
     private fun accept(f: Fixture, index: Int) {
@@ -517,6 +581,21 @@ class SubstituteShiftChangeIntegrationTest {
                 requestId = request?.id ?: -1L,
                 candidates = candidates,
             )
+        }
+    )
+
+    // 그 근무지에 이 User의 EMPLOYEE 소속을 추가 (두 근무지에 소속된 직원)
+    private fun addEmployee(workplaceId: Long, userId: Long): Long = requireNotNull(
+        TransactionTemplate(transactionManager).execute {
+            val member = workplaceMemberRepository.save(
+                WorkplaceMember(
+                    workplaceRepository.findById(workplaceId).orElseThrow(),
+                    userRepository.findById(userId).orElseThrow(),
+                    WorkplaceRole.EMPLOYEE,
+                    now().minusDays(30),
+                )
+            )
+            member.id
         }
     )
 

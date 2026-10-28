@@ -320,7 +320,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | M3-T5 | **V4-N-47** (후보 응답·대타 종료) + **V5-N-18** (알림 읽음) | V4 / V5 | PROPOSED_IMPROVEMENT | Domain별로 나눔 |
 | M3-T6 | 참조: 기존 BASELINE (V4-T-23·36 등, 각 API의 정상 경로 Test) | 각 Domain | BASELINE | 회귀 |
 | NT-T1~T16 | **V5-N-01~16** (번호 그대로) | V5 | T3·T8·T12는 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | §6 |
-| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내) | ML-5 | H6 | `BLOCKED` (ML5-T1·T2·T3·T13, H6-C1·C2·C3·C5·C6은 `LOCAL_PASSED`) |
+| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2·T4, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내) | ML-5 | H6 | `BLOCKED` (ML5-T1·T2·T3·T4·T13, H6-C1·C2·C3·C5·C6은 `LOCAL_PASSED`) |
 | ErrorCode Test 0 (11개) | **V3-N-24~32**, **V4-N-48** | V3 / V4 | MIGRATION | §5-3 |
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
@@ -490,6 +490,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
 | 2026-10-29 | 공개 근무 변경 연결: 끝에 "V4 공개 근무 변경 연결" 절 신설 (V4-N-61·62, V4-N-39, H6-C1~C3, ML5-T1·T2), D21-T6·§5-1 H6·V3-N-33 행에 연결 (EV-039) |
 | 2026-10-29 | TODO 21 현재 동작 고정: V4-N-01·02·03·48 작성 (`LOCAL_PASSED`, EV-041), V4-N-04·V4-N-02 일부는 기존 Test로 충족 표시, V4-T-13·14·23·82·83과 §3-3 환경 근거 갱신, 끝에 "V4 현재 동작 고정" 절 신설 |
+| 2026-10-29 | ML5-T4 (다른 근무지 수락 × 재배정) 양쪽 순서 작성 (`LOCAL_PASSED`, EV-043), "이중 배정" 해석 기록 (ML-5 §7) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -626,7 +627,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - 회귀 (기대값 변경 0): 기존 Test 584개 목록 그대로 통과 (`rejectCandidate_LastCandidate_ClosesRequest` 포함). 리뷰 반영 때 Mock Test 3곳은 Mock하는 조회 이름만 바꿈 (`existsRespondableCandidateExcept`)
 - 범위 밖: V2 퇴사 확정 경로 Test (V2-N-53), 대타 생성 × 퇴사 (H6-C7, 소속 `FOR SHARE` 필요), 알림 Type·받는 사람 (V5, V5-N-20), 요청자 퇴사 시 본인 근무의 요청 (V3 인계·취소의 `SHIFT_CHANGED`, V4-N-12)
 
-## V4 공개 근무 변경 연결 (V4-N-61·62·39, H6-C1~C3, ML5-T1·T2, 2026-10-29)
+## V4 공개 근무 변경 연결 (V4-N-61·62·39, H6-C1~C3, ML5-T1·T2·T4, 2026-10-29)
 
 V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(`reassignPublishedShift`, `b411f2e`)이 V4 `closeActiveRequestsByShiftChange`(PR #80)를 부르는 실제 경로를 MySQL에서 확인한다. Class: `SubstituteShiftChangeIntegrationTest` (MySQL Testcontainers, test Profile). V3 두 Command의 V3 Test는 Mock 단위 Test뿐이다. V4-N-61·62는 [ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) V4 범위 다음 번호 (V4-N-61~64를 이 연결 Test용으로 예약, PR #92에서 65~부터 사용), H6·ML5는 문서 ID 그대로 (§5-1 "같은 내용이면 기존 ID 참조")
 
@@ -642,9 +643,11 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 | H6-C1 ② | `acceptWaitsForReassignInProgress` | 재배정이 먼저 → 수락 대기 → `REQUEST_NOT_OPEN`, 후보 PENDING | `LOCAL_PASSED` |
 | H6-C2 ① | `reassignWaitsForApproveInProgress` | 승인이 Shift·Request를 잡은 채 → 재배정 대기 → APPROVED 뒤 재배정, `closedSubstituteRequests = 0`, 담당 = 재배정 대상, 이력의 이전 담당 = 수락자, Deadlock 0 (ML5-T3 장면을 실제 재배정 Command로) | `LOCAL_PASSED` |
 | H6-C2 ② | `approveWaitsForReassignInProgress` | 재배정이 먼저 → 승인 대기 → `INVALID_REQUEST`, `SHIFT_CHANGED`, 담당 = 재배정 대상 | `LOCAL_PASSED` |
+| ML5-T4 ① | `reassignWaitsForOtherWorkplaceAccept` | 다른 근무지(W2) 수락이 User B를 잡은 채 → W1에서 B에게 재배정 대기 → 수락 반영 뒤 재배정 진행(담당 = B, 이력 1건) → W2 승인 `CONFLICT_SHIFT`, W2 담당 = 요청자. B의 공식 배정 1개 | `LOCAL_PASSED` |
+| ML5-T4 ② | `otherWorkplaceAcceptWaitsForReassign` | W1 재배정이 User B를 잡은 채 → W2 수락 대기 → `CONFLICT_SHIFT`, B PENDING, W2 요청 OPEN. B의 공식 배정 1개 | `LOCAL_PASSED` |
 
 **⑤ 상태의 뜻:**
-- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `cade449` 위 전체 629/629 (EV-039). CI는 PR 생성 후 기록
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `cade449` 위 전체 629/629 (EV-039). ML5-T4는 develop `e429343` 위 전체 729 → 731/731 (EV-043). CI는 PR 생성 후 기록
 - 회귀 (기대값 변경 0): 기존 Test 619개 목록 그대로 통과. Production 코드 변경 없음
 - 문서 불일치 (기록만, AI-RULES §3): [ML-5](../decisions/proposals/ML-5-concurrency-and-lock-order.md) §7은 ML5-T1 옆에 "(H6-C1)"이라고 적었지만 ML-3 §10 H6-C1은 "인계 × **수락**"이다. 이 절은 ML5-T1(인계 × 생성)과 H6-C1(인계 × 수락)을 따로 실행했다
 - 범위 밖: H6-C4 (관리자 두 명 동시 재배정, 배정 이력 순서 = V3 소유), 종료 알림 Type·받는 사람·합치기 (V5), V3-N-33 알림·화면까지의 전체 경로 (V3)
