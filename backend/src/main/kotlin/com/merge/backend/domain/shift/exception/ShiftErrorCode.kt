@@ -117,11 +117,6 @@ enum class ShiftErrorCode(
         HttpStatus.CONFLICT,
         "SFT-022",
         "담당자 변경 대상이 현재 담당자와 같습니다."
-    ),
-    PUBLISHED_SHIFT_TIME_CONFLICT(
-        HttpStatus.CONFLICT,
-        "SFT-023",
-        "공개 근무 시간이 기존 근무와 겹칩니다."
     );
 
     override fun getHttpStatus(): HttpStatus = httpStatus

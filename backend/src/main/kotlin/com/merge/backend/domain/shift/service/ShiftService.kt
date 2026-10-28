@@ -230,6 +230,7 @@ class ShiftService(
 
         validateNewShiftAcknowledgementKeys(schedule.id, memberId, startAt, endAt, request)
         validatePublishedShiftTime(schedule, startAt, endAt)
+        validatePublishedShiftNotStarted(startAt)
 
         val targetScope = workplaceMemberRepository.findScopeById(memberId)
             ?: throw BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
@@ -617,12 +618,14 @@ class ShiftService(
         startAt: LocalDateTime,
         endAt: LocalDateTime,
     ) {
-        if (shiftRepository.existsOverlappingInSchedule(scheduleId, memberId, startAt, endAt, null) ||
-            shiftRepository.existsOverlappingOfficialShift(
+        if (shiftRepository.existsOverlappingInSchedule(scheduleId, memberId, startAt, endAt, null)) {
+            throw BusinessException(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
+        }
+        if (shiftRepository.existsOverlappingOfficialShift(
                 userId, ScheduleStatus.PUBLISHED, startAt, endAt, null,
             )
         ) {
-            throw BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_TIME_CONFLICT)
+            throw BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
         }
     }
 

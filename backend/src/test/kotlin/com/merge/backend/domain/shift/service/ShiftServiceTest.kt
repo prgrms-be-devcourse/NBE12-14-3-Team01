@@ -1168,7 +1168,7 @@ class ShiftServiceTest {
     }
 
     @Test
-    fun createPublishedShift_RejectsOverlappingOfficialShiftWithPublishedShiftSpecificConflict() {
+    fun createPublishedShift_RejectsLocalScheduleOverlapWithSft009() {
         val fixture = publishedShiftCreateFixture()
         given(shiftRepository.existsOverlappingInSchedule(
             fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt, null,
@@ -1180,7 +1180,7 @@ class ShiftServiceTest {
             )
         }
 
-        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_TIME_CONFLICT)
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
         verify(shiftRepository, never()).save(any())
         verifyNoInteractions(substituteRequestService, shiftAssignmentHistoryRepository)
     }
@@ -1252,9 +1252,55 @@ class ShiftServiceTest {
         }
 
         assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
-        verify(userRepository).findByIdForUpdate(fixture.targetUserId)
         verify(shiftRepository, never()).save(any())
-        verifyNoInteractions(substituteRequestService, shiftAssignmentHistoryRepository)
+        verifyNoInteractions(userRepository, substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RechecksStartTimeAfterTargetLocksBeforeSaving() {
+        val fixture = publishedShiftCreateFixture()
+        given(clock.instant()).willReturn(
+            fixture.now.toInstant(ZoneOffset.UTC),
+            fixture.startAt.toInstant(ZoneOffset.UTC),
+        )
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(emptyList())
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verify(userRepository).findByIdForUpdate(fixture.targetUserId)
+        verify(workplaceMemberRepository).findByIdForShare(fixture.memberId)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsStartedShiftBeforeUnavailableConflictCheck() {
+        val fixture = publishedShiftCreateFixture()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        Mockito.lenient().`when`(unavailableTime.startAt).thenReturn(fixture.now.minusHours(1))
+        Mockito.lenient().`when`(unavailableTime.endAt).thenReturn(fixture.now.plusHours(1))
+        Mockito.lenient().`when`(unavailableTimeRepository.findByUserId(fixture.targetUserId))
+            .thenReturn(listOf(unavailableTime))
+        val request = PublishedShiftCreateRequest(
+            fixture.memberId,
+            fixture.now,
+            fixture.now.plusHours(1),
+            emptyList(),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, request, fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(unavailableTimeRepository, userRepository, substituteRequestService)
+        verify(shiftRepository, never()).save(any())
     }
 
     @Test
@@ -1417,7 +1463,7 @@ class ShiftServiceTest {
     }
 
     @Test
-    fun createPublishedShift_RejectsGlobalOfficialShiftOverlap() {
+    fun createPublishedShift_RejectsGlobalOfficialShiftOverlapWithSft010() {
         val fixture = publishedShiftCreateFixture()
         given(shiftRepository.existsOverlappingOfficialShift(
             fixture.targetUserId, ScheduleStatus.PUBLISHED, fixture.startAt, fixture.endAt, null,
@@ -1429,7 +1475,7 @@ class ShiftServiceTest {
             )
         }
 
-        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_TIME_CONFLICT)
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
         verify(shiftRepository, never()).save(any())
     }
 
