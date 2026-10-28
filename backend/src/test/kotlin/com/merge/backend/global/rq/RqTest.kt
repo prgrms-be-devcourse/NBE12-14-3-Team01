@@ -85,4 +85,35 @@ class RqTest {
         assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax")
         assertThat(cookie.isHttpOnly).isTrue()
     }
+
+    @Test
+    @DisplayName("쿠키를 지울 때 Path, HttpOnly, Secure, SameSite, Domain이 발급할 때와 같다")
+    fun deleteCookieUsesSameAttributesAsIssuedCookie() {
+        // given: 배포처럼 속성을 모두 채운 설정
+        val rq = createRq("example.com", true, "None")
+
+        // when: 같은 설정으로 발급하고 삭제
+        rq.addCookie("refreshToken", "token")
+        rq.deleteCookie("refreshToken")
+
+        // then: 속성이 하나라도 다르면 브라우저가 다른 쿠키로 보고 지우지 않음
+        val cookies = response.cookies.filter { cookie -> cookie.name == "refreshToken" }
+        assertThat(cookies).hasSize(2)
+        val issued = cookies[0]
+        val deleted = cookies[1]
+
+        // 빈 값끼리 같아서 통과하지 않도록 발급 쿠키에 설정값이 들어갔는지 먼저 확인
+        assertThat(issued.path).isEqualTo("/")
+        assertThat(issued.isHttpOnly).isTrue()
+        assertThat(issued.secure).isTrue()
+        assertThat(issued.getAttribute("SameSite")).isEqualTo("None")
+        assertThat(issued.domain).isEqualTo("example.com")
+
+        assertThat(deleted.maxAge).isZero()
+        assertThat(deleted.path).isEqualTo(issued.path)
+        assertThat(deleted.isHttpOnly).isEqualTo(issued.isHttpOnly)
+        assertThat(deleted.secure).isEqualTo(issued.secure)
+        assertThat(deleted.getAttribute("SameSite")).isEqualTo(issued.getAttribute("SameSite"))
+        assertThat(deleted.domain).isEqualTo(issued.domain)
+    }
 }
