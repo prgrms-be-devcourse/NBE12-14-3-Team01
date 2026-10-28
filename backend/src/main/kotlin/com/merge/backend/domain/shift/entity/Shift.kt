@@ -43,6 +43,20 @@ class Shift(
     var status: ShiftStatus = status
         protected set
 
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "cancellation_reason")
+    var cancellationReason: ShiftCancellationReason? = null
+        protected set
+
+    @field:Column(name = "cancelled_at")
+    var cancelledAt: LocalDateTime? = null
+        protected set
+
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "cancelled_by_member_id")
+    var cancelledBy: WorkplaceMember? = null
+        protected set
+
     fun update(
         member: WorkplaceMember,
         startAt: LocalDateTime,
@@ -57,5 +71,16 @@ class Shift(
 
     fun changeMember(member: WorkplaceMember) {
         this.member = member
+    }
+
+    fun cancel(
+        reason: ShiftCancellationReason,
+        cancelledAt: LocalDateTime,
+        cancelledBy: WorkplaceMember?
+    ) {
+        status = ShiftStatus.CANCELLED
+        cancellationReason = reason
+        this.cancelledAt = cancelledAt
+        this.cancelledBy = cancelledBy
     }
 }
