@@ -105,6 +105,39 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         @Param("now") now: LocalDateTime,
     ): List<SubstituteCandidate>
 
+    // API-SB-01
+    // 현재 소속으로 내가 수락했고 끝난 대타 요청 (승인·종료·계산된 만료), 효력 종료 시각이 :from 이후
+    @EntityGraph(
+        attributePaths = [
+            "request",
+            "request.shift",
+            "request.shift.schedule",
+            "request.shift.schedule.workplace",
+            "request.requesterMember",
+            "request.requesterMember.user",
+        ],
+    )
+    @Query(
+        """
+        SELECT c
+        FROM SubstituteCandidate c
+        WHERE c.member.user.id = :userId
+          AND c.member.leftAt IS NULL
+          AND c.status = 'ACCEPTED'
+          AND (
+                (c.request.status IN ('APPROVED', 'CLOSED') AND c.request.closedAt >= :from)
+             OR (c.request.status IN ('OPEN', 'ACCEPTED')
+                 AND c.request.shift.startAt <= :now
+                 AND c.request.shift.startAt >= :from)
+          )
+        """,
+    )
+    fun findAcceptedClosedRequests(
+        @Param("userId") userId: Long,
+        @Param("now") now: LocalDateTime,
+        @Param("from") from: LocalDateTime,
+    ): List<SubstituteCandidate>
+
     // SUB-03
     // 현재 Candidate를 제외하고 다른 PENDING Candidate가 남아 있는지 확인
     fun existsByRequest_IdAndStatusAndIdNot(

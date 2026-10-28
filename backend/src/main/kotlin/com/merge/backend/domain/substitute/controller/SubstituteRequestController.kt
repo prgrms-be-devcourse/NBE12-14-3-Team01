@@ -1,5 +1,6 @@
 package com.merge.backend.domain.substitute.controller
 
+import com.merge.backend.domain.substitute.dto.AcceptedClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.AcceptedPendingSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.ReceivedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCloseResponse
@@ -49,6 +50,19 @@ class SubstituteRequestController(
 
         return ResponseEntity.ok(
             ApiResponse.success("200", "승인 대기 중인 대타 요청을 조회했습니다.", response),
+        )
+    }
+
+    // API-SB-01 - 내가 수락했던 대타 요청 중 끝난 것 (최근 7일)
+    @GetMapping("/substitute-requests/accepted/closed")
+    fun getAcceptedClosedRequests():
+        ResponseEntity<ApiResponse<List<AcceptedClosedSubstituteRequestResponse>>> {
+        val userId = rq.actorId
+
+        val response = substituteCandidateService.findAcceptedClosedRequests(userId)
+
+        return ResponseEntity.ok(
+            ApiResponse.success("200", "종료된 대타 요청을 조회했습니다.", response),
         )
     }
 
