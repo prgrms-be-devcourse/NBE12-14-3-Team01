@@ -29,7 +29,7 @@
 | Filter를 제외하거나 실제 Chain을 구성하지 않는 HTTP Test | `WorkplaceControllerTest`는 `addFilters = false`, `ScheduleControllerTest`는 Mockito 단독 | 실제 Security Filter 경계 미검증 |
 | 알림 Listener | 7개 모두 `@TransactionalEventListener(AFTER_COMMIT)` + 예외를 잡아 로그만 남김. 저장은 `NotificationService`의 `REQUIRES_NEW` | **Commit 후 실제 알림 Row까지 확인하는 Test는 근무표 공개 1개뿐** (`SchedulePublishedEventListenerIntegrationTest`). 대타 6개 Event는 Unit(Mock)만 |
 | 동시성 Test | 대타 8 (동시 4 + 순서 강제 4), 근무 4, 불가능 시간 3, 알림 읽음 1, 근무 수정 Lock 2 | 순서 강제(`CountDownLatch`)는 대타 4개뿐 |
-| 공유 MySQL DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true` — JVM 동안 Container 1개 재사용. MySQL Test 16 Class 중 **Class 단위 `@Transactional` 롤백이 없는 Class 11개, 데이터 정리(`deleteAll`·`TRUNCATE`·`@Sql`) 0개** | Commit된 Test 데이터가 다음 Test까지 남는다 |
+| 공유 MySQL DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true` (2026-10-28부터 `&TC_MY_CNF=testcontainers/mysql`, 테스트 Container `max_connections = 500`) — JVM 동안 Container 1개 재사용. MySQL Test 16 Class 중 **Class 단위 `@Transactional` 롤백이 없는 Class 11개, 데이터 정리(`deleteAll`·`TRUNCATE`·`@Sql`) 0개** | Commit된 Test 데이터가 다음 Test까지 남는다 |
 | 공유 DB의 실제 영향 | 전체 Table 조회·건수 Assertion은 `WorkplaceServiceIntegrationTest.rollbackWorkplaceCreation`의 `count()` 1곳뿐이고 **같은 Test 안의 전후 비교**다. 다른 Test는 고유 값(이메일·초대 코드)으로 충돌을 피한다 (`SubstituteRequestConcurrencyTest` 주석) | **현재 순서 의존 Assertion은 발견하지 못함** (정적 확인). Test가 순차 실행이라 전후 비교가 안전. 그러나 고유 데이터만으로는 충분하지 않다 — 남은 데이터가 **조회 결과·업무 판정**에 끼어들 수 있다: 앞 Test의 활성 대타 요청이 같은 사용자 기준 목록에 섞임, 끝나지 않은 공식 근무가 시간 충돌 판정에 걸림, 페이지네이션 결과가 달라짐, 동시성 Test가 예상 밖 상태의 데이터를 만남. → 원칙: **Test 데이터는 구분할 수 있어야 하고, 조회 범위와 정리 전략을 명시한다** (DOMAIN-DEVELOPMENT-GUIDE §3-2). 정리 방식(Test별 고유 근무지·사용자, 명시적 Cleanup, 격리 DB, 공용 Fixture) 선택은 E4·E5 MySQL 검증 후 팀이 정한다 |
 
 ## 3. 경로별 검증 수준
