@@ -4,11 +4,14 @@ import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.ScheduleStatus
 import com.merge.backend.domain.shift.entity.Shift
+import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ScheduleRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.service.ShiftChangeClosedRequest
+import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.workplace.entity.Workplace
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
@@ -18,8 +21,10 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
 import com.merge.backend.global.exception.BusinessException
+import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.Optional
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -33,7 +38,9 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.given
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -60,6 +67,11 @@ class ShiftServiceTest {
     private lateinit var workplaceMemberRepository: WorkplaceMemberRepository
     @Mock
     private lateinit var unavailableTimeRepository: UnavailableTimeRepository
+    @Mock
+    private lateinit var substituteRequestService: SubstituteRequestService
+
+    @Mock
+    private lateinit var clock: Clock
 
     @Test
     @DisplayName("SCH-01 - Pattern에서 전달된 정보로 SCHEDULED Shift를 저장한다")
@@ -337,6 +349,196 @@ class ShiftServiceTest {
         verify(unavailableTimeRepository).existsOverlappingUnavailableTime(userId, startAt, endAt)
         verify(scheduleRepository).findByIdForUpdate(scheduleId)
         verify(shift, never()).update(any(), any(), any())
+    }
+
+    @Test
+    @DisplayName("공개된 시작 전 Shift를 취소하고 취소 메타데이터를 기록한다")
+    fun cancelPublishedShift_Success() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.id).willReturn(shiftId)
+        given(substituteRequestService.closeActiveRequestsByShiftChange(shiftId, now)).willReturn(
+            listOf(
+                ShiftChangeClosedRequest(1L, 10L, null),
+                ShiftChangeClosedRequest(2L, 11L, 12L),
+            ),
+        )
+
+        val result = shiftService.cancelPublishedShift(workplaceId, scheduleId, shiftId, actorId)
+
+        assertThat(result.shift).isSameAs(shift)
+        assertThat(result.closedSubstituteRequests).isEqualTo(2)
+        verify(shift).cancel(
+            eq(ShiftCancellationReason.MANAGER_CANCELLED),
+            eq(now),
+            eq(actorMember),
+        )
+        inOrder(scheduleRepository, shiftRepository, substituteRequestService) {
+            verify(scheduleRepository).findByIdForUpdate(scheduleId)
+            verify(shiftRepository).findByIdForUpdate(shiftId)
+            verify(substituteRequestService).closeActiveRequestsByShiftChange(shiftId, now)
+        }
+    }
+
+    @Test
+    @DisplayName("대타 요청 종료에 실패하면 공개 Shift를 취소하지 않는다")
+    fun cancelPublishedShift_DoesNotCancelWhenClosingSubstituteRequestsFails() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        doThrow(IllegalStateException("V4 종료 실패"))
+            .whenever(substituteRequestService)
+            .closeActiveRequestsByShiftChange(shiftId, now)
+
+        assertThatThrownBy {
+            shiftService.cancelPublishedShift(workplaceId, scheduleId, shiftId, actorId)
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        verify(shift, never()).cancel(any(), any(), any())
+    }
+
+    @Test
+    @DisplayName("관리자가 아니면 공개 Shift를 취소할 수 없고 잠금을 획득하지 않는다")
+    fun cancelPublishedShift_FailsWhenActorIsNotManager() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val actorId = 200L
+
+        doThrow(BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
+            .whenever(workplaceMemberService)
+            .requireManager(actorId, workplaceId)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.cancelPublishedShift(workplaceId, scheduleId, shiftId, actorId)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(WorkplaceErrorCode.MANAGER_REQUIRED)
+        verifyNoInteractions(scheduleRepository, shiftRepository)
+    }
+
+    @Test
+    @DisplayName("시작한 공개 Shift는 취소할 수 없다")
+    fun cancelPublishedShift_FailsWhenShiftStarted() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.cancelPublishedShift(workplaceId, scheduleId, shiftId, actorId)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verify(shift, never()).cancel(any(), any(), any())
+    }
+
+    @Test
+    @DisplayName("이미 취소된 공개 Shift는 다시 취소할 수 없다")
+    fun cancelPublishedShift_FailsWhenShiftAlreadyCancelled() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val actorId = 200L
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.CANCELLED)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.cancelPublishedShift(workplaceId, scheduleId, shiftId, actorId)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verify(shift, never()).cancel(any(), any(), any())
+    }
+
+    @Test
+    @DisplayName("공개되지 않은 근무표의 Shift는 취소할 수 없다")
+    fun cancelPublishedShift_FailsWhenScheduleIsNotPublished() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val actorId = 200L
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val actorMember = mock<WorkplaceMember>()
+
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.DRAFT)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.cancelPublishedShift(workplaceId, scheduleId, 100L, actorId)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(shiftRepository)
     }
 
 }

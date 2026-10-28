@@ -1,6 +1,7 @@
 package com.merge.backend.domain.shift.controller
 
 import com.merge.backend.domain.shift.dto.ShiftCreateResponse
+import com.merge.backend.domain.shift.dto.ShiftCancelResponse
 import com.merge.backend.domain.shift.dto.ShiftDetailResponse
 import com.merge.backend.domain.shift.dto.ShiftListResponse
 import com.merge.backend.domain.shift.dto.ShiftModifyResponse
@@ -118,6 +119,31 @@ class ShiftController(
                 "200",
                 "근무가 삭제되었습니다.",
                 null
+            )
+        )
+    }
+
+    @PostMapping("/workplaces/{workplaceId}/schedules/{scheduleId}/shifts/{shiftId}/cancel")
+    fun cancel(
+        @PathVariable workplaceId: Long?,
+        @PathVariable scheduleId: Long?,
+        @PathVariable shiftId: Long?,
+    ): ResponseEntity<ApiResponse<ShiftCancelResponse>> {
+        val cancellationResult = shiftService.cancelPublishedShift(
+            workplaceId,
+            scheduleId,
+            shiftId,
+            rq.actorId,
+        )
+
+        return ResponseEntity.status(HttpStatus.OK).body(
+            ApiResponse.success(
+                "200",
+                "공개 근무를 취소했습니다.",
+                ShiftCancelResponse.from(
+                    cancellationResult.shift,
+                    cancellationResult.closedSubstituteRequests,
+                ),
             )
         )
     }
