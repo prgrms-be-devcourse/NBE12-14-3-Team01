@@ -4,6 +4,7 @@ import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
+import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
 import com.merge.backend.domain.shift.service.PublishedShiftCancellationResult
 import com.merge.backend.domain.shift.service.PublishedShiftReassignmentResult
 import com.merge.backend.domain.shift.service.ShiftService
@@ -151,6 +152,62 @@ class ShiftControllerTest {
             org.mockito.kotlin.eq(scheduleId),
             org.mockito.kotlin.eq(shiftId),
             org.mockito.kotlin.any(),
+            org.mockito.kotlin.eq(actorId),
+        )
+    }
+
+    @Test
+    fun 공개_Shift_추가는_201과_기존_ShiftCreateResponse를_반환한다() {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val actorId = 200L
+        val memberId = 20L
+        val shiftId = 100L
+        val startAt = LocalDateTime.of(2026, 10, 30, 9, 0)
+        val endAt = LocalDateTime.of(2026, 10, 30, 18, 0)
+        val user = mock<User>()
+        val member = mock<WorkplaceMember>()
+        val shift = mock<Shift>()
+
+        given(rq.actorId).willReturn(actorId)
+        given(shift.id).willReturn(shiftId)
+        given(shift.member).willReturn(member)
+        given(member.id).willReturn(memberId)
+        given(member.user).willReturn(user)
+        given(user.name).willReturn("직원")
+        given(shift.startAt).willReturn(startAt)
+        given(shift.endAt).willReturn(endAt)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shiftService.createPublishedShift(
+            org.mockito.kotlin.eq(workplaceId),
+            org.mockito.kotlin.eq(scheduleId),
+            org.mockito.kotlin.any<PublishedShiftCreateRequest>(),
+            org.mockito.kotlin.eq(actorId),
+        )).willReturn(shift)
+
+        mockMvc.perform(
+            post(
+                "/workplaces/{workplaceId}/schedules/{scheduleId}/published-shifts",
+                workplaceId,
+                scheduleId,
+            )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"memberId":20,"startAt":"2026-10-30T09:00:00","endAt":"2026-10-30T18:00:00","acknowledgedUnavailableConflicts":[]}""",
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.code").value("201"))
+            .andExpect(jsonPath("$.message").value("공개 근무가 추가되었습니다."))
+            .andExpect(jsonPath("$.data.shiftId").value(shiftId))
+            .andExpect(jsonPath("$.data.memberId").value(memberId))
+            .andExpect(jsonPath("$.data.status").value("SCHEDULED"))
+
+        verify(shiftService).createPublishedShift(
+            org.mockito.kotlin.eq(workplaceId),
+            org.mockito.kotlin.eq(scheduleId),
+            org.mockito.kotlin.any<PublishedShiftCreateRequest>(),
             org.mockito.kotlin.eq(actorId),
         )
     }

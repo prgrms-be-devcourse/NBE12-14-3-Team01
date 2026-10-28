@@ -4,4 +4,5 @@ enum class CandidateStatus {
     PENDING,
     REJECTED,
     ACCEPTED,
+    INELIGIBLE,
 }

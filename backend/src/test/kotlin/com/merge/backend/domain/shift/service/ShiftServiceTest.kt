@@ -2,6 +2,10 @@ package com.merge.backend.domain.shift.service
 
 import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.dto.ShiftReassignRequest
+import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
+import com.merge.backend.domain.shift.dto.AcknowledgedNewShiftUnavailableConflict
+import com.merge.backend.domain.shift.dto.NewShiftKey
+import com.merge.backend.domain.shift.dto.PublishedShiftConfirmationRequiredResponse
 import com.merge.backend.domain.shift.dto.AcknowledgedUnavailableConflict
 import com.merge.backend.domain.shift.dto.UnavailableOverlap
 import com.merge.backend.domain.shift.entity.ShiftAssignmentHistory
@@ -34,14 +38,18 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Optional
+import java.util.stream.Stream
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
@@ -936,6 +944,67 @@ class ShiftServiceTest {
         )
     }
 
+    @ParameterizedTest
+    @MethodSource("invalidAcknowledgedUnavailableOverlaps")
+    @DisplayName("잘못된 확인 구간은 충돌 여부와 관계없이 입력 오류로 거부하고 변경 작업을 시작하지 않는다")
+    fun reassignPublishedShift_RejectsInvalidAcknowledgedUnavailableOverlap(
+        invalidOverlap: UnavailableOverlap,
+    ) {
+        val workplaceId = 1L
+        val scheduleId = 10L
+        val shiftId = 100L
+        val targetMemberId = 20L
+        val actorId = 200L
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val workplace = mock<Workplace>()
+        val schedule = mock<Schedule>()
+        val shift = mock<Shift>()
+        val actorMember = mock<WorkplaceMember>()
+        val previousMember = mock<WorkplaceMember>()
+
+        given(clock.instant()).willReturn(now.toInstant(ZoneOffset.UTC))
+        given(clock.zone).willReturn(ZoneOffset.UTC)
+        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(actorMember)
+        given(scheduleRepository.findByIdForUpdate(scheduleId)).willReturn(Optional.of(schedule))
+        given(schedule.workplace).willReturn(workplace)
+        given(workplace.id).willReturn(workplaceId)
+        given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+        given(shift.schedule).willReturn(schedule)
+        given(shift.status).willReturn(ShiftStatus.SCHEDULED)
+        given(shift.startAt).willReturn(now.plusHours(1))
+        given(shift.member).willReturn(previousMember)
+        given(previousMember.id).willReturn(10L)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                workplaceId,
+                scheduleId,
+                shiftId,
+                ShiftReassignRequest(
+                    targetMemberId,
+                    listOf(
+                        AcknowledgedUnavailableConflict(
+                            shiftId,
+                            targetMemberId,
+                            listOf(invalidOverlap),
+                        ),
+                    ),
+                ),
+                actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verify(shift, never()).changeMember(any())
+        verifyNoInteractions(
+            substituteRequestService,
+            userRepository,
+            shiftAssignmentHistoryRepository,
+        )
+    }
+
     @Test
     @DisplayName("확인 구간이 현재 충돌 범위를 모두 포함하지 않으면 재확인을 요구한다")
     fun reassignPublishedShift_RequiresConfirmationForInsufficientAcknowledgement() {
@@ -1075,6 +1144,438 @@ class ShiftServiceTest {
             substituteRequestService,
             userRepository,
             shiftAssignmentHistoryRepository,
+        )
+    }
+
+    @Test
+    fun createPublishedShift_SavesScheduledShiftWithoutAssignmentHistoryOrSubstituteClosure() {
+        val fixture = publishedShiftCreateFixture()
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(emptyList())
+        given(shiftRepository.save(any<Shift>())).willAnswer { it.getArgument<Shift>(0) }
+
+        val result = shiftService.createPublishedShift(
+            fixture.workplaceId,
+            fixture.scheduleId,
+            fixture.request(),
+            fixture.actorId,
+        )
+
+        assertThat(result.status).isEqualTo(ShiftStatus.SCHEDULED)
+        assertThat(result.schedule).isSameAs(fixture.schedule)
+        assertThat(result.member).isSameAs(fixture.targetMember)
+        verify(shiftRepository).save(any<Shift>())
+        verifyNoInteractions(substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RejectsLocalScheduleOverlapWithSft009() {
+        val fixture = publishedShiftCreateFixture()
+        given(shiftRepository.existsOverlappingInSchedule(
+            fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt, null,
+        )).willReturn(true)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
+        verify(shiftRepository, never()).save(any())
+        verifyNoInteractions(substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun createPublishedShift_ReturnsSft021WithNewShiftKeyWhenUnavailableConflictIsUnacknowledged() {
+        val fixture = publishedShiftCreateFixture()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        given(fixture.targetUser.name).willReturn("직원")
+        given(unavailableTime.startAt).willReturn(fixture.startAt.plusHours(1))
+        given(unavailableTime.endAt).willReturn(fixture.startAt.plusHours(2))
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(listOf(unavailableTime))
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode)
+            .isEqualTo(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED)
+        val response = exception.data as PublishedShiftConfirmationRequiredResponse
+        assertThat(response.requiresConfirmation).isTrue()
+        assertThat(response.unavailableConflicts.single().newShiftKey)
+            .isEqualTo(NewShiftKey(fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt))
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsInvalidAcknowledgementBeforeTargetLockOrWrite() {
+        val fixture = publishedShiftCreateFixture(
+            withTargetLocks = false,
+            withTimeValidationStubs = false,
+        )
+        val invalidRequest = fixture.request(
+            listOf(
+                AcknowledgedNewShiftUnavailableConflict(
+                    NewShiftKey(fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt),
+                    listOf(UnavailableOverlap(fixture.startAt.plusHours(2), fixture.startAt.plusHours(2))),
+                ),
+            ),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, invalidRequest, fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verifyNoInteractions(userRepository, substituteRequestService, shiftAssignmentHistoryRepository)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsCurrentStartTimeWithSft020() {
+        val fixture = publishedShiftCreateFixture()
+        val request = PublishedShiftCreateRequest(
+            fixture.memberId,
+            fixture.now,
+            fixture.now.plusHours(1),
+            emptyList(),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, request, fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verify(shiftRepository, never()).save(any())
+        verifyNoInteractions(userRepository, substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RechecksStartTimeAfterTargetLocksBeforeSaving() {
+        val fixture = publishedShiftCreateFixture()
+        given(clock.instant()).willReturn(
+            fixture.now.toInstant(ZoneOffset.UTC),
+            fixture.startAt.toInstant(ZoneOffset.UTC),
+        )
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(emptyList())
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verify(userRepository).findByIdForUpdate(fixture.targetUserId)
+        verify(workplaceMemberRepository).findByIdForShare(fixture.memberId)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsStartedShiftBeforeUnavailableConflictCheck() {
+        val fixture = publishedShiftCreateFixture()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        Mockito.lenient().`when`(unavailableTime.startAt).thenReturn(fixture.now.minusHours(1))
+        Mockito.lenient().`when`(unavailableTime.endAt).thenReturn(fixture.now.plusHours(1))
+        Mockito.lenient().`when`(unavailableTimeRepository.findByUserId(fixture.targetUserId))
+            .thenReturn(listOf(unavailableTime))
+        val request = PublishedShiftCreateRequest(
+            fixture.memberId,
+            fixture.now,
+            fixture.now.plusHours(1),
+            emptyList(),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, request, fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(unavailableTimeRepository, userRepository, substituteRequestService)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_SavesShiftWhenAllUnavailableConflictsAreAcknowledged() {
+        val fixture = publishedShiftCreateFixture()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        val overlapStartAt = fixture.startAt.plusHours(1)
+        val overlapEndAt = fixture.startAt.plusHours(2)
+        given(unavailableTime.startAt).willReturn(overlapStartAt)
+        given(unavailableTime.endAt).willReturn(overlapEndAt)
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(listOf(unavailableTime))
+        given(shiftRepository.save(any<Shift>())).willAnswer { it.getArgument<Shift>(0) }
+
+        val result = shiftService.createPublishedShift(
+            fixture.workplaceId,
+            fixture.scheduleId,
+            fixture.request(listOf(newShiftAcknowledgement(fixture, overlapStartAt, overlapEndAt))),
+            fixture.actorId,
+        )
+
+        assertThat(result.status).isEqualTo(ShiftStatus.SCHEDULED)
+        verify(shiftRepository).save(any<Shift>())
+    }
+
+    @Test
+    fun createPublishedShift_ReturnsSft021WhenAcknowledgementOnlyPartiallyCoversCurrentConflict() {
+        val fixture = publishedShiftCreateFixture()
+        val unavailableTime = mock<com.merge.backend.domain.shift.entity.UnavailableTime>()
+        given(unavailableTime.startAt).willReturn(fixture.startAt.plusHours(1))
+        given(unavailableTime.endAt).willReturn(fixture.startAt.plusHours(3))
+        given(unavailableTimeRepository.findByUserId(fixture.targetUserId)).willReturn(listOf(unavailableTime))
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId,
+                fixture.scheduleId,
+                fixture.request(listOf(newShiftAcknowledgement(
+                    fixture,
+                    fixture.startAt.plusHours(1),
+                    fixture.startAt.plusHours(2),
+                ))),
+                fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode)
+            .isEqualTo(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsAcknowledgementForDifferentNewShiftKey() {
+        val fixture = publishedShiftCreateFixture(
+            withTargetLocks = false,
+            withTimeValidationStubs = false,
+        )
+        val acknowledgement = AcknowledgedNewShiftUnavailableConflict(
+            NewShiftKey(fixture.scheduleId + 1, fixture.memberId, fixture.startAt, fixture.endAt),
+            listOf(UnavailableOverlap(fixture.startAt.plusHours(1), fixture.startAt.plusHours(2))),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId,
+                fixture.scheduleId,
+                fixture.request(listOf(acknowledgement)),
+                fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE)
+        verifyNoInteractions(userRepository, substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RequiresManagerPermission() {
+        val fixture = publishedShiftCreateFixture(
+            withTargetLocks = false,
+            withTimeValidationStubs = false,
+            withScheduleStubs = false,
+        )
+        doThrow(BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
+            .whenever(workplaceMemberService)
+            .requireManager(fixture.actorId, fixture.workplaceId)
+
+        assertThatThrownBy {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }.isInstanceOf(BusinessException::class.java)
+        verifyNoInteractions(scheduleRepository, userRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RejectsNonPublishedSchedule() {
+        val fixture = publishedShiftCreateFixture(
+            withTargetLocks = false,
+            withTimeValidationStubs = false,
+        )
+        given(fixture.schedule.status).willReturn(ScheduleStatus.DRAFT)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(userRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RejectsMemberOutsideWorkplace() {
+        val fixture = publishedShiftCreateFixture()
+        given(fixture.targetScope.workplaceId).willReturn(fixture.workplaceId + 1)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.NOT_FOUND_ERROR)
+        verifyNoInteractions(userRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RejectsEndedMember() {
+        val fixture = publishedShiftCreateFixture()
+        given(fixture.targetMember.leftAt).willReturn(fixture.now)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.NOT_FOUND_ERROR)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    @Test
+    fun createPublishedShift_RejectsTimeOutsideScheduleWeek() {
+        val fixture = publishedShiftCreateFixture(withTargetLocks = false)
+        val request = PublishedShiftCreateRequest(
+            fixture.memberId,
+            fixture.startAt.plusWeeks(1),
+            fixture.endAt.plusWeeks(1),
+            emptyList(),
+        )
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, request, fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.INVALID_SHIFT_INSCHEDULE)
+        verifyNoInteractions(userRepository)
+    }
+
+    @Test
+    fun createPublishedShift_RejectsGlobalOfficialShiftOverlapWithSft010() {
+        val fixture = publishedShiftCreateFixture()
+        given(shiftRepository.existsOverlappingOfficialShift(
+            fixture.targetUserId, ScheduleStatus.PUBLISHED, fixture.startAt, fixture.endAt, null,
+        )).willReturn(true)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.createPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
+        verify(shiftRepository, never()).save(any())
+    }
+
+    private fun newShiftAcknowledgement(
+        fixture: PublishedShiftCreateFixture,
+        startAt: LocalDateTime,
+        endAt: LocalDateTime,
+    ) = AcknowledgedNewShiftUnavailableConflict(
+        NewShiftKey(fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt),
+        listOf(UnavailableOverlap(startAt, endAt)),
+    )
+
+    private fun publishedShiftCreateFixture(
+        withTargetLocks: Boolean = true,
+        withTimeValidationStubs: Boolean = true,
+        withScheduleStubs: Boolean = true,
+    ): PublishedShiftCreateFixture {
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val fixture = PublishedShiftCreateFixture(
+            workplaceId = 1L,
+            scheduleId = 10L,
+            memberId = 20L,
+            targetUserId = 30L,
+            actorId = 200L,
+            now = now,
+            startAt = now.plusHours(1),
+            endAt = now.plusHours(5),
+            workplace = mock(),
+            schedule = mock(),
+            actorMember = mock(),
+            targetMember = mock(),
+            targetUser = mock(),
+            targetScope = mock(),
+        )
+        if (withTimeValidationStubs) {
+            Mockito.lenient().`when`(clock.instant()).thenReturn(now.toInstant(ZoneOffset.UTC))
+            Mockito.lenient().`when`(clock.zone).thenReturn(ZoneOffset.UTC)
+        }
+        if (withScheduleStubs) {
+            Mockito.lenient().`when`(workplaceMemberService.requireManager(fixture.actorId, fixture.workplaceId))
+                .thenReturn(fixture.actorMember)
+            Mockito.lenient().`when`(scheduleRepository.findByIdForUpdate(fixture.scheduleId))
+                .thenReturn(Optional.of(fixture.schedule))
+            Mockito.lenient().`when`(fixture.schedule.workplace).thenReturn(fixture.workplace)
+            Mockito.lenient().`when`(fixture.schedule.id).thenReturn(fixture.scheduleId)
+            Mockito.lenient().`when`(fixture.workplace.id).thenReturn(fixture.workplaceId)
+            Mockito.lenient().`when`(fixture.schedule.status).thenReturn(ScheduleStatus.PUBLISHED)
+            if (withTimeValidationStubs) {
+                Mockito.lenient().`when`(fixture.schedule.weekStartDate).thenReturn(now.toLocalDate())
+            }
+        }
+        if (withTargetLocks) {
+            Mockito.lenient().`when`(workplaceMemberRepository.findScopeById(fixture.memberId)).thenReturn(fixture.targetScope)
+            Mockito.lenient().`when`(fixture.targetScope.workplaceId).thenReturn(fixture.workplaceId)
+            Mockito.lenient().`when`(fixture.targetScope.userId).thenReturn(fixture.targetUserId)
+            Mockito.lenient().`when`(userRepository.findByIdForUpdate(fixture.targetUserId)).thenReturn(Optional.of(fixture.targetUser))
+            Mockito.lenient().`when`(workplaceMemberRepository.findByIdForShare(fixture.memberId)).thenReturn(Optional.of(fixture.targetMember))
+            Mockito.lenient().`when`(fixture.targetMember.workplace).thenReturn(fixture.workplace)
+            Mockito.lenient().`when`(fixture.targetMember.leftAt).thenReturn(null)
+            Mockito.lenient().`when`(fixture.targetMember.user).thenReturn(fixture.targetUser)
+            Mockito.lenient().`when`(fixture.targetMember.id).thenReturn(fixture.memberId)
+            Mockito.lenient().`when`(fixture.targetUser.id).thenReturn(fixture.targetUserId)
+        }
+        return fixture
+    }
+
+    private data class PublishedShiftCreateFixture(
+        val workplaceId: Long,
+        val scheduleId: Long,
+        val memberId: Long,
+        val targetUserId: Long,
+        val actorId: Long,
+        val now: LocalDateTime,
+        val startAt: LocalDateTime,
+        val endAt: LocalDateTime,
+        val workplace: Workplace,
+        val schedule: Schedule,
+        val actorMember: WorkplaceMember,
+        val targetMember: WorkplaceMember,
+        val targetUser: User,
+        val targetScope: WorkplaceMemberScope,
+    ) {
+        fun request(
+            acknowledgedUnavailableConflicts: List<AcknowledgedNewShiftUnavailableConflict> = emptyList(),
+        ) = PublishedShiftCreateRequest(memberId, startAt, endAt, acknowledgedUnavailableConflicts)
+    }
+
+    companion object {
+        @JvmStatic
+        fun invalidAcknowledgedUnavailableOverlaps(): Stream<UnavailableOverlap> = Stream.of(
+            UnavailableOverlap(null, LocalDateTime.of(2026, 10, 28, 17, 0)),
+            UnavailableOverlap(LocalDateTime.of(2026, 10, 28, 16, 0), null),
+            UnavailableOverlap(
+                LocalDateTime.of(2026, 10, 28, 17, 0),
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+            ),
+            UnavailableOverlap(
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+                LocalDateTime.of(2026, 10, 28, 16, 0),
+            ),
         )
     }
 
