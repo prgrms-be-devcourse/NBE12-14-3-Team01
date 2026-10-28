@@ -3,13 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
 import {
   ApiError,
   apiFetch,
   setToken,
   UnexpectedResponseError,
 } from "@/lib/api";
+import {
+  clearPendingLogout,
+  getPendingLogout,
+  retryLogout,
+  subscribePendingLogout,
+} from "@/lib/logout";
 
 // 로그인 성공 시 서버가 data에 담아주는 값
 type LoginResponse = {
@@ -42,6 +48,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRetryingLogout, setIsRetryingLogout] = useState(false);
+
+  // 서버 로그아웃이 확인 안 됐으면 안내와 다시 시도를 보여줌 (서버 렌더링 땐 sessionStorage가 없어서 null)
+  const pendingLogout = useSyncExternalStore(
+      subscribePendingLogout,
+      getPendingLogout,
+      () => null
+  );
+
+  const handleRetryLogout = async () => {
+    setIsRetryingLogout(true);
+    await retryLogout();
+    setIsRetryingLogout(false);
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -55,6 +75,7 @@ export default function LoginPage() {
       });
 
       setToken(data.accessToken);
+      clearPendingLogout();
       router.push("/workplaces");
     } catch (error) {
       if (error instanceof ApiError) {
@@ -100,6 +121,26 @@ export default function LoginPage() {
               계정 정보를 입력해주세요.
             </p>
           </div>
+
+          {pendingLogout && (
+              <div className="mt-6 rounded-xl bg-[#fff5f5] px-4 py-3 text-sm font-bold text-[#d95555]">
+                <p>
+                  {pendingLogout === "forbidden"
+                      ? "보안 확인에 실패했습니다. 관리자에게 문의해 주세요."
+                      : "서버 로그아웃을 확인하지 못했습니다. 다시 시도해 주세요."}
+                </p>
+
+                {/* 로그인 중에 누르면 새 로그인 쿠키로 로그아웃을 보낼 수 있어서 막음 */}
+                <button
+                    type="button"
+                    onClick={handleRetryLogout}
+                    disabled={isRetryingLogout || isLoading}
+                    className="mt-3 rounded-xl border border-[#d95555] bg-white px-3 py-2 text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isRetryingLogout ? "다시 시도 중..." : "다시 시도"}
+                </button>
+              </div>
+          )}
 
           {/* 에러가 있으면 가입 안내는 숨김 */}
           {!errorMessage && (

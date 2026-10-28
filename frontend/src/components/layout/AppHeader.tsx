@@ -3,7 +3,8 @@
 import {useEffect, useState} from "react";
 import {useParams, useRouter} from "next/navigation";
 import {useCurrentUser} from "@/components/providers/CurrentUserProvider";
-import {apiFetch, clearToken} from "@/lib/api";
+import {apiFetch} from "@/lib/api";
+import {logout} from "@/lib/logout";
 
 type WorkplaceRole = "MANAGER" | "EMPLOYEE";
 
@@ -175,6 +176,7 @@ export default function AppHeader() {
   const [notificationLoadStatus, setNotificationLoadStatus] = useState<NotificationLoadStatus>("loading");
   const [readingNotificationId, setReadingNotificationId] = useState<number | null>(null);
   const [notificationReloadKey, setNotificationReloadKey] = useState(0);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const unreadCount = notifications.filter(
     (notification) => notification.readAt === null
@@ -214,9 +216,14 @@ export default function AppHeader() {
     };
   }, [notificationReloadKey]);
 
-  // 토큰 지우고 로그인 화면으로 (뒤로 가기로 못 돌아오게 replace)
-  const handleLogout = () => {
-    clearToken();
+  // 서버 로그아웃 후 로그인 화면으로 (실패해도 이동, 안내는 로그인 화면이 보여줌. 뒤로 가기로 못 돌아오게 replace)
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    await logout();
     router.replace("/login");
   };
 
@@ -487,9 +494,10 @@ export default function AppHeader() {
                   <button
                       type="button"
                       onClick={handleLogout}
-                      className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
+                      disabled={isLoggingOut}
+                      className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    로그아웃
+                    {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
                   </button>
                 </div>
             )}
