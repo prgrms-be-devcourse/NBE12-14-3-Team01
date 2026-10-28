@@ -29,6 +29,21 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
     )
     fun findByIdForUpdate(@Param("requestId") requestId: Long): SubstituteRequest?
 
+    // 해당 근무의 진행 중(OPEN·ACCEPTED) 요청을 잠금
+    // 여러 건이면 ID 순서로 잠가서 다른 Transaction과 순서가 엇갈리지 않게 함
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT r
+        FROM SubstituteRequest r
+        WHERE r.shift.id = :shiftId
+          AND r.status IN (com.merge.backend.domain.substitute.entity.RequestStatus.OPEN,
+                           com.merge.backend.domain.substitute.entity.RequestStatus.ACCEPTED)
+        ORDER BY r.id ASC
+        """,
+    )
+    fun findActiveByShiftIdForUpdate(@Param("shiftId") shiftId: Long): List<SubstituteRequest>
+
     // 해당 근무지의 모든 대체근무 요청 조회
     // 근무 시간 순으로 정렬하되, 시간이 같으면 id 기준으로 정렬
     @Query(
