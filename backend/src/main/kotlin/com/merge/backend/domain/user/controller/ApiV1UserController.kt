@@ -62,6 +62,17 @@ class ApiV1UserController(
         )
     }
 
+    // Access Token 없이 Refresh Cookie만으로 처리
+    @PostMapping("/logout")
+    fun logout(): ResponseEntity<ApiResponse<Void?>> {
+        val refreshToken = rq.getCookieValue("refreshToken", "")
+        userService.logout(refreshToken)
+
+        rq.deleteCookie("refreshToken")
+
+        return ResponseEntity.ok(ApiResponse.success("200", "로그아웃되었습니다"))
+    }
+
     @GetMapping("/me")
     fun me(): ResponseEntity<ApiResponse<UserResponse>> {
         val user = userService.getById(rq.actorId)
