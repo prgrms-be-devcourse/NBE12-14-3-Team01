@@ -1282,6 +1282,7 @@ class SubstituteRequestServiceTest {
             assertThat(responses[0].requestId).isEqualTo(2L)
             assertThat(responses[0].status).isEqualTo(RequestStatus.CLOSED)
             assertThat(responses[0].closeReason).isEqualTo(RequestCloseReason.EXPIRED)
+            assertThat(responses[0].closedAt).isEqualTo(expiredShift.startAt)
             assertThat(responses[1].requestId).isEqualTo(1L)
             assertThat(responses[1].status).isEqualTo(RequestStatus.OPEN)
         }
