@@ -104,7 +104,7 @@ G-03 원문은 참고 공유본 `docs/references/G-03-contract-review.md`에 있
 | [`G03-D-05`](proposals/G03-D-05-confirmation-response.md) 경고 후 확인 응답 계약 | G03-D-05 (주), G03-D-21·03 | 사용자 잠정 결정 (2026-10-25) / ② `PROPOSED` / ③ `DRAFT`. S05-a: 겹침 구간만 표시 | G03-D-05 `PENDING` | 새 Command만: 확정 요청 → 409 CONFIRM_REQUIRED + 충돌 목록 → 확인 목록과 함께 같은 API 재요청, 현재 충돌 ⊆ 확인 범위면 진행. 계획 불일치는 409 STALE. 기존 DRAFT·Publish·불가능 시간 등록 형식은 유지 |
 | [`API-CATALOG`](../contract/API-CATALOG.md) B1 퇴사·공개 후 변경 API | G03-D-04 (새 API 범위), ML-2 D27-5 해석 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | 새 API는 대상 없음·다른 근무지를 404로 통일 (기존 API 400/404 유지). 대타가 있는 근무도 상태별 처리(OPEN·ACCEPTED → `SHIFT_CHANGED`, APPROVED 이력 보존)를 보장하면 취소·담당자 변경 가능 |
 | [`USER-PATH-REVIEW`](../contract/USER-PATH-REVIEW.md) S3 사용자 경로 검증 (S3-A 결정) | CHG-06·07 (M3), G03-D-10 (연결), G03-D-22 (관리자 대체 화면) | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-10 `PENDING` (`DEFER` 유지) | A: 대타 승인·종료는 역할 먼저 검사 (비관리자 403 조회 전, 범위 밖 관리자 404). B: 알림 읽음 응답 code는 G03-D-10 대기, Lock 전 확인·Frontend 복구는 별도. C: 관리자 끝난 대타 요청 API-SB-02 (종료+만료, 사실 Field, 7일 기본 필터) P0 후보. X-4: 실행한 관리자는 관리자 수신에서만 제외. B2·Frontend·ErrorCode·NotificationType·우선순위·검증 전략 행은 S3-B에서 추가 (아래) |
-| [`API-CATALOG`](../contract/API-CATALOG.md) B2 새 API·기존 API 변경 (CHG-01~07, M3) | **G03-D-04 (연결, `DEFER`)**, ML-H2, ML-4, G03-D-22 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | CHG-06 (나) 대타 승인 권한 검사 순서 P0, CHG-07 (가) ID 직접 지정 API 전체에 M3 선검사, S3-A W안. **M3·W안은 G03-D-04(다른 근무지·User 자원 접근 노출 정책)의 답에 해당한다 → 팀이 함께 승인해야 함** (S3-B 발견, 결정 아님) |
+| [`API-CATALOG`](../contract/API-CATALOG.md) B2 새 API·기존 API 변경 (CHG-01~07, M3) | **G03-D-04 (연결, `DEFER`)**, ML-H2, ML-4, G03-D-22 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-04 `PENDING` | CHG-06 (나) 대타 승인 권한 검사 순서 P0, CHG-07 (가) ID 직접 지정 API 전체에 M3 선검사, S3-A W안. **M3·W안은 G03-D-04(다른 근무지·User 자원 접근 노출 정책)의 답에 해당한다 → 팀이 함께 승인해야 함** (S3-B 발견, 결정 아님). 대타 승인(SUB-04) 부분만 §4-6에서 채택 (2026-10-28, PR #83) |
 | [`FRONTEND-CONTRACT`](../contract/FRONTEND-CONTRACT.md) §9 화면 계약 | G03-D-05, ML-4 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | — | 인계 대상이 확정 전 소속 종료 → 409 STALE, 빠진 근무에 새 담당자 이름 없음, 이전 소속 데이터 폐기 원칙. S3-A: 알림 읽음 실패 복구, 관리자 끝난 요청 탭 |
 | [`ERROR-CODES`](../contract/ERROR-CODES.md) §6 | G03-D-03 | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-03 `PENDING` | 목록 확인 경고는 새 code `WPL-011`·`SFT-021` (공통 `data` 형식), T1-04 `SUB-006`은 code 유지·문구만 중립화 |
 | [`NOTIFICATION-TYPES`](../contract/NOTIFICATION-TYPES.md) §6 | G03-D-22, **G03-D-16 (연결)**, **G03-D-20 (연결)** | 사용자 잠정 결정 (2026-10-25) / ③ `DRAFT` | G03-D-16·20 `PENDING` | 종료 알림 사유별 Type, 받는 사람별 합치기 세 조건, `SHIFT_CHANGED`의 PENDING 후보 제외, 실행 관리자는 관리자 수신에서만 제외 (S3-A X-4). 과거 소속 알림 읽음(B-2)은 G03-D-16과 같은 질문, 관리자 만료 조회(API-SB-02)는 만료 알림(G03-D-20) 없이 대체 화면만 제공 |
@@ -173,3 +173,18 @@ G03-D-23(§4-2) 범위 안에서 V1 Owner가 Issue #62 구현 중 이 대화의 
 | 로그아웃 성공 응답 | 200, "로그아웃되었습니다", `data: null` | AUTH-1 §8 응답 형식 |
 | `jti` 형식 | `UUID.randomUUID()` (AUTH-1 §8 예시) | 64바이트 이상 비밀키 + id 8자리부터 255자 초과는 배포 확인 항목으로 넘김 (EV-032) |
 | 허용 안 된 Origin의 응답 | 기존 CORS 거부(403 `Invalid CORS request`)를 그대로 둠. `AUTH-007`은 Referer 실패·둘 다 없음에서 사용 | 보안 결과 같음, 브라우저는 그 응답을 읽지 못함. 보안 필터 순서 변경 없음 (AUTH-1 "Backend 구현 기록" 절) |
+
+### 4-6. 대타 승인 응답·Lock 순서 (B', 2026-10-28, PR #83 리뷰 승인)
+
+USER-PATH-REVIEW 결정 A(W안)와 ML-5의 승인 Lock 순서를 **대타 승인 API(SUB-04)에 한해** 채택한다.
+
+- 근거: [PR #83](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/83) Head `03a4bcc`의 abcdeghi·dewyflowers Approve (2026-10-28). dewyflowers 리뷰가 "이 PR 승인을 결정 A 수용으로 기록"을 요청했고, V4 Owner가 이 리뷰 승인으로 팀 승인을 갈음한다고 전달했다 (2026-10-28). §4-1의 "PR Approve만으로는 정책 승인으로 읽지 않는다" 규칙의 예외이며 이 절의 범위에만 적용한다.
+- abcdeghi 리뷰는 이 응답이 G03-D-04 미결정 사항과 관련돼 "나중에 충돌하면 합의해서 맞출 수 있다"는 여지를 남겼다. G03-D-04가 다르게 결정되면 이 절을 다시 연다.
+
+| 항목 | 결정 | 근거 |
+|---|---|---|
+| 승인 실패 응답 (결정 A) | 어느 근무지에서도 현재 MANAGER가 아니면 Request 조회 전 403 `WPL-004`. 다른 근무지 요청과 없는 ID는 같은 404 `SUB-001` | API-CATALOG §5-5, USER-PATH-REVIEW §9-0 |
+| 승인 Lock 순서 | Lock 없는 ID 조회 → Shift `FOR UPDATE` → Request `FOR UPDATE` → Lock 뒤 근무 동일성·상태·관리자 재확인 → 수락자 User | ML-5 §5-1 승인 행. ML5-T3이 이전 코드에서 Deadlock으로 실패(ML5-R2 재현), 바꾼 코드에서 통과 (EV-035) |
+| 기존 Test 기대값 | V4-T-26을 둘로 나눔 (403 `WPL-004` / 404 `SUB-001`), V4-T-74는 code 그대로·조회 전 거절 확인 추가 | TEST-INVENTORY §5-4 |
+
+**이 절로 정하지 않은 것:** G03-D-04 전체(다른 API의 범위 밖 응답), 대타 종료(SUB-08)의 W안과 후보 응답·알림 읽음 선검사(CHG-07), 수락자 소속 `FOR SHARE` 재확인(묶음 C), Lock 뒤 근무 동일성 불일치 응답(지금 500, ML-5 §6 기준이면 409 후보로 ErrorCode 추가 필요), 다른 Command의 Lock 순서와 RC/RR·교착/timeout 응답 매핑.

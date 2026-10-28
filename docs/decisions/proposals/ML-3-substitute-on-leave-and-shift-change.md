@@ -7,8 +7,8 @@
 | 결정 단계 | **사용자 잠정 결정** (2026-10-23). 팀 승인 전 |
 | ② 정책 | 카드 `PROPOSED`. `DECISION-LOG` G03-D-11·D-15·D-17·D-18·D-22 모두 `PENDING` |
 | ③ 문서 | `DRAFT` (저장소 Proposal 문서. 2026-10-25 이관, 원본 로컬 `drafts/D4-ML-3/`) |
-| 구현 | 없음. Kotlin Migration PR과 분리된 Improvement |
-| ④ / ⑤ | 신규 Test 전부 `SPECIFIED` / `NOT_RUN` |
+| 구현 | **근무 변경 시 대타 종료 구현 (2026-10-28, `feat/v4-shift-change-close-requests`, PR 전·`develop` 미반영)**. 세부는 끝의 "V4 구현 기록" 절. 퇴사 처리(ML-3-P·P1·A)와 V3 Command 연결은 없음. Kotlin Migration PR과 분리된 Improvement |
+| ④ / ⑤ | V4-N-08·09(V4 함수 부분)·10·11·17·19·20, V4-N-55~59 `IMPLEMENTED` / `LOCAL_PASSED` (EV-034, TEST-INVENTORY "V4 근무 변경 시 대타 종료" 절). 나머지 신규 Test `SPECIFIED` / `NOT_RUN` |
 | 기준 코드 | 3차 `develop` `31ecaee` (PR #5 병합 후. Production은 `c0427c2`와 같고 Substitute Test만 변경). 정적 확인 |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
@@ -165,6 +165,7 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 배포 순서 후보 | ① DB에 새 값 허용 → ② 새 값을 **읽을 수 있는** 앱 배포 (아직 쓰지 않음) → ③ 새 값을 쓰는 기능 활성화 |
 | Rollback 위험 | 새 값이 저장된 뒤 예전 앱으로 되돌리면 Enum 변환 실패로 조회 500 (원문 B+ §5). ② 단계 이후로만 되돌리거나, 되돌릴 때 값을 바꾸는 절차가 필요 |
 | 함께 묶을 변경 | ML-2 Shift 취소 Column, 배정 이력 Table, §4 연결 Column, 알림 Type |
+| 확인 (2026-10-28, 실행) | test Profile(Testcontainers MySQL 9.7.2, `ddl-auto: create`)에서 Hibernate가 `@Enumerated(STRING)`을 **MySQL `ENUM(...)`**으로 만듦: `substitute_request.close_reason` = `enum('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED')`(새 코드에서는 `SHIFT_CHANGED` 포함), `substitute_candidate.status`·`substitute_request.status`·`notification.type`도 ENUM. 예전 값만 있는 ENUM에 `SHIFT_CHANGED` 저장 → `DataIntegrityViolationException / Data truncated` (`sql_mode`에 `STRICT_TRANS_TABLES`). `application-prod.yml`은 `ddl-auto: update`이고 별도 Migration 도구 없음. `update`가 기존 ENUM 허용 값을 바꾸는지는 **실행하지 않음**. → V3 근무 취소·담당자 변경이 종료 함수를 호출하기 전에 운영 DB에 `ALTER TABLE substitute_request MODIFY close_reason ENUM('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED','SHIFT_CHANGED');` 적용 필요 (배포 담당, EV-034). 운영 Column 실제 형식은 여전히 배포 담당 확인 대상 |
 
 ## 10. H6 경합 후보 (기대 결과 수정본, 모두 `SPECIFIED` / `NOT_RUN`)
 
@@ -262,6 +263,23 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | V4-N-08 "종료 알림 1건", V4-N-09 "B에게 알림", V4-N-14 "알림 1건" (§11 Test) | [NOTIFICATION-TYPES](../../contract/NOTIFICATION-TYPES.md) §3-4·§6-3, NT-T10·T13·T14 (= V5-N-10·13·14) | 이 Test들은 **업무 결과**(Request·Candidate·근무 상태)만 V4가 확인한다. 알림 기대값은 받는 사람별 표(§3-4)를 따른다: PENDING 후보 0건, 실행한 관리자 0건, 다른 현재 관리자 각 1건, 요청자·ACCEPTED 후보는 Type 규칙대로. 원문의 "1건"은 고치지 않고 이 연결로 대체한다 (사용자 잠정 결정 2026-10-25, 팀 `PENDING`) |
 | V4-N-20 (`SHIFT_CHANGED` 종료 → `MANAGER_CLOSED` 알림 없음) | [TEST-INVENTORY](../../evidence/TEST-INVENTORY.md) §5-2 | NT-T5 (= V5-N-05)와 실제 중복. ID는 유지하고 V5-N-05로 한 번만 작성 |
 
+## V4 구현 기록 (2026-10-28)
+
+ML-3-Q1(G03-D-15 APPROVED)의 "근무 변경 시 활성 요청 `SHIFT_CHANGED` 종료" 중 V4 부분. V3 공개 근무 취소(API-PS-02)·담당자 변경(API-PS-03) Command가 같은 Transaction 안에서 부르는 함수로 만들었다 (RELEASE-READINESS-PLAN §4 "V4의 요청 종료 규칙은 그 안에서 호출되는 계약", PR 경계 "V4의 작은 선행 PR").
+
+| 항목 | 내용 | 근거 |
+|---|---|---|
+| 함수 | `SubstituteRequestService.closeActiveRequestsByShiftChange(shiftId, now)` → `List<ShiftChangeClosedRequest>` (`requestId`, `requesterMemberId`, `acceptedMemberId`) | V4 Owner 결정 (문서에 형식 없음) |
+| 대상 | 그 근무의 OPEN·ACCEPTED Request 전부를 ID 오름차순 `FOR UPDATE`로 조회 (`SubstituteRequestRepository.findActiveByShiftIdForUpdate`) → `CLOSED / SHIFT_CHANGED`, `closedAt = now`. Candidate는 건드리지 않음. APPROVED·CLOSED는 조회 대상이 아님 | ML-3-Q1·Q1b·H, API-CATALOG §4, ML-5 §5 규칙 1 |
+| 2건 이상 | 모두 종료 | API-CATALOG §4 "모든 OPEN·ACCEPTED". G03-D-15의 처리 방식은 미결정 → **팀 확인 대상** |
+| Transaction | `Propagation.MANDATORY`: 호출한 쪽 Transaction에 합류, 없으면 예외. 따로 Commit하지 않음 | ML-2-A3, ML-3 §6 |
+| Lock 순서 | 호출하는 쪽이 Shift를 먼저 `FOR UPDATE` → 이 함수가 Request → (V3가) 새 담당 User | ML-5 §5-1, API-PS-02·03 |
+| 수락 후보 | Request `status`를 보지 않고 ACCEPTED Candidate를 직접 조회 (Lock 전에 읽힌 Entity의 옛 status를 보지 않기 위해). 진행 중 요청에 ACCEPTED 후보가 있으면 그 요청은 ACCEPTED | ML-5 §4-3 |
+| 알림 | **이 함수는 이벤트를 발행하지 않는다.** 요청자 알림은 V3의 `SHIFT_CANCELLED`·`SHIFT_REASSIGNED_AWAY`에, 새 담당이 된 수락 후보 알림은 `SHIFT_ASSIGNED`에 합쳐야 하고(받는 사람별 판단) 받는 사람은 Lock 이후 상태로 정해야 해서, 판단에 필요한 요청자·수락 후보 소속을 돌려준다. 알림 발행 위치는 V3·V5와 확정 | NOTIFICATION-TYPES §3-2 R1·§3-3·§3-4, G03-D-22 |
+| `closedSubstituteRequests` | 반환 목록의 크기 (이번 Transaction에서 실제로 바뀐 서로 다른 요청 수) | API-PS-02·03 |
+| 운영 DB | `close_reason`이 MySQL ENUM이라 V3 호출 전에 `ALTER` 필요 (§9 확인 행) | §9 |
+| 하지 않은 것 | V3 Command 연결, 알림 Type·발행, 퇴사 처리(P·P1·A), 종료 원인 연결(§4), Frontend `SHIFT_CHANGED` 표시 | — |
+
 ## 16. 변경 이력
 
 | 일자 | 내용 |
@@ -271,3 +289,4 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 2026-10-23 | 교차 검증 반영: P1 구성 규칙을 "원문 B+ 구체화, 사용자 확인 대기"로 표시하고 사유 의미 정의. 기존 거절 종료 판정 변경 필요(L274-284) 추가. 승인 대상 식별 근거와 V4-N-21. §4를 최소 계약 / 상세 표시 후보로 분리. §7에 퇴사 범위·Lock 구체 항목. V4-N-18 조건부, V4-N-22 추가 |
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
 | 2026-10-25 | S2-5B: "S1 결정 연결"에 V4-N-08·09·14 알림 기대값 연결, V4-N-20 통합 표시 (본문 수정 없음) |
+| 2026-10-28 | 근무 변경 시 대타 종료 구현: 머리 표 구현·④/⑤, §9 확인 행 (MySQL ENUM, 예전 ENUM 저장 실패 재현, `ALTER` 필요), 끝에 "V4 구현 기록" 절 (EV-034) |
