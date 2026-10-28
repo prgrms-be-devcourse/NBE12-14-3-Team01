@@ -30,6 +30,46 @@ type Shift = {
   day: DayKey;
   startTime: string;
   endTime: string;
+  status: "SCHEDULED" | "CANCELLED";
+};
+
+type UnavailableOverlap = {
+  startAt: string;
+  endAt: string;
+};
+
+type UnavailableConflict = {
+  shiftId: number;
+  shiftStartAt: string;
+  shiftEndAt: string;
+  targetMemberId: number;
+  targetName: string;
+  overlaps: UnavailableOverlap[];
+};
+
+type NewShiftKey = {
+  scheduleId: number;
+  targetMemberId: number;
+  shiftStartAt: string;
+  shiftEndAt: string;
+};
+
+type NewShiftUnavailableConflict = {
+  newShiftKey: NewShiftKey;
+  targetName: string;
+  overlaps: UnavailableOverlap[];
+};
+
+type PublishedReassignResponse = {
+  shift: {
+    shiftId: number;
+    memberId: number;
+    memberName: string;
+    startAt: string;
+    endAt: string;
+    status: "SCHEDULED";
+  };
+  closedSubstituteRequests: number;
 };
 
 type ScheduleShiftResponse = {
@@ -173,6 +213,7 @@ function convertScheduleShiftToShift(
     day: dayMap[dayOfWeek],
     startTime: shift.startAt.slice(11, 16),
     endTime: shift.endAt.slice(11, 16),
+    status: shift.status,
   };
 }
 
@@ -278,6 +319,10 @@ function getShiftStyle(shift: PositionedShift) {
 
 // 에러 코드 상수 정의
 const UNAVAILABLE_TIME_CONFLICT_CODE = "SFT-015";
+const PUBLISHED_UNAVAILABLE_CONFIRMATION_CODE = "SFT-021";
+const PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED_CODE = "SFT-020";
+const SHIFT_OVERLAP_CODES = ["SFT-009", "SFT-010"];
+const SAME_SHIFT_MEMBER_REASSIGNMENT_CODE = "SFT-022";
 
 // API 요청 함수 정의
 async function getManagerSchedule(
@@ -384,6 +429,72 @@ async function deleteShift(
   );
 }
 
+async function cancelPublishedShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number
+) {
+  return await apiFetch<{
+    shift: { shiftId: number; status: "CANCELLED" };
+    closedSubstituteRequests: number;
+  }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}/cancel`,
+      { method: "POST" }
+  );
+}
+
+async function reassignPublishedShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number,
+    targetMemberId: number,
+    acknowledgedUnavailableConflicts: Array<{
+      shiftId: number;
+      targetMemberId: number;
+      overlaps: UnavailableOverlap[];
+    }>
+) {
+  return await apiFetch<PublishedReassignResponse>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}/reassign`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          targetMemberId,
+          acknowledgedUnavailableConflicts,
+        }),
+      }
+  );
+}
+
+async function createPublishedShift(
+    workplaceId: string,
+    scheduleId: number,
+    payload: {
+      memberId: number;
+      startAt: string;
+      endAt: string;
+      acknowledgedUnavailableConflicts: Array<{
+        newShiftKey: NewShiftKey;
+        overlaps: UnavailableOverlap[];
+      }>;
+    }
+) {
+  return await apiFetch<{
+    shiftId: number;
+    memberId: number;
+    memberName: string;
+    startAt: string;
+    endAt: string;
+    status: "SCHEDULED";
+  }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/published-shifts`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+  );
+}
+
 export default function SchedulePage() {
   const params = useParams<{ workplaceId: string }>();
   const workplaceId = params.workplaceId;
@@ -398,6 +509,18 @@ export default function SchedulePage() {
 
   const [scheduleId, setScheduleId] = useState<number | null>(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
+  const [showPublishedCreateShiftModal, setShowPublishedCreateShiftModal] = useState(false);
+  const [showPublishedShiftModal, setShowPublishedShiftModal] = useState(false);
+  const [selectedPublishedShift, setSelectedPublishedShift] = useState<Shift | null>(null);
+  const [selectedReassignMemberId, setSelectedReassignMemberId] = useState<number | null>(null);
+  const [publishedShiftError, setPublishedShiftError] = useState("");
+  const [unavailableConflicts, setUnavailableConflicts] = useState<UnavailableConflict[]>([]);
+  const [publishedCreateMemberId, setPublishedCreateMemberId] = useState<number | null>(null);
+  const [publishedCreateDay, setPublishedCreateDay] = useState<DayKey>("mon");
+  const [publishedCreateStartTime, setPublishedCreateStartTime] = useState("09:00");
+  const [publishedCreateEndTime, setPublishedCreateEndTime] = useState("18:00");
+  const [publishedCreateError, setPublishedCreateError] = useState("");
+  const [publishedCreateConflicts, setPublishedCreateConflicts] = useState<NewShiftUnavailableConflict[]>([]);
   const [members, setMembers] = useState<ScheduleMember[]>([]);
   const [memberLoadStatus, setMemberLoadStatus] = useState<MemberLoadStatus>("loading");
   const [loadedMembersWorkplaceId, setLoadedMembersWorkplaceId] = useState<string | null>(null);
@@ -790,6 +913,7 @@ export default function SchedulePage() {
         day: selectedDay,
         startTime,
         endTime,
+        status: "SCHEDULED",
       };
 
       setShifts((prev) => [...prev, newShift]);
@@ -967,6 +1091,264 @@ export default function SchedulePage() {
       setIsSubmitting(false);
     }
   };
+
+  const openPublishedCreateShiftModal = () => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      !areCurrentMembersReady ||
+      members.length === 0 ||
+      status !== "PUBLISHED"
+    ) {
+      return;
+    }
+
+    setPublishedCreateMemberId(members[0].id);
+    setPublishedCreateDay("mon");
+    setPublishedCreateStartTime("09:00");
+    setPublishedCreateEndTime("18:00");
+    setPublishedCreateError("");
+    setPublishedCreateConflicts([]);
+    setShowPublishedCreateShiftModal(true);
+  };
+
+  const closePublishedCreateShiftModal = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setShowPublishedCreateShiftModal(false);
+    setPublishedCreateError("");
+    setPublishedCreateConflicts([]);
+  };
+
+  const resetPublishedCreateConfirmation = () => {
+    setPublishedCreateConflicts([]);
+    setPublishedCreateError("");
+  };
+
+  const submitPublishedCreateShift = async (acknowledgeConflicts: boolean) => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "PUBLISHED" ||
+      scheduleId === null ||
+      publishedCreateMemberId === null
+    ) {
+      return;
+    }
+
+    if (publishedCreateStartTime >= publishedCreateEndTime) {
+      setPublishedCreateError("종료 시간은 시작 시간보다 늦어야 합니다.");
+      return;
+    }
+
+    const day = days.find((item) => item.key === publishedCreateDay);
+    if (!day) {
+      setPublishedCreateError("날짜 정보를 확인해주세요.");
+      return;
+    }
+
+    const startAt = `${day.date}T${publishedCreateStartTime}:00`;
+    const endAt = `${day.date}T${publishedCreateEndTime}:00`;
+    const acknowledgedUnavailableConflicts = acknowledgeConflicts
+      ? publishedCreateConflicts.map((conflict) => ({
+          newShiftKey: conflict.newShiftKey,
+          overlaps: conflict.overlaps,
+        }))
+      : [];
+
+    setIsSubmitting(true);
+    setPublishedCreateError("");
+
+    try {
+      await createPublishedShift(workplaceId, scheduleId, {
+        memberId: publishedCreateMemberId,
+        startAt,
+        endAt,
+        acknowledgedUnavailableConflicts,
+      });
+      setShowPublishedCreateShiftModal(false);
+      setPublishedCreateConflicts([]);
+      setScheduleReloadKey((prev) => prev + 1);
+    } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.code === PUBLISHED_UNAVAILABLE_CONFIRMATION_CODE &&
+        !acknowledgeConflicts &&
+        typeof err.data === "object" &&
+        err.data !== null &&
+        "requiresConfirmation" in err.data &&
+        err.data.requiresConfirmation === true &&
+        "unavailableConflicts" in err.data &&
+        Array.isArray(err.data.unavailableConflicts)
+      ) {
+        setPublishedCreateConflicts(
+          err.data.unavailableConflicts as NewShiftUnavailableConflict[]
+        );
+        setPublishedCreateError(
+          "선택한 직원의 근무 불가능 시간과 겹칩니다. 아래 구간을 확인해주세요."
+        );
+      } else if (err instanceof ApiError) {
+        setPublishedCreateError(err.message);
+      } else {
+        setPublishedCreateError("공개 근무 추가 중 오류가 발생했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openPublishedShiftModal = (shift: Shift) => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "PUBLISHED" ||
+      shift.status !== "SCHEDULED"
+    ) {
+      return;
+    }
+
+    setSelectedPublishedShift(shift);
+    setSelectedReassignMemberId(
+      members.find((member) => member.id !== shift.memberId)?.id ?? null
+    );
+    setPublishedShiftError("");
+    setUnavailableConflicts([]);
+    setShowPublishedShiftModal(true);
+  };
+
+  const closePublishedShiftModal = () => {
+    setShowPublishedShiftModal(false);
+    setSelectedPublishedShift(null);
+    setSelectedReassignMemberId(null);
+    setPublishedShiftError("");
+    setUnavailableConflicts([]);
+  };
+
+  const refreshScheduleAfterPublishedChange = () => {
+    setScheduleReloadKey((prev) => prev + 1);
+  };
+
+  const handlePublishedShiftError = (err: unknown) => {
+    if (!(err instanceof ApiError)) {
+      setPublishedShiftError("요청 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+      return;
+    }
+
+    if (err.code === PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED_CODE) {
+      setPublishedShiftError("이미 시작했거나 취소된 근무는 변경할 수 없습니다. 최신 근무표를 다시 불러옵니다.");
+      refreshScheduleAfterPublishedChange();
+      return;
+    }
+
+    if (
+      SHIFT_OVERLAP_CODES.includes(err.code) ||
+      err.code === SAME_SHIFT_MEMBER_REASSIGNMENT_CODE
+    ) {
+      setPublishedShiftError(err.message);
+      return;
+    }
+
+    setPublishedShiftError(err.message);
+  };
+
+  const handleCancelPublishedShift = async () => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "PUBLISHED" ||
+      scheduleId === null ||
+      selectedPublishedShift === null
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${selectedPublishedShift.memberName}님의 근무를 취소하시겠습니까?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setPublishedShiftError("");
+
+    try {
+      await cancelPublishedShift(workplaceId, scheduleId, selectedPublishedShift.id);
+      closePublishedShiftModal();
+      refreshScheduleAfterPublishedChange();
+    } catch (err) {
+      handlePublishedShiftError(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitPublishedReassignment = async (acknowledgeConflicts: boolean) => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "PUBLISHED" ||
+      scheduleId === null ||
+      selectedPublishedShift === null ||
+      selectedReassignMemberId === null
+    ) {
+      return;
+    }
+
+    const acknowledgedUnavailableConflicts = acknowledgeConflicts
+      ? unavailableConflicts.map((conflict) => ({
+          shiftId: conflict.shiftId,
+          targetMemberId: conflict.targetMemberId,
+          overlaps: conflict.overlaps,
+        }))
+      : [];
+
+    setIsSubmitting(true);
+    setPublishedShiftError("");
+
+    try {
+      await reassignPublishedShift(
+        workplaceId,
+        scheduleId,
+        selectedPublishedShift.id,
+        selectedReassignMemberId,
+        acknowledgedUnavailableConflicts
+      );
+      closePublishedShiftModal();
+      refreshScheduleAfterPublishedChange();
+    } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.code === PUBLISHED_UNAVAILABLE_CONFIRMATION_CODE &&
+        !acknowledgeConflicts &&
+        typeof err.data === "object" &&
+        err.data !== null &&
+        "requiresConfirmation" in err.data &&
+        err.data.requiresConfirmation === true &&
+        "unavailableConflicts" in err.data &&
+        Array.isArray(err.data.unavailableConflicts)
+      ) {
+        setUnavailableConflicts(err.data.unavailableConflicts as UnavailableConflict[]);
+        setPublishedShiftError("선택한 직원의 근무 불가능 시간과 겹칩니다. 아래 구간을 확인해주세요.");
+      } else {
+        handlePublishedShiftError(err);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReassignPublishedShift = async () => {
+    if (selectedReassignMemberId === null) {
+      setPublishedShiftError("재배정할 직원을 선택해주세요.");
+      return;
+    }
+
+    await submitPublishedReassignment(false);
+  };
   return (
       <>
         <PageHeader
@@ -1009,6 +1391,21 @@ export default function SchedulePage() {
                   공개하기
                 </button>
               </div>
+          )}
+
+          {isCurrentScheduleReady && status === "PUBLISHED" && (
+              <button
+                  type="button"
+                  onClick={openPublishedCreateShiftModal}
+                  disabled={
+                    !areCurrentMembersReady ||
+                    members.length === 0 ||
+                    isSubmitting
+                  }
+                  className="rounded-xl border border-[#dce8e2] bg-white px-4 py-2.5 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + 근무 추가
+              </button>
           )}
 
         </PageHeader>
@@ -1221,15 +1618,26 @@ export default function SchedulePage() {
                                   <button
                                       key={shift.id}
                                       type="button"
-                                      onClick={() => openEditShiftModal(shift)}
+                                      onClick={() => {
+                                        if (status === "DRAFT") {
+                                          openEditShiftModal(shift);
+                                          return;
+                                        }
+
+                                        openPublishedShiftModal(shift);
+                                      }}
                                       disabled={
                                         isSubmitting ||
                                         !isCurrentScheduleReady ||
-                                        !areCurrentMembersReady ||
-                                        status !== "DRAFT"
+                                        shift.status === "CANCELLED" ||
+                                        (status === "DRAFT" && !areCurrentMembersReady)
                                       }
                                       style={getShiftStyle(shift)}
-                                      className="absolute z-10 overflow-hidden rounded-lg border border-[#bde5d3] bg-[#dff7ec] px-2 py-2 text-left text-[#005642] shadow-sm transition hover:bg-[#cceedd] disabled:cursor-default disabled:hover:bg-[#dff7ec]"
+                                      className={`absolute z-10 overflow-hidden rounded-lg px-2 py-2 text-left shadow-sm transition disabled:cursor-default ${
+                                        shift.status === "CANCELLED"
+                                          ? "border border-[#e6caca] bg-[#fffafa] text-[#a85b5b]"
+                                          : "border border-[#bde5d3] bg-[#dff7ec] text-[#005642] hover:bg-[#cceedd] disabled:hover:bg-[#dff7ec]"
+                                      }`}
                                   >
                                     <p className="truncate text-sm font-black">
                                       {shift.memberName}
@@ -1242,6 +1650,18 @@ export default function SchedulePage() {
                                     {status === "DRAFT" && (
                                         <p className="mt-2 text-[10px] text-[#5d8f7b]">
                                           클릭하여 수정
+                                        </p>
+                                    )}
+
+                                    {status === "PUBLISHED" && shift.status === "SCHEDULED" && (
+                                        <p className="mt-2 text-[10px] text-[#5d8f7b]">
+                                          클릭하여 관리
+                                        </p>
+                                    )}
+
+                                    {shift.status === "CANCELLED" && (
+                                        <p className="mt-2 text-[10px] text-[#a85b5b]">
+                                          취소됨
                                         </p>
                                     )}
                                   </button>
@@ -1274,7 +1694,7 @@ export default function SchedulePage() {
 
                   {status === "PUBLISHED" && (
                       <p className="text-xs font-semibold text-[#14956c]">
-                        공개 완료된 근무표입니다.
+                        근무 카드를 클릭하면 취소하거나 담당자를 변경할 수 있어요.
                       </p>
                   )}
                 </div>
@@ -1410,6 +1830,295 @@ export default function SchedulePage() {
                     {isSubmitting ? "처리 중..." : editingShiftId !== null
                             ? "수정 완료" : "근무 추가"}
                   </button>
+                </div>
+              </div>
+            </div>
+        )}
+
+        {showPublishedCreateShiftModal &&
+          isCurrentScheduleReady &&
+          status === "PUBLISHED" && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-xl font-black">공개 근무 추가</h2>
+                    <p className="mt-1 text-sm text-[#78847f]">
+                      직원에게 즉시 공개되는 근무를 추가합니다.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closePublishedCreateShiftModal}
+                    disabled={isSubmitting}
+                    className="text-xl text-[#78847f] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="공개 근무 추가 창 닫기"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">직원</label>
+                    <select
+                      value={publishedCreateMemberId ?? ""}
+                      onChange={(event) => {
+                        setPublishedCreateMemberId(Number(event.target.value));
+                        resetPublishedCreateConfirmation();
+                      }}
+                      disabled={isSubmitting || publishedCreateConflicts.length > 0}
+                      className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c] disabled:cursor-not-allowed disabled:bg-[#fafcfb]"
+                    >
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">날짜</label>
+                    <select
+                      value={publishedCreateDay}
+                      onChange={(event) => {
+                        setPublishedCreateDay(event.target.value as DayKey);
+                        resetPublishedCreateConfirmation();
+                      }}
+                      disabled={isSubmitting || publishedCreateConflicts.length > 0}
+                      className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c] disabled:cursor-not-allowed disabled:bg-[#fafcfb]"
+                    >
+                      {days.map((day) => (
+                        <option key={day.key} value={day.key}>
+                          {day.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">근무 시간</label>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                      <input
+                        type="time"
+                        value={publishedCreateStartTime}
+                        onChange={(event) => {
+                          setPublishedCreateStartTime(event.target.value);
+                          resetPublishedCreateConfirmation();
+                        }}
+                        disabled={isSubmitting || publishedCreateConflicts.length > 0}
+                        className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c] disabled:cursor-not-allowed disabled:bg-[#fafcfb]"
+                      />
+
+                      <span className="text-[#78847f]">~</span>
+
+                      <input
+                        type="time"
+                        value={publishedCreateEndTime}
+                        onChange={(event) => {
+                          setPublishedCreateEndTime(event.target.value);
+                          resetPublishedCreateConfirmation();
+                        }}
+                        disabled={isSubmitting || publishedCreateConflicts.length > 0}
+                        className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c] disabled:cursor-not-allowed disabled:bg-[#fafcfb]"
+                      />
+                    </div>
+                  </div>
+
+                  {publishedCreateConflicts.length > 0 && (
+                    <div className="rounded-xl border border-[#f0cf8b] bg-[#fff9eb] p-4">
+                      <p className="text-sm font-bold text-[#8a5c00]">근무 불가능 시간 충돌</p>
+                      <ul className="mt-2 space-y-1 text-xs leading-5 text-[#78633a]">
+                        {publishedCreateConflicts.flatMap((conflict) =>
+                          conflict.overlaps.map((overlap) => (
+                            <li key={`${conflict.newShiftKey.scheduleId}-${overlap.startAt}-${overlap.endAt}`}>
+                              {conflict.targetName}: {overlap.startAt.replace("T", " ")} ~ {overlap.endAt.replace("T", " ")}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {publishedCreateError && (
+                    <p className="text-sm font-semibold text-[#d95555]">
+                      {publishedCreateError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closePublishedCreateShiftModal}
+                    disabled={isSubmitting}
+                    className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+
+                  {publishedCreateConflicts.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void submitPublishedCreateShift(true)}
+                      disabled={isSubmitting}
+                      className="flex-1 rounded-xl bg-[#8a5c00] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#704a00] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      충돌을 확인하고 추가
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void submitPublishedCreateShift(false)}
+                      disabled={isSubmitting}
+                      className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSubmitting ? "처리 중..." : "공개 근무 추가"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+        )}
+
+        {showPublishedShiftModal &&
+          isCurrentScheduleReady &&
+          status === "PUBLISHED" &&
+          selectedPublishedShift !== null && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-black">공개 근무 관리</h2>
+                    <p className="mt-1 text-sm text-[#78847f]">
+                      {selectedPublishedShift.memberName} · {selectedPublishedShift.startTime} ~ {selectedPublishedShift.endTime}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closePublishedShiftModal}
+                    disabled={isSubmitting}
+                    className="text-xl text-[#78847f] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="공개 근무 관리 창 닫기"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-5">
+                  <div className="rounded-xl border border-[#dce8e2] bg-[#fafdfb] p-4">
+                    <p className="text-sm font-bold">근무 취소</p>
+                    <p className="mt-1 text-xs leading-5 text-[#78847f]">
+                      시작 전인 공개 근무만 취소할 수 있습니다. 취소 전 다시 확인합니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelPublishedShift}
+                      disabled={isSubmitting}
+                      className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      근무 취소
+                    </button>
+                  </div>
+
+                  <div className="border-t border-[#edf2ef] pt-5">
+                    <p className="text-sm font-bold">담당자 재배정</p>
+                    <p className="mt-1 text-xs leading-5 text-[#78847f]">
+                      현재 이 근무지에 소속된 구성원만 선택할 수 있습니다.
+                    </p>
+
+                    {memberLoadStatus === "loading" && (
+                      <p className="mt-3 text-sm text-[#78847f]">구성원 목록을 불러오는 중입니다...</p>
+                    )}
+
+                    {memberLoadStatus === "error" && (
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-[#d95555]">구성원 목록을 불러오지 못했습니다.</p>
+                        <button
+                          type="button"
+                          onClick={handleRetryMembers}
+                          disabled={isSubmitting}
+                          className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-bold text-[#005642] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          다시 시도
+                        </button>
+                      </div>
+                    )}
+
+                    {areCurrentMembersReady && (
+                      <>
+                        <select
+                          value={selectedReassignMemberId ?? ""}
+                          onChange={(event) => {
+                            setSelectedReassignMemberId(Number(event.target.value));
+                            setUnavailableConflicts([]);
+                            setPublishedShiftError("");
+                          }}
+                          disabled={isSubmitting || members.every((member) => member.id === selectedPublishedShift.memberId)}
+                          className="mt-3 w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c] disabled:cursor-not-allowed disabled:bg-[#fafcfb]"
+                        >
+                          {members
+                            .filter((member) => member.id !== selectedPublishedShift.memberId)
+                            .map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.name}
+                              </option>
+                            ))}
+                        </select>
+
+                        {members.every((member) => member.id === selectedPublishedShift.memberId) && (
+                          <p className="mt-2 text-sm text-[#78847f]">
+                            재배정할 다른 현재 소속 구성원이 없습니다.
+                          </p>
+                        )}
+
+                        {unavailableConflicts.length > 0 && (
+                          <div className="mt-3 rounded-xl border border-[#f0cf8b] bg-[#fff9eb] p-4">
+                            <p className="text-sm font-bold text-[#8a5c00]">근무 불가능 시간 충돌</p>
+                            <ul className="mt-2 space-y-1 text-xs leading-5 text-[#78633a]">
+                              {unavailableConflicts.flatMap((conflict) =>
+                                conflict.overlaps.map((overlap) => (
+                                  <li key={`${conflict.shiftId}-${overlap.startAt}-${overlap.endAt}`}>
+                                    {conflict.targetName}: {overlap.startAt.replace("T", " ")} ~ {overlap.endAt.replace("T", " ")}
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                            <button
+                              type="button"
+                              onClick={() => void submitPublishedReassignment(true)}
+                              disabled={isSubmitting}
+                              className="mt-3 rounded-lg bg-[#8a5c00] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#704a00] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              충돌을 확인하고 재배정
+                            </button>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => void handleReassignPublishedShift()}
+                          disabled={
+                            isSubmitting ||
+                            selectedReassignMemberId === null ||
+                            unavailableConflicts.length > 0
+                          }
+                          className="mt-3 rounded-lg bg-[#005642] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          담당자 재배정
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {publishedShiftError && (
+                    <p className="text-sm font-semibold text-[#d95555]">
+                      {publishedShiftError}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
