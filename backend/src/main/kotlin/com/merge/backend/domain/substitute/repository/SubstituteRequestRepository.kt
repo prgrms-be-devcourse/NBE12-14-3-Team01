@@ -57,6 +57,36 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
     )
     fun findActiveByShiftIdForUpdate(@Param("shiftId") shiftId: Long): List<SubstituteRequest>
 
+    // 이 소속이 대기·수락 후보로 걸린 진행 중 요청 (근무 시작 전)을 잠금
+    // 여러 건이면 ID 순서로 잠가서 다른 Transaction과 순서가 엇갈리지 않게 함
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT r
+        FROM SubstituteRequest r
+        WHERE r.status IN (com.merge.backend.domain.substitute.entity.RequestStatus.OPEN,
+                           com.merge.backend.domain.substitute.entity.RequestStatus.ACCEPTED)
+          AND r.shift.startAt > :now
+          AND EXISTS (
+                SELECT c.id
+                FROM SubstituteCandidate c
+                WHERE c.request = r
+                  AND c.member.id = :memberId
+                  AND c.status IN (com.merge.backend.domain.substitute.entity.CandidateStatus.PENDING,
+                                   com.merge.backend.domain.substitute.entity.CandidateStatus.ACCEPTED)
+          )
+        ORDER BY r.id ASC
+        """,
+    )
+    fun findActiveByCandidateMemberIdForUpdate(
+        @Param("memberId") memberId: Long,
+        @Param("now") now: LocalDateTime,
+    ): List<SubstituteRequest>
+
+    // Lock 뒤 상태를 DB 값으로 확인 (Lock 전에 읽힌 Entity는 옛 값일 수 있음)
+    @Query("SELECT r.status FROM SubstituteRequest r WHERE r.id = :requestId")
+    fun findStatusById(@Param("requestId") requestId: Long): RequestStatus?
+
     // 해당 근무지의 모든 대체근무 요청 조회
     // 근무 시간 순으로 정렬하되, 시간이 같으면 id 기준으로 정렬
     @Query(

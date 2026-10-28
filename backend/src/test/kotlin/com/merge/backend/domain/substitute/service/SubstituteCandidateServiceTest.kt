@@ -508,8 +508,8 @@ class SubstituteCandidateServiceTest {
             // given
             givenRespondableCandidate()
             given(
-                substituteCandidateRepository.existsByRequest_IdAndStatusAndIdNot(
-                    REQUEST_ID, CandidateStatus.PENDING, CANDIDATE_ID,
+                substituteCandidateRepository.existsRespondableCandidateExcept(
+                    REQUEST_ID, CANDIDATE_MEMBER_ID,
                 )
             ).willReturn(true)
 
@@ -534,8 +534,8 @@ class SubstituteCandidateServiceTest {
             // given
             givenRespondableCandidate()
             given(
-                substituteCandidateRepository.existsByRequest_IdAndStatusAndIdNot(
-                    REQUEST_ID, CandidateStatus.PENDING, CANDIDATE_ID,
+                substituteCandidateRepository.existsRespondableCandidateExcept(
+                    REQUEST_ID, CANDIDATE_MEMBER_ID,
                 )
             ).willReturn(false)
 
@@ -633,7 +633,7 @@ class SubstituteCandidateServiceTest {
 
             // 실패했다면 "남은 후보 확인 → Request 종료" 단계까지 가면 안 된다
             verify(substituteCandidateRepository, never())
-                .existsByRequest_IdAndStatusAndIdNot(anyOrNull(), anyOrNull(), anyOrNull())
+                .existsRespondableCandidateExcept(anyOrNull(), anyOrNull())
         }
     }
 
