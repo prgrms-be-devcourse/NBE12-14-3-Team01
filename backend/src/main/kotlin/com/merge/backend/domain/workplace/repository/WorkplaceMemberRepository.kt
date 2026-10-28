@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
+    @EntityGraph(attributePaths = ["user"])
+    fun findByIdAndWorkplace_Id(memberId: Long, workplaceId: Long): Optional<WorkplaceMember>
+
     @Query(
         """
         SELECT COUNT(m) > 0
