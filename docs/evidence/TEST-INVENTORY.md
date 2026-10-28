@@ -267,7 +267,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | D21-T9 = D05-T6 | **V2-N-43** | V2 | PROPOSED_IMPROVEMENT | §5-2 실제 중복 (D05-T6의 "DB 변경 0"까지 확인) |
 | D21-R1~R5 | 보류 (H6) | ML-5 | H6 | `BLOCKED` |
 | D22-T1 | **V5-N-17** | V5 | MIGRATION | 알림 저장 실패가 업무에 영향 없음 (현재 동작 고정) |
-| D22-T2·T3·T4·T4b·T5·T6·T7·T8·T9·T10·T11·T12 | **V4-N-27·28·29·30·31·32·33·34·35·36·37·38** (순서대로) | V4 | PROPOSED_IMPROVEMENT | 종료된 대타 조회. D22-T4b는 독립 번호 V4-N-30. **2026-10-28 API-SB-01 구현: V4-N-27~35·38 + 새 V4-N-60 작성·`LOCAL_PASSED` (EV-037, 아래 "V4 종료된 대타 조회" 절). V4-N-36·37(SUB-07·05 현재 소속)은 묶음 D** |
+| D22-T2·T3·T4·T4b·T5·T6·T7·T8·T9·T10·T11·T12 | **V4-N-27·28·29·30·31·32·33·34·35·36·37·38** (순서대로) | V4 | PROPOSED_IMPROVEMENT | 종료된 대타 조회. D22-T4b는 독립 번호 V4-N-30. **2026-10-28 API-SB-01 구현: V4-N-27~35·38 + 새 V4-N-60 작성·`LOCAL_PASSED` (EV-037, 아래 "V4 종료된 대타 조회" 절). V4-N-36·37(SUB-07·05 현재 소속)은 묶음 D**. **2026-10-29 V4-N-36·37 (CHG-03·02) `SubstituteCurrentMembershipListTest` `LOCAL_PASSED` (EV-042, 아래 "V4 보낸·수락한 요청 현재 소속" 절)** |
 | D03-T1 | 참조: V4-N-01 (V4) + 각 Domain의 Migration Controller Slice | 각 Domain | MIGRATION | Domain마다 V4-N-01 방식으로 작성 |
 | D03-T2 | **V4-N-40** | V4 | PROPOSED_IMPROVEMENT | 기존 V4-T-25·V4-T-81 기대값 변경 (§5-4) |
 | D03-T3 | **V4-N-41** | V4 | PROPOSED_IMPROVEMENT | 기존 V4-T-64·65·72 기대값 변경 (§5-4) |
@@ -449,6 +449,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | PR #79 Global Test Kotlin 전환: §7 CM-N-01~06 ⑤를 Java·Kotlin으로 나누고 Kotlin `LOCAL_PASSED` 근거(전환 Commit 488/488, develop `0aec24f` 통합 515/515)를 적음. 이전 "Kotlin 이후 `NOT_RUN`" 표기 대체. §6-1 V5-N-21~30도 같은 통합 실행 근거로 갱신. PR #79 병합 시 `src/test/java` 0개 |
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 | 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
+| 2026-10-29 | CHG-02·03 SUB-05·07 현재 소속: D22 행에 구현 표시, 끝에 "V4 보낸·수락한 요청 현재 소속" 절 신설 (V4-N-36·37, EV-042) |
 | 2026-10-29 | 퇴사자 후보 처리: 끝에 "V4 퇴사자 후보 처리" 절 신설 (V4-N-13~16·22, H6-C5·C6, 새 V4-N-65~71), V4-N-06 행·§5-1 H6 행에 연결 (EV-038) |
 | 2026-10-29 | PR #92 리뷰 반영: "V4 퇴사자 후보 처리" 절에 V4-N-72~74 추가 (거절 경로 응답 가능 판정), ⑤ 상태 갱신 (EV-038) |
 | 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
@@ -558,7 +559,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 **⑤ 상태의 뜻:**
 - `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `55b1ac3` 위 전체 553/553 (EV-037). V4-N-21은 develop `19066d3` 위 전체 681 → 682/682 (EV-040). CI는 PR 생성 후 기록
 - 회귀 (기대값 변경 0): 기존 Test 542개 목록 그대로 통과
-- 범위 밖: V4-N-36·37 (D22-T10·T11, SUB-07·SUB-05 현재 소속 = CHG-02·03, 묶음 D. SUB-07 조건은 PR #82가 추가). Frontend "수락한 요청 — 종료" 화면
+- 범위 밖: V4-N-36·37 (D22-T10·T11, SUB-07·SUB-05 현재 소속 = CHG-02·03, 묶음 D. SUB-07 조건은 PR #82가 추가) → 2026-10-29 "V4 보낸·수락한 요청 현재 소속" 절에서 작성. Frontend "수락한 요청 — 종료" 화면
 
 ## V4 퇴사자 후보 처리 (V4-N-13~16·22, H6-C5·C6, V4-N-65~74, 2026-10-29)
 
@@ -634,3 +635,18 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 - V4-N-01 실패 code 목록은 지금 대타 Service(와 호출하는 공통 검사)가 던지는 code를 정적으로 모은 것이다. Service는 Mock이고 `GlobalExceptionHandler`는 Endpoint와 상관없이 같은 응답을 만들므로 code마다 1번만 확인한다 (Endpoint 칸은 그 code를 처음 던지는 곳일 뿐 그 Endpoint의 전체 실패 목록이 아니다). message는 Enum `getMessage()`로 비교한다 (문구가 바뀌어도 깨지지 않게, §5-4 "message 확인 Test 없음" 유지)
 - TODO 20 (V4-N-40~43)과의 관계: V4-N-01은 "code → HTTP 응답"만 고정하므로 TODO 20의 기대값 변경은 0이다. 새 code만 목록에 추가하고, 대타에서 더 이상 던지지 않는 code(`SFT-006`·`SFT-005` 등)는 목록에서 뺀다. Mock 방식이라 목록이 낡아도 Test가 실패하지 않으므로 TODO 20 PR에서 함께 갱신한다
 - 범위 밖: 인증 Filter(401, V1), ACCEPTED 여러 명일 때의 이력 조회 오류 (ML-3 §3, 팀 결정 대상)
+
+## V4 보낸·수락한 요청 현재 소속 (CHG-02·03, V4-N-36·37, 2026-10-29)
+
+[G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) §9의 D22-T10·T11, [API-CATALOG](../contract/API-CATALOG.md) CHG-02·03. Class: `SubstituteCurrentMembershipListTest` (MySQL Testcontainers, test Profile)
+
+| Test ID | Method | 확인하는 것 | ⑤ 실행 |
+|---|---|---|---|
+| V4-N-36 (D22-T10) | `acceptedListShowsOnlyCurrentMembershipCandidates` | 한 직원이 W1·W2에서 수락 → W1 소속만 종료(`leftAt` 직접 기록) → SUB-07에 W2 1건만, W1 Request·Candidate Row 그대로(ACCEPTED). 조건은 PR #82 `e643c30`이 이미 넣음 → Test만 추가 | `LOCAL_PASSED` (D22-T10 중 현재 소속 조건(방어)만. 퇴사 시 요청 종료는 #92 V4-N-12~16·22) |
+| V4-N-37 (D22-T11) | `sentListShowsOnlyCurrentMembershipRequests` | 요청 → 소속 종료 → SUB-05 0건 → 같은 근무지 재가입 → 새 소속 요청 1건만, 이전 Request Row는 이전 소속을 가리킨 채 그대로. 관련: V2-N-54 (V2 소유 재가입 통합 시나리오) | `LOCAL_PASSED` |
+
+**⑤ 상태의 뜻:**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `19066d3` 위 전체 681 → 683/683 (EV-042). CI는 PR 생성 후 기록
+- 회귀 (기대값 변경 0): 기존 Test 681개 목록 그대로 통과. V4-T-47·48 (`SubstituteRequestServiceTest` `$SentRequestsTest`)의 Mock 대상 메서드 이름과 `SubstituteRequestConcurrencyTest`의 활성 요청 세기 헬퍼 호출 이름만 바뀜 (Assertion 변경 0이라 §5-4 표에 넣지 않음)
+- 같은 근무지 재가입 × SUB-07은 PR #82 `MembershipRejoinCompatibilityIntegrationTest.acceptedSubstituteFromEndedMembershipIsExcludedAfterRejoin`이 이미 확인 (참조)
+- 결함 넣기: SUB-05 조회에서 현재 소속 조건 제거 → V4-N-37 FAIL. 첫 작성(develop `cade449`)에서 SUB-07 `c.member.leftAt IS NULL` 삭제 → V4-N-36·PR #82 Test FAIL
