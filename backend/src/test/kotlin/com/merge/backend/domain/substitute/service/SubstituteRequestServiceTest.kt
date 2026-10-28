@@ -20,6 +20,7 @@ import com.merge.backend.domain.substitute.event.SubstituteRequestManagerClosedE
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository
+import com.merge.backend.domain.substitute.repository.SubstituteRequestScope
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.user.service.UserService
 import com.merge.backend.domain.workplace.entity.Workplace
@@ -104,6 +105,7 @@ class SubstituteRequestServiceTest {
     private val actorId = 10L
     private val workplaceId = 100L
     private val requesterMemberId = 15L
+    private val shiftId = 30L
 
     private val candidateUserId = 200L
     private val now: LocalDateTime = LocalDateTime.now(clock)
@@ -172,8 +174,30 @@ class SubstituteRequestServiceTest {
         given(candidate.member).willReturn(candidateMember)
     }
 
+    // 승인 실행자의 현재 소속 = 그 근무지의 MANAGER
+    private fun setupActorManagerOf(managedWorkplaceId: Long) {
+        val managedWorkplace = mock<Workplace>()
+        given(managedWorkplace.id).willReturn(managedWorkplaceId)
+
+        val actorMember = mock<WorkplaceMember>()
+        given(actorMember.role).willReturn(WorkplaceRole.MANAGER)
+        given(actorMember.workplace).willReturn(managedWorkplace)
+
+        given(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)).willReturn(listOf(actorMember))
+    }
+
+    // 승인의 Lock 전 단계(역할 확인, ID 조회, Shift Lock)까지 정상 설정
+    private fun setupApproveScope() {
+        setupActorManagerOf(workplaceId)
+        given(substituteRequestRepository.findScopeById(requestId))
+            .willReturn(SubstituteRequestScope(shiftId, workplaceId))
+        given(shiftRepository.findByIdForUpdate(shiftId)).willReturn(Optional.of(shift))
+        given(shift.id).willReturn(shiftId)
+    }
+
     // 승인 직전 단계(Request/Workplace/ACCEPTED Candidate 조회)까지 정상 설정
     private fun setupApprovableRequest() {
+        setupApproveScope()
         setupValidRequestFullInfo()
         given(substituteRequestRepository.findByIdForUpdate(requestId))
             .willReturn(request)
@@ -221,6 +245,7 @@ class SubstituteRequestServiceTest {
         fun approve_success() {
 
             // given
+            setupApproveScope()
             setupValidRequestFullInfo()
             setupValidCandidateInfo()
 
@@ -285,7 +310,8 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: 존재하지 않는 요청이면 예외가 발생한다")
         fun approve_fail_request_not_found() {
             // given
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
+            setupActorManagerOf(workplaceId)
+            given(substituteRequestRepository.findScopeById(requestId))
                 .willReturn(null)
 
             // when & then
@@ -300,6 +326,8 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: 아무도 수락하지 않았거나(OPEN) 이미 끝난 요청은 승인할 수 없다")
         fun approve_fail_invalid_request_status(status: RequestStatus) {
             // given
+            setupApproveScope()
+            given(request.shift).willReturn(shift)
             given(request.status).willReturn(status)
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(request)
@@ -313,32 +341,43 @@ class SubstituteRequestServiceTest {
         }
 
         @Test
-        @DisplayName("실패: 승인 요청자가 해당 근무지 소속이 아니면 예외가 발생한다")
+        @DisplayName("실패: 승인 요청자가 어느 근무지에도 소속이 아니면 요청을 조회하기 전에 MANAGER_REQUIRED가 발생한다")
         fun approve_fail_actor_not_in_workplace() {
             // given
-            setupValidRequestBasicInfo()
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(request)
-            given(workplaceMemberService.requireManager(actorId, workplaceId))
-                .willThrow(BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER))
-
-            // when & then
-            assertApproveFails(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER)
-            verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(anyOrNull(), anyOrNull())
-        }
-
-        @Test
-        @DisplayName("실패: 승인 요청자가 MANAGER가 아니면 예외가 발생한다")
-        fun approve_fail_actor_not_manager() {
-            // given
-            setupValidRequestBasicInfo()
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(request)
-            given(workplaceMemberService.requireManager(actorId, workplaceId))
-                .willThrow(BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
+            given(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)).willReturn(emptyList())
 
             // when & then
             assertApproveFails(WorkplaceErrorCode.MANAGER_REQUIRED)
+            verify(substituteRequestRepository, never()).findScopeById(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
+        }
+
+        @Test
+        @DisplayName("실패: 승인 요청자가 다른 근무지의 MANAGER이면 없는 요청과 같은 SUBSTITUTE_REQUEST_NOT_FOUND가 발생한다")
+        fun approve_fail_actor_manager_of_other_workplace() {
+            // given
+            setupActorManagerOf(999L)
+            given(substituteRequestRepository.findScopeById(requestId))
+                .willReturn(SubstituteRequestScope(shiftId, workplaceId))
+
+            // when & then
+            assertApproveFails(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND)
+            verify(shiftRepository, never()).findByIdForUpdate(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
+        }
+
+        @Test
+        @DisplayName("실패: 승인 요청자가 MANAGER가 아니면 요청을 조회하기 전에 예외가 발생한다")
+        fun approve_fail_actor_not_manager() {
+            // given
+            val actorMember = mock<WorkplaceMember>()
+            given(actorMember.role).willReturn(WorkplaceRole.EMPLOYEE)
+            given(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(actorId)).willReturn(listOf(actorMember))
+
+            // when & then
+            assertApproveFails(WorkplaceErrorCode.MANAGER_REQUIRED)
+            verify(substituteRequestRepository, never()).findScopeById(anyOrNull())
+            verify(substituteRequestRepository, never()).findByIdForUpdate(anyOrNull())
             verify(substituteCandidateRepository, never()).findByRequestIdAndStatus(anyOrNull(), anyOrNull())
         }
 
@@ -346,6 +385,7 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: 근무표가 공개 전(DRAFT)이면 승인할 수 없다")
         fun approve_fail_schedule_not_published() {
             // given
+            setupApproveScope()
             setupValidRequestBasicInfo()
             given(schedule.status).willReturn(ScheduleStatus.DRAFT)
             given(substituteRequestRepository.findByIdForUpdate(requestId))
@@ -359,6 +399,7 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: Shift가 취소됐으면 승인할 수 없다")
         fun approve_fail_shift_cancelled() {
             // given
+            setupApproveScope()
             setupValidRequestBasicInfo()
             given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
             given(shift.status).willReturn(ShiftStatus.CANCELLED)
@@ -373,6 +414,7 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: 요청 이후 Shift 담당자가 바뀌었으면 승인할 수 없다")
         fun approve_fail_shift_member_changed() {
             // given
+            setupApproveScope()
             setupValidRequestBasicInfo()
             given(schedule.status).willReturn(ScheduleStatus.PUBLISHED)
             given(shift.status).willReturn(ShiftStatus.SCHEDULED)
@@ -395,6 +437,7 @@ class SubstituteRequestServiceTest {
         @DisplayName("실패: Request는 ACCEPTED인데 ACCEPTED Candidate가 없으면 예외가 발생한다")
         fun approve_fail_accepted_candidate_not_found() {
             // given
+            setupApproveScope()
             setupValidRequestFullInfo()
             given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(request)

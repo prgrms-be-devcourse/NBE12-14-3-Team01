@@ -86,4 +86,11 @@ class SubstituteRequest(
         closedAt = now
         approvedAt = null
     }
+
+    // 근무가 취소·인계되어 요청 종료 (후보 상태와 수락 기록은 그대로)
+    fun closeByShiftChange(now: LocalDateTime) {
+        status = RequestStatus.CLOSED
+        closeReason = RequestCloseReason.SHIFT_CHANGED
+        closedAt = now
+    }
 }

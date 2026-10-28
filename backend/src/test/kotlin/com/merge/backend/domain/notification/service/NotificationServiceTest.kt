@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -287,6 +288,89 @@ class NotificationServiceTest {
         notificationService.createSubstituteManagerClosedNotifications(ids)
         assertSavedRecipients(ids, first, second, NotificationType.SUBSTITUTE_MANAGER_CLOSED,
             "관리자가 대체 근무 요청을 종료했습니다.")
+    }
+
+    @Test
+    @DisplayName("근무표 공개 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSchedulePublishedNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "Schedule 공개 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSchedulePublishedNotifications(ids)
+        }
+    }
+
+    @Test
+    @DisplayName("대타 요청 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteRequestReceivedNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "대타 요청 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteRequestReceivedNotifications(ids)
+        }
+    }
+
+    @Test
+    @DisplayName("대타 후보 없음 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteNoCandidateNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "대타 후보 없음 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteNoCandidateNotifications(ids)
+        }
+    }
+
+    @Test
+    @DisplayName("대타 수락 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteAcceptedNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "대타 수락 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteAcceptedNotifications(ids)
+        }
+    }
+
+    @Test
+    @DisplayName("대타 후보 전원 거절 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteAllRejectedNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "대타 후보 전원 거절 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteAllRejectedNotifications(ids)
+        }
+    }
+
+    @Test
+    @DisplayName("대체 근무 승인 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteApprovedNotificationsFailsWhenRecipientMissing() {
+        val requesterMemberId = 100L
+        val acceptedMemberId = 200L
+        val ids = listOf(requesterMemberId, acceptedMemberId)
+        val requester = mock<WorkplaceMember>()
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(requester))
+        assertMissingRecipientFails(ids, "대체 근무 승인 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteApprovedNotifications(requesterMemberId, acceptedMemberId)
+        }
+    }
+
+    @Test
+    @DisplayName("대체 근무 관리자 종료 알림 수신자 일부를 찾지 못하면 예외가 나고 알림을 저장하지 않는다")
+    fun createSubstituteManagerClosedNotificationsFailsWhenRecipientMissing() {
+        val ids = listOf(100L, 200L)
+        whenever(workplaceMemberRepository.findAllById(ids)).thenReturn(listOf(mock<WorkplaceMember>()))
+        assertMissingRecipientFails(ids, "대체 근무 관리자 종료 알림 수신자를 찾을 수 없습니다.") {
+            notificationService.createSubstituteManagerClosedNotifications(ids)
+        }
+    }
+
+    private fun assertMissingRecipientFails(ids: List<Long>, expectedMessage: String, action: () -> Unit) {
+        val thrown = catchThrowable { action() }
+
+        assertThat(thrown)
+            .isExactlyInstanceOf(IllegalStateException::class.java)
+            .hasMessage(expectedMessage)
+        verify(workplaceMemberRepository, times(1)).findAllById(ids)
+        verify(notificationRepository, never()).save(any<Notification>())
     }
 
     private fun arrangeRecipients(ids: List<Long>, members: List<WorkplaceMember>) {

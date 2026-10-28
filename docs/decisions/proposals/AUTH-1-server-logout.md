@@ -7,8 +7,8 @@
 | 결정 단계 | **사용자 잠정 결정** (Q1·S1·S2·Q2·Q3·Q5, 2026-10-23). 팀 승인 전 |
 | ② 정책 | 카드 `PROPOSED`. `DECISION-LOG` G03-D-23 `PENDING`, G03-D-24 `PENDING` |
 | ③ 문서 | `DRAFT` (저장소 Proposal 문서. 2026-10-25 이관, 원본 로컬 `drafts/D2-AUTH-1/`) |
-| 구현 | **Backend 구현 (2026-10-28, Issue #62 `feat/auth-server-logout`, PR 전·`develop` 미반영)**. 세부 결정은 끝의 "Backend 구현 기록" 절. Frontend 없음 (별도 Issue) |
-| ④ / ⑤ | Backend V1-N-01~13 `IMPLEMENTED` / `LOCAL_PASSED` (EV-032, TEST-INVENTORY V1 AUTH-1 절). Frontend FE-AUTH-01~09 `SPECIFIED` / `NOT_RUN` |
+| 구현 | **Backend PR #74 병합 (2026-10-28), Frontend PR #76 병합 (2026-10-28), Issue #62 종료**. 세부 구현은 끝의 "Backend 구현 기록" 절. 병합은 배포 환경 통합 검증 완료를 뜻하지 않는다. |
+| ④ / ⑤ | Backend V1-N-01~13 `IMPLEMENTED` / `LOCAL_PASSED` (EV-032, TEST-INVENTORY V1 AUTH-1 절). PR #74 Backend/Docker CI 성공. Frontend 구현은 PR #76에서 병합됐으며 FE-AUTH-01~09의 실제 브라우저 통합 검증은 별도 확인 대상이다. |
 | 기준 코드 | 3차 `develop` `c0427c2` (Production Java = `cdaaa13` = 2차 `8da2bec`). 정적 확인 |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
