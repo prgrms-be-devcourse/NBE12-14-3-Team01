@@ -409,9 +409,9 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 ## 7. 공통 `global` (CM) — G-A2 공통 응답 계약
 
-[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **현재 Java 공통 응답의 대표 계약을 고정**한 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (현재 동작 고정), ④ `IMPLEMENTED` (Test PR #15, **Draft, `develop` 미반영**).
+[TEST-GAP-ANALYSIS](TEST-GAP-ANALYSIS.md) G-A2. **Java 기준선에서 관찰한 공통 응답 계약**을 고정하는 Test다 (모든 API 계약을 검증한 것이 아님). 구분 `MIGRATION` (기존 동작 보존). Java 원본 테스트는 develop에 존재했고, Kotlin 대응 테스트는 PR #79에서 전환 중이다.
 
-| Test ID | Class · Method | 확인하는 현재 Java 동작 | 종류 · 환경 | ⑤ 실행 |
+| Test ID | Class · Method | Java 원본에서 확인한 보존 계약 | 종류 · 환경 | ⑤ 실행 (Java 기준선) |
 |---|---|---|---|---|
 | CM-N-01 | `global.dto.ApiResponseJsonContractTest.successResponseSerializesFourFields` | 응답 key가 정확히 `success`·`code`·`message`·`data`, `success` boolean, `code`·`message` 문자열 | SPRINGBOOT (애플리케이션 Jackson Mapper) · MYSQL_TC 설정 | LOCAL_PASSED |
 | CM-N-02 | `…ApiResponseJsonContractTest.successResponseWithoutDataKeepsNullDataField` | data 없는 성공 응답도 `data: null` key 유지 | 같음 | LOCAL_PASSED |
@@ -422,9 +422,9 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 **⑤ 상태의 뜻 (섞지 않는다):**
 - `LOCAL_PASSED`: 로컬 macOS·GraalVM 25에서 신규 6/6 (EV-013), 전체 400/400 (EV-014). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
-- CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위 성공**이며 개별 Test 결과 근거가 아니다 (CI는 Test Report를 보관하지 않음).
-- `develop` 미반영: PR #15가 Merge되기 전까지 `develop`에서는 이 Test가 없다.
-- Kotlin Migration 이후: `NOT_RUN` (전환 후 같은 Test를 다시 실행해야 함).
+- Java 기준선 CI: PR #15의 `Backend CI`(`./gradlew check`, ubuntu·Temurin 25)·`Docker Build CI Test` 성공 (EV-016). **Workflow·Job 단위의 역사적 근거**이며 Kotlin 개별 Test 결과가 아니다.
+- Kotlin 전환 상태 (2026-10-28): PR #79 Head `baf1acab63894895d7d7797083c065a2cf701647`에서 CM-N-01~06 대응 테스트가 Kotlin으로 전환됐다. PR #79의 [Backend Check](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40651240531)와 [Docker Build CI Test](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/actions/runs/40651240485)는 성공했다. Backend Check Run 메타데이터의 Base는 `933fd88cf4c79072a5ae067070e03f8b3dd977c4`이며 당시 `origin/develop` `eeef2c2155c9b80f2827ee0ba2a111691fabad20`와 다르다. 따라서 최신 develop 통합 결과로 보지 않는다. 이는 Suite 단위 결과다. 개별 JUnit XML을 이 변경에 연결하지 못했으므로 Test별 ⑤ 상태는 `UNKNOWN`이며 `PASSED`로 올리지 않는다.
+- develop 상태 (조회 당시 `eeef2c2155c9b80f2827ee0ba2a111691fabad20`): PR #79 미병합, 기존 Java 테스트가 develop에 남아 있다. PR 병합 후 최신 develop에서 다시 확인한다.
 
 ## 8. 변경 이력
 
