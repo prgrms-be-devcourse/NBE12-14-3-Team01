@@ -437,6 +437,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-25 | S3 Commit 전: §5-4에서 V4-T-35와 알림 L240 행 분리, L240(B-2)을 G03-D-16 결정 대기로 표시 (기존 "그대로"는 미결 질문을 확정한 것처럼 읽힘) |
 | 2026-10-25 | S4-E1: §3-1에 `a148a62` 실행 근거 (394/394 × 2, EV-010·011, `LOCAL_ONLY`) 추가, V4-T-01~93 ⑤ 갱신. 새 Test는 `NOT_RUN` 유지 |
 | 2026-10-26 | V5-J2: §5-4에 알림 Test 6행 (V5-N-28·29·23 변경 후보, V5-N-27·성공 code·읽음 동시성 연관만)과 구분·운영 규칙, §6-1에 V5-N-21~30 (PR #16 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN`) |
+| 2026-10-28 | AUTH-1 코드 검토 반영: V1-N-03 확인 방법 보강, V1-N-13 Method 2개 추가, V1-N-14 추가 (EV-033) |
 | 2026-10-28 | AUTH-1: 끝에 "V1 AUTH-1 서버 로그아웃" 절 신설. 예약 V1-N-01~12 등록, 범위 다음 번호 V1-N-13 추가 (출처 검사 단위 Test). ④ `IMPLEMENTED`, ⑤ `LOCAL_PASSED` (EV-032) |
 | 2026-10-26 | G-A2: §1에 공통 Domain 코드 `CM` 추가, §7 공통 `global` (CM-N-01~06, Test PR #15 Draft·`develop` 미반영, LOCAL_PASSED·CI 성공·Kotlin 이후 `NOT_RUN` 구분). 변경 이력을 §8로 이동 |
 
@@ -470,13 +471,13 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 
 ## V1 AUTH-1 서버 로그아웃 (V1-N-01~13, 2026-10-28)
 
-[AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) §10-1의 예약 번호를 그대로 쓴다. V1-N-13은 범위 다음 번호다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-23 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — Issue #62 `feat/auth-server-logout` (**PR 전, `develop` 미반영**). 한 ID에 Method가 여러 개면 모두 적는다.
+[AUTH-1](../decisions/proposals/AUTH-1-server-logout.md) §10-1의 예약 번호를 그대로 쓴다. V1-N-13·14는 범위 다음 번호다 (§5-1 규칙). 구분 `IMPROVEMENT` (G03-D-23 APPROVED, DECISION-LOG §4-2). ④ `IMPLEMENTED` — Issue #62 `feat/auth-server-logout` (**PR 전, `develop` 미반영**). 한 ID에 Method가 여러 개면 모두 적는다.
 
 | Test ID | Class · Method | 확인하는 것 | 종류 · 환경 | ⑤ 실행 |
 |---|---|---|---|---|
 | V1-N-01 | `ApiV1UserLogoutTest.logoutClearsRefreshTokenAndDeletesCookie` | 200 "로그아웃되었습니다", `data: null`, DB `refreshToken` null, `Set-Cookie` Max-Age 0 | API · MYSQL_TC | LOCAL_PASSED |
 | V1-N-02 | `.logoutWithOldDeviceTokenKeepsNewerLogin` | 예전 기기 쿠키로 로그아웃해도 DB = 새 기기 토큰, 새 기기 재발급 200 | API · MYSQL_TC | LOCAL_PASSED |
-| V1-N-03 | `.logoutWithoutCookieSucceedsWithoutChange`, `.logoutWithForgedTokenSucceedsWithoutChange`, `.logoutWithExpiredTokenSucceedsWithoutChange`, `.logoutWithAccessTokenAsCookieSucceedsWithoutChange` | 쿠키 없음·위조·만료·Access Token → 200, DB 그대로, 쿠키 삭제 헤더 | API · MYSQL_TC | LOCAL_PASSED |
+| V1-N-03 | `.logoutWithoutCookieSucceedsWithoutChange`, `.logoutWithForgedTokenSucceedsWithoutChange`, `.logoutWithExpiredTokenSucceedsWithoutChange`, `.logoutWithAccessTokenAsCookieSucceedsWithoutChange` | 쿠키 없음·위조·만료·Access Token → 200, DB 그대로, 쿠키 삭제 헤더. 위조·만료·Access Token은 **DB 값을 그 토큰으로 맞춰 둔 뒤** 확인 (DB 값과 같아도 토큰 검증에서 걸러지는지) | API · MYSQL_TC | LOCAL_PASSED |
 | V1-N-04 | `.refreshAfterLogoutFails` | 로그아웃한 Refresh로 재발급 → 401 `AUTH-003` | API · MYSQL_TC | LOCAL_PASSED |
 | V1-N-05 | `RqTest.deleteCookieUsesSameAttributesAsIssuedCookie` | Domain·Secure·SameSite를 채운 설정에서 삭제 쿠키의 Path·HttpOnly·Secure·SameSite·Domain = 발급 쿠키, Max-Age 0 (기존 test5는 Domain 빈 값·Path 미확인) | UNIT · NONE | LOCAL_PASSED |
 | V1-N-06 | `ApiV1UserLogoutTest.logoutWithoutValidAccessTokenPassesSecurityFilter` | Access Token 없음 / 잘못된 Bearer 헤더에도 로그아웃 200 (같은 조건의 `/auth/me`는 401 `AUTH-004`·`AUTH-006`으로 Filter 동작 확인) | API · MYSQL_TC | LOCAL_PASSED |
@@ -486,10 +487,11 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | V1-N-10 | `.oldTokenWithoutJtiStillWorks` | jti 없는 예전 형식 토큰도 재발급 200, 로그아웃 후 DB null | API · MYSQL_TC | LOCAL_PASSED |
 | V1-N-11 | `UserLogoutConcurrencyTest.logoutWaitsForNewerLoginAndKeepsIt`, `.loginWaitsForLogoutAndNewerLoginRemains` | 한쪽이 행을 잡고 Commit 전 대기(Latch) → 다른 쪽이 Lock을 기다림(1초 Timeout 확인) → 최종 DB = 새 기기 토큰 | CONCURRENCY · MYSQL_TC RC | LOCAL_PASSED |
 | V1-N-12 | `ApiV1UserLogoutDbErrorTest.logoutWithDbErrorFailsWithoutChange` | 진짜 조건부 UPDATE가 1행을 바꾼 뒤 DB 오류 주입 → 500 `COM-500`, `Set-Cookie` 없음, DB 토큰 되돌려짐 | API · MYSQL_TC (`@MockitoSpyBean`) | LOCAL_PASSED |
-| V1-N-13 | `RequestOriginValidatorTest.isAllowedUsesOnlyOriginWhenPresent`, `.isAllowedComparesRefererOriginWhenOriginMissing`, `.isAllowedRejectsMissingOrBrokenHeaders` | Origin이 있으면 Origin만 정확히 비교 (CORS가 막지 못해도 거부), 없으면 Referer 출처(scheme·host·port), 앞글자만 같은 주소·깨진 값·둘 다 없음 거부 | UNIT · NONE | LOCAL_PASSED |
+| V1-N-13 | `RequestOriginValidatorTest.isAllowedUsesOnlyOriginWhenPresent`, `.isAllowedComparesRefererOriginWhenOriginMissing`, `.isAllowedMatchesCorsRules`, `.isAllowedRejectsWildcardEntry`, `.isAllowedRejectsMissingOrBrokenHeaders` | Origin이 있으면 Origin만 비교 (CORS가 막지 못해도 거부), 없으면 Referer 출처(scheme·host·port). 비교는 Spring CORS와 같은 규칙 (목록 끝의 `/`·대소문자 무시, Referer 기본 포트 80·443 제거). 목록에 `*`가 있어도 거부. 앞글자만 같은 주소·깨진 값·둘 다 없음 거부 | UNIT · NONE | LOCAL_PASSED |
+| V1-N-14 | `ApiV1UserLogoutOriginConfigTest.logoutWithOriginWrittenDifferentlyInConfigSucceeds` | 허용 목록을 `https://app.example.com/`, `https://Shop.Example.com`처럼 적어도 CORS를 통과한 Origin(소문자, `/` 없음)은 로그아웃 200 + CORS 허가 헤더 + DB null. 고치기 전 코드(정확히 같은 글자 비교)에서 403으로 실패 확인 (같은 설정의 임시 재현에서 응답 `AUTH-007`) | API · MYSQL_TC (Property 덮어쓰기) | LOCAL_PASSED |
 
 **⑤ 상태의 뜻 (섞지 않는다):**
-- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 `7c1b77d` 전체 512/512 (EV-032). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 `7c1b77d` 전체 512/512 (EV-032), 수정 후 `8da19fa` 전체 515/515 (EV-033). 개별 결과 근거는 로컬 JUnit XML (저장소 밖).
 - CI: PR 생성 후 기록. `develop` 미반영: PR Merge 전까지 `develop`에는 이 Test가 없다.
 - 회귀 (기대값 변경 0): `UserServiceTest`, `ApiV1UserControllerTest`, `RqTest` test1~5, `CustomAuthenticationFilterTest` 그대로 통과 (EV-032).
 - 범위 밖: Frontend 로그아웃·다시 시도 (FE-AUTH-01~09, 별도 Issue), 운영 CORS Origin·쿠키 SameSite·비밀키 길이 (배포 담당 확인).

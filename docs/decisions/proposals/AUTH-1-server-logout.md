@@ -229,7 +229,7 @@ V1 Owner가 구현 중 정한 세부다. 정책 방향은 §4·DECISION-LOG §4-
 |---|---|---|
 | `jti` | `UUID.randomUUID()` (§8 예시 그대로) | 운영 비밀키가 64바이트 이상(HS512)이면 사용자 id 8자리(1,000만)부터 Refresh Token이 256자로 `VARCHAR(255)`를 넘음 (실측, EV-032. V1-N-08은 7자리 255자 이하를 확인). 배포 담당 확인 항목 |
 | 경로·응답 | `POST /auth/logout` (실제 `/api/v1/auth/logout`), 200 `"로그아웃되었습니다"`, `data: null` | §8 형식 |
-| 출처 검사 | 새 `RequestOriginValidator`가 `custom.cors.allowed-origins` 값을 재사용 (`application.yml` 변경 없음). Origin이 있으면 Origin만 정확히 비교, 없으면 Referer 출처(scheme·host·port), 둘 다 없거나 읽을 수 없으면 거부 | S2, §8 |
+| 출처 검사 | 새 `RequestOriginValidator`가 `custom.cors.allowed-origins` 값을 재사용 (`application.yml` 변경 없음). Origin이 있으면 Origin만 비교, 없으면 Referer 출처(scheme·host·port, 기본 포트 80·443 제거), 둘 다 없거나 읽을 수 없으면 거부. **비교는 Spring CORS의 `CorsConfiguration.checkOrigin`과 같은 규칙** (목록 끝의 `/`·대소문자 무시). 와일드카드 패턴은 쓰지 않고 목록에 `*`가 있어도 거부 | S2, §8 (정확한 주소·와일드카드 없음). 규칙이 다르면 운영 목록을 `https://app.example.com/`처럼 적었을 때 CORS는 통과하는데 로그아웃만 403이 됨 (코드 검토에서 발견·재현, V1-N-14) |
 | 허용 안 된 Origin·`Origin: null` | 기존 CORS 설정이 먼저 403 `Invalid CORS request`(JSON 아님)로 거부. 우리 검사도 Origin을 직접 비교해 CORS 설정이 바뀌어도 `AUTH-007`로 거부 (V1-N-13) | 브라우저는 CORS 허가 헤더 없는 응답을 읽지 못하므로 `AUTH-007` JSON으로 통일해도 화면 결과가 같음. 보안 필터 순서를 바꾸지 않음 |
 | `AUTH-007` | 403 `"허용되지 않은 요청 출처입니다."` — Origin 없음 + Referer 실패, 둘 다 없음 | ERROR-CODES §4 예약 |
 | 검사 위치 | Controller 맨 앞. 실패하면 DB·쿠키 변경 전에 멈춤 | INV-03 |
@@ -243,3 +243,4 @@ V1 Owner가 구현 중 정한 세부다. 정책 방향은 §4·DECISION-LOG §4-
 | 2026-10-23 | 초안. Q1·S1·S2·Q2·Q3·Q5 사용자 잠정 결정 통합. 교차 검토 의견 반영 (§4) |
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
 | 2026-10-28 | Backend 구현 반영: 머리 표 구현·④/⑤ 행, "Backend 구현 기록" 절 (jti UUID와 길이 경계, 출처 검사와 CORS 관계, `AUTH-007` 문구) |
+| 2026-10-28 | 코드 검토 반영: 출처 비교를 Spring CORS와 같은 규칙으로 (끝의 `/`·대소문자, Referer 기본 포트), `*` 거부 |
