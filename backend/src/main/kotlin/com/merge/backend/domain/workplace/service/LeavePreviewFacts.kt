@@ -1,5 +1,7 @@
 package com.merge.backend.domain.workplace.service
 
+import com.merge.backend.domain.shift.entity.ScheduleStatus
+import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.substitute.entity.CandidateStatus
 import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.workplace.entity.WorkplaceRole
@@ -28,7 +30,10 @@ data class LeavePreviewFacts(
 
     data class WorkShift(
         val shiftId: Long,
+        val memberId: Long,
         val scheduleId: Long,
+        val scheduleStatus: ScheduleStatus,
+        val shiftStatus: ShiftStatus,
         val weekStartDate: LocalDate,
         val startAt: LocalDateTime,
         val endAt: LocalDateTime
@@ -36,13 +41,19 @@ data class LeavePreviewFacts(
 
     data class ActiveRequest(
         val requestId: Long,
+        val requesterMemberId: Long,
         val shiftId: Long,
-        val status: RequestStatus
+        val status: RequestStatus,
+        // ML-3-Q1: 해당 미래 공식 근무의 인계·취소 시 요청 종료 예상. 상태는 변경하지 않는다.
+        val wouldCloseRequest: Boolean
     )
 
     data class Candidacy(
         val candidateId: Long,
+        val memberId: Long,
         val requestId: Long,
+        val requesterMemberId: Long,
+        val shift: WorkShift,
         val requestStatus: RequestStatus,
         val candidateStatus: CandidateStatus,
         val otherCurrentPendingCandidates: Int,

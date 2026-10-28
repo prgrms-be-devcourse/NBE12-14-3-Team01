@@ -14,11 +14,15 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.LocalDateTime
+import org.hibernate.annotations.GeneratedColumn
 
 @Entity
 @Table(
     uniqueConstraints = [
-        UniqueConstraint(columnNames = ["workplace_id", "user_id"])
+        UniqueConstraint(
+            name = "uk_u2_active_membership",
+            columnNames = ["workplace_id", "user_id", "active_marker"]
+        )
     ]
 )
 class WorkplaceMember @JvmOverloads constructor(
@@ -48,6 +52,11 @@ class WorkplaceMember @JvmOverloads constructor(
         protected set
 
     var leftAt: LocalDateTime? = leftAt
+        protected set
+
+    @field:GeneratedColumn("CASE WHEN left_at IS NULL THEN 1 END")
+    @field:Column(insertable = false, updatable = false)
+    var activeMarker: Int? = null
         protected set
 
     fun isCurrent(): Boolean = leftAt == null

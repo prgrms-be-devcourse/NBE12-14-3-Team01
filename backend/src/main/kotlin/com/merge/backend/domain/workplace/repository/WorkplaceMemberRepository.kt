@@ -7,9 +7,21 @@ import com.merge.backend.domain.workplace.entity.WorkplaceRole
 import java.util.Optional
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface WorkplaceMemberRepository : JpaRepository<WorkplaceMember, Long> {
-    fun existsByWorkplaceAndUser(workplace: Workplace?, user: User?): Boolean
+    @Query(
+        """
+        SELECT COUNT(m) > 0
+        FROM WorkplaceMember m
+        WHERE m.workplace = :workplace AND m.user = :user AND m.leftAt IS NULL
+        """
+    )
+    fun existsByWorkplaceAndUser(
+        @Param("workplace") workplace: Workplace?,
+        @Param("user") user: User?
+    ): Boolean
 
     @EntityGraph(attributePaths = ["user"])
     fun findByIdAndWorkplace_Id(memberId: Long, workplaceId: Long): Optional<WorkplaceMember>
