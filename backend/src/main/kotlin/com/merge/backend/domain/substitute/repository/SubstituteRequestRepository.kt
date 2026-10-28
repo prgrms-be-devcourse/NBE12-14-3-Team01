@@ -14,8 +14,10 @@ interface SubstituteRequestRepository : JpaRepository<SubstituteRequest, Long> {
 
     fun existsByShift_IdAndStatusIn(shiftId: Long, statuses: Collection<RequestStatus>): Boolean
 
+    // SUB-05
+    // 현재 소속(leftAt IS NULL)으로 보낸 요청만 조회. 이전 소속 기간의 요청 Row는 지우지 않고 목록에서만 빠짐 (ML-4-4)
     @EntityGraph(attributePaths = ["shift.schedule.workplace"])
-    fun findAllByRequesterMember_User_IdOrderByCreateDateDesc(
+    fun findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(
         userId: Long,
     ): List<SubstituteRequest>
 

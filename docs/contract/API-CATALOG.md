@@ -270,8 +270,8 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | ID | 기존 API | 지금 | 바뀌는 점 | 근거 |
 |---|---|---|---|---|
 | CHG-01 | `POST /workplaces/join` | 같은 (근무지, User) Row가 있으면 `WPL-002` (퇴사자 포함). DB Unique `(workplace_id, user_id)` | 유효 코드 + 현재 소속 없음이면 **새 WorkplaceMember Row** (재가입). 이전 Row는 그대로. 현재 소속이면 `WPL-002`. 동시 가입은 현재 소속 Unique(U2' 우선, 실험 조건부) 위반을 `WPL-002` 409로 변환 (지금은 500). 가입도 Workplace Row Lock 후 코드 재비교 (ML-H2 §8 B안) | ML-H2 |
-| CHG-02 | SUB-05 `GET /substitute-requests/sent` | User 기준 (`findAllByRequesterMember_User_Id…`), 소속 조건 없음 | **현재 소속의 요청만** | ML-4-4, G03-D-22 §6-4 |
-| CHG-03 | SUB-07 `GET /substitute-requests/accepted` | User 기준, `c.member.leftAt` 조건 없음 | 현재 소속 조건 추가 (방어) | G03-D-22 §6-4 |
+| CHG-02 | SUB-05 `GET /substitute-requests/sent` | User 기준 (`findAllByRequesterMember_User_Id…`), 소속 조건 없음 | **현재 소속의 요청만** | ML-4-4, G03-D-22 §6-4. **구현 (2026-10-29):** `findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc` (현재 소속 조건 추가, 응답·정렬·에러 그대로), Test V4-N-37 (EV-042) |
+| CHG-03 | SUB-07 `GET /substitute-requests/accepted` | User 기준, `c.member.leftAt` 조건 없음 | 현재 소속 조건 추가 (방어) | G03-D-22 §6-4. **구현:** PR #82 `e643c30`이 `c.member.leftAt IS NULL` 추가, Test V4-N-36 (EV-042) |
 | CHG-04 | `GET /shifts/{shiftId}` | 공개·SCHEDULED·담당 **User** = 나 확인. 담당 소속이 현재 소속인지는 확인 안 함 | 담당 소속이 현재 소속인지 확인 (재가입자가 이전 소속 근무를 ID로 보지 못하게). CANCELLED 거부는 유지 | ML-4 §8 ① |
 | CHG-05 | 대타 승인 `PATCH .../approve`, 후보 응답 `PATCH .../response` | 시작한 근무에서 승인 `SFT-006`, 응답 `SUB-012` (요청 문구) | 잘못된 안내 정정 (T1-01·02). **P1** | G03-D-03 §3-1 |
 | CHG-06 | 대타 승인 `PATCH .../approve` | **Request를 `FOR UPDATE`로 잠그고 상태를 검사한 뒤에 관리자 권한을 검사한다** (`SubstituteRequestService` L236 → L241 → L247). 그래서 그 근무지 관리자가 아닌 인증 사용자도 임의 `requestId`로 존재·상태(404 / `SUB-002` 400 / 403)를 구분할 수 있고 Row Lock을 잠깐 잡게 된다 | M3 선검사 (§5-5) | **사용자 잠정 결정 2026-10-25: 대타 P0 정합성 묶음에 포함 (§5-4 (나))**. 2026-10-28 구현 PR #83 (DECISION-LOG §4-6) |
@@ -426,3 +426,4 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-28 | API-SB-01 구현 행 추가 (경로 확정, 정렬·필드 이름·7일 경계) |
 | 2026-10-29 | API-SC-01 구현 행 추가 (응답 필드, 정렬·7일 경계·마지막 이력 Row 정의) |
 | 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |
+| 2026-10-29 | CHG-02 SUB-05 현재 소속 구현, CHG-03은 PR #82 구현에 Test 연결 (V4-N-36·37, EV-042) |
