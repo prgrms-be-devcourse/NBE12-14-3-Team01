@@ -32,6 +32,7 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import org.springframework.test.util.ReflectionTestUtils
 
 @ExtendWith(MockitoExtension::class)
 class WorkplaceServiceTest {
@@ -70,12 +71,18 @@ class WorkplaceServiceTest {
     @DisplayName("초대코드로 참여하면 EMPLOYEE 멤버십이 생성된다")
     fun joinAsEmployee() {
         val workplace = Workplace("테스트 매장", "ABCD1234")
+        ReflectionTestUtils.setField(workplace, "id", 10L)
+        whenever(user.id).thenReturn(1L)
 
-        whenever(workplaceRepository.findByInviteCode("ABCD1234"))
+        whenever(workplaceRepository.findIdByInviteCode("ABCD1234"))
+            .thenReturn(10L)
+        whenever(workplaceRepository.findByIdForUpdate(10L))
             .thenReturn(Optional.of(workplace))
+        whenever(workplaceMemberRepository.findByWorkplace_IdAndUser_IdAndLeftAtIsNull(10L, 1L))
+            .thenReturn(Optional.empty())
 
         // 실제 DB 대신 전달받은 멤버십을 반환하도록 Mock 설정
-        whenever(workplaceMemberRepository.save(any<WorkplaceMember>()))
+        whenever(workplaceMemberRepository.saveAndFlush(any<WorkplaceMember>()))
             .thenAnswer { invocation -> invocation.getArgument<WorkplaceMember>(0) }
 
         val result = workplaceService.joinWorkplace("ABCD1234", user)
@@ -92,16 +99,16 @@ class WorkplaceServiceTest {
         assertNull(result.leftAt)
 
         verify(workplaceMemberRepository)
-            .existsByWorkplaceAndUser(workplace, user)
+            .findByWorkplace_IdAndUser_IdAndLeftAtIsNull(10L, 1L)
 
-        verify(workplaceMemberRepository).save(result)
+        verify(workplaceMemberRepository).saveAndFlush(result)
     }
 
     @Test
     @DisplayName("유효하지 않은 초대코드로 참여하면 저장하지 않는다")
     fun rejectInvalidInviteCode() {
-        whenever(workplaceRepository.findByInviteCode("INVALID"))
-            .thenReturn(Optional.empty())
+        whenever(workplaceRepository.findIdByInviteCode("INVALID"))
+            .thenReturn(null)
 
         val exception = assertThrows(BusinessException::class.java) {
             workplaceService.joinWorkplace("INVALID", user)
@@ -179,13 +186,20 @@ class WorkplaceServiceTest {
     @Test
     @DisplayName("이미 참여 중인 사용자는 다시 참여할 수 없다")
     fun rejectDuplicateJoin() {
-        val workplace = mock<Workplace>()
+        val workplace = Workplace("테스트 매장", "ABC123")
+        ReflectionTestUtils.setField(workplace, "id", 10L)
+        whenever(user.id).thenReturn(1L)
+        val currentMember = WorkplaceMember(
+            workplace, user, WorkplaceRole.EMPLOYEE, LocalDateTime.now(clock)
+        )
 
-        whenever(workplaceRepository.findByInviteCode("ABC123"))
+        whenever(workplaceRepository.findIdByInviteCode("ABC123"))
+            .thenReturn(10L)
+        whenever(workplaceRepository.findByIdForUpdate(10L))
             .thenReturn(Optional.of(workplace))
 
-        whenever(workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user))
-            .thenReturn(true)
+        whenever(workplaceMemberRepository.findByWorkplace_IdAndUser_IdAndLeftAtIsNull(10L, 1L))
+            .thenReturn(Optional.of(currentMember))
 
         val exception = assertThrows(BusinessException::class.java) {
             workplaceService.joinWorkplace("ABC123", user)
@@ -197,7 +211,7 @@ class WorkplaceServiceTest {
         )
 
         verify(workplaceMemberRepository, never())
-            .save(any<WorkplaceMember>())
+            .saveAndFlush(any<WorkplaceMember>())
     }
 
     @Test
