@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -267,11 +268,114 @@ class ApiV1UserLogoutTest {
         assertThat(savedRefreshToken()).isNull()
     }
 
+    // 출처 헤더만 직접 정해서 로그아웃 (허용 Origin을 자동으로 붙이지 않음)
+    private fun logoutWithHeaders(refreshToken: String, headers: Map<String, String>): ResultActions {
+        val request = post("/api/v1/auth/logout").contextPath("/api/v1")
+            .cookie(Cookie("refreshToken", refreshToken))
+        headers.forEach { (name, value) -> request.header(name, value) }
+        return mvc.perform(request)
+    }
+
+    // 거부된 요청은 DB 토큰도 브라우저 쿠키도 그대로 (쿠키 삭제 헤더 없음)
+    private fun ResultActions.andExpectNothingChanged(refreshToken: String): ResultActions {
+        andExpect(status().isForbidden())
+            .andExpect(header().doesNotExist("Set-Cookie"))
+        assertThat(savedRefreshToken()).isEqualTo(refreshToken)
+        return this
+    }
+
+    @Test
+    @DisplayName("허용된 Origin이면 로그아웃된다")
+    fun logoutWithAllowedOriginSucceeds() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when
+        val result = logoutWithHeaders(refreshToken, mapOf("Origin" to ALLOWED_ORIGIN))
+
+        // then
+        result.andExpectLogoutSuccess()
+        assertThat(savedRefreshToken()).isNull()
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 Origin이면 403이고 DB와 쿠키를 그대로 둔다")
+    fun logoutWithOtherOriginIsRejected() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when: 기존 CORS 설정이 먼저 막음 (응답이 JSON이 아님)
+        val result = logoutWithHeaders(refreshToken, mapOf("Origin" to OTHER_ORIGIN))
+
+        // then
+        result.andExpectNothingChanged(refreshToken)
+    }
+
+    @Test
+    @DisplayName("Origin이 null이면 403이고 DB와 쿠키를 그대로 둔다")
+    fun logoutWithNullOriginIsRejected() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when
+        val result = logoutWithHeaders(refreshToken, mapOf("Origin" to "null"))
+
+        // then
+        result.andExpectNothingChanged(refreshToken)
+    }
+
+    @Test
+    @DisplayName("Origin이 없어도 Referer가 허용된 출처면 로그아웃된다")
+    fun logoutWithAllowedRefererSucceeds() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when
+        val result = logoutWithHeaders(refreshToken, mapOf("Referer" to "$ALLOWED_ORIGIN/schedule?week=1"))
+
+        // then
+        result.andExpectLogoutSuccess()
+        assertThat(savedRefreshToken()).isNull()
+    }
+
+    @Test
+    @DisplayName("Origin 없이 다른 사이트 Referer로 오면 403과 AUTH-007이고 DB와 쿠키를 그대로 둔다")
+    fun logoutWithOtherRefererIsRejected() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when
+        val result = logoutWithHeaders(refreshToken, mapOf("Referer" to "$OTHER_ORIGIN/page"))
+
+        // then
+        result.andExpectNothingChanged(refreshToken)
+            .andExpect(jsonPath("$.code").value("AUTH-007"))
+            .andExpect(jsonPath("$.message").value("허용되지 않은 요청 출처입니다."))
+    }
+
+    @Test
+    @DisplayName("Origin과 Referer가 둘 다 없으면 403과 AUTH-007이고 DB와 쿠키를 그대로 둔다")
+    fun logoutWithoutOriginAndRefererIsRejected() {
+        // given
+        val refreshToken = refreshTokenOf(login())
+
+        // when
+        val result = logoutWithHeaders(refreshToken, emptyMap())
+
+        // then
+        result.andExpectNothingChanged(refreshToken)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("AUTH-007"))
+            .andExpect(jsonPath("$.message").value("허용되지 않은 요청 출처입니다."))
+    }
+
     companion object {
         private const val PASSWORD = "password1"
 
         // application.yml의 custom.cors.allowed-origins 기본값
         private const val ALLOWED_ORIGIN = "http://localhost:3000"
+
+        private const val OTHER_ORIGIN = "http://evil.example"
 
         private const val REFRESH_EXPIRE_MILLS = 1000L * 60 * 60 * 24 * 14
     }
