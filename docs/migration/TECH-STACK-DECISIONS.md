@@ -36,7 +36,7 @@
 | MapStruct / QueryDSL / kapt | 없음 | BUILD, 코드 검색 0건 |
 | DB Driver | `mysql-connector-j` 9.7.0, H2 2.4.240 | RESOLVED |
 | Testcontainers | 2.0.5 (`testcontainers-mysql`) | RESOLVED, BOM |
-| Test DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true`, `ddl-auto: create` | BUILD (`application-test.yml`) |
+| Test DB | `jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true&TC_MY_CNF=testcontainers/mysql`, `ddl-auto: create`. 테스트 Container만 `max_connections = 500` (`src/test/resources/testcontainers/mysql/my.cnf`, 2026-10-28). Spring 테스트 Context마다 연결 Pool(최대 10)이 캐시되어 기본 151로는 Context 17개부터 `Too many connections`가 났고, Pool을 줄이면 10스레드 동시성 테스트가 약해져 서버 한도를 올림 | BUILD (`application-test.yml`) |
 | Test | JUnit Jupiter 6.0.3, Mockito 5.23.0, AssertJ 3.27.7 | RESOLVED |
 | Isolation | 전역 `spring.datasource.hikari.transaction-isolation: TRANSACTION_READ_COMMITTED` (모든 Profile) | BUILD (`application.yml`) |
 | Profile | `dev` (기본, H2 file, `ddl-auto: update`) / `test` (Testcontainers MySQL) / `prod` (MySQL, `ddl-auto: update`) / `init-data` | BUILD |

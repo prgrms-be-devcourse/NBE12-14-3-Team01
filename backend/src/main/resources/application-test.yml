@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true
+    url: jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true&TC_MY_CNF=testcontainers/mysql
 
   jpa:
     hibernate:
