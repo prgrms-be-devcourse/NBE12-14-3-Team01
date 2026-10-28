@@ -23,25 +23,38 @@
 
 ## 2. 진행 상태
 
-> 아래 표는 2026-10-23 `cdaaa13`의 역사적 snapshot이다. 현재 Kotlin 전환0/현재 Blocker로 해석하지 않는다. 2026-10-26 확인된 develop `9959077`에는 Workplace·V4 Kotlin 변경과 mockito-kotlin이 포함되어 있다. J2 PR16/J3 PR21 및 J4 로컬 d9f193b는 각각의 Branch/실행 SHA와 develop 반영 여부를 나누어 기록한다. 이 문서 보정은 미검증 Kotlin 품질/통합 상태를 PASS로 채우지 않는다.
+> 이 절은 서로 다른 시점의 기록을 구분한다. 아래의 역사적 표는 2026-10-23 cdaaa13을 초기 기준으로 작성했으며, V1 행은 2026-10-27에 당시 확인한 내용으로 갱신했다. 이 표의 과거 상태를 현재 상태로 해석하지 않는다. 최신 Git·PR·테스트 상태는 날짜와 SHA를 명시한 현재 snapshot에서 확인한다. 검증 상태 칸은 해당 기준에서 통과한 Run 링크나 식별 가능한 Evidence가 있을 때만 채운다.
 
-Kotlin 상태 근거 (2026-10-23 확인): 3차 원격 Branch는 `develop`·`main`뿐. `develop` `cdaaa13`의 `.kt`는 환경 검증 파일 2개(`KotlinEnvironmentCheck.kt`, `KotlinEnvironmentTest.kt`, PR #1)이며 **Domain 코드의 Kotlin 전환은 0**. 담당자 보고는 받지 않았다 → 담당자 보고 전까지 `UNKNOWN`으로 표시한다.
-2차 Java 저장소의 Test PR #76·#77·#78은 모두 2026-10-22 병합됐다 (2차 `origin/develop` `8da2bec` = 3차 `main`).
+### 2-1. 역사적 진행 상태
+
+Kotlin 상태의 최초 확인 기준은 2026-10-23의 3차 develop cdaaa13이다. 당시 .kt 파일은 Kotlin 환경 검증 파일 2개(KotlinEnvironmentCheck.kt, KotlinEnvironmentTest.kt, PR #1)였으며, Domain 코드의 Kotlin 전환은 없었다. 이는 해당 Commit 시점의 기록이다.
+
+2차 Java 저장소의 Test PR #76·#77·#78은 2026-10-22에 병합됐다. 당시 2차 origin/develop 8da2bec은 3차 저장소의 main 기준이었다.
 
 | V | Branch / PR | Kotlin (Git) | Kotlin (담당자 보고) | MIGRATION_CODE_COMPLETE | KOTLIN_QUALITY_REVIEWED | UNIT_TEST_VERIFIED | INTEGRATION_TEST_VERIFIED | CONTRACT_REGRESSION_VERIFIED | CROSS_DOMAIN_INTEGRATED | API_DOC_UPDATED | Blocker |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 공통 (M0) | PR #1 `chore/kotlin-setup` (MERGED), PR #79 `test/global-tests-kotlin` (OPEN, 2026-10-28 확인) | develop `0aec24f`: Java 테스트 소스 17개. PR #79 Kotlin 소스 검증 snapshot `f86f0777`: Kotlin 대응 파일 17개(테스트 14개 클래스·보조 코드 3개), `src/test/java` 추적 파일 0개. 이후 PR 변경은 문서 두 파일뿐 | Kotlin 소스 snapshot 확인, develop 반영 대기 | — (PR 미병합) | — | — (최신 develop + Kotlin 소스 임시 통합 `clean check`: 514 PASS; 개별 Test 판정 근거와 XML은 PR Evidence로 보관되지 않음) | — | — | — | — | PR #79 현재 문서 후속 Head에 새 CI 미보고, 리뷰 필요. PR #77 병합 후 `src/main/java` 0개로 `checkstyleMain`도 `NO-SOURCE`; Checkstyle 및 Lombok 설정은 별도 Task에서 사용처와 프로젝트 규칙 확인 후 정리 여부 판단. 기존 M0-FOLLOWUP-01~03 (`TECH-STACK-DECISIONS` §5-A) |
-| V1 | 3차 PR #19 `refactor/v1-auth-kotlin`, #26 `fix/rq-actor-id-non-null`, #22 `test/v1-auth-hardening` (모두 MERGED), #46 `test/v1-auth-kotlin` (V1 Test 7개 Kotlin 전환). 이전: 2차 PR #76 `test/auth-tests` | V1 Production 16개 전부 `.kt` (`domain/user/**`, `global/security/**`, `global/rq/**`, develop `6ae2727`). V1 Test 7개 전부 `.kt` (#46, EV-031) | 전환 완료 (2026-10-27) | ✅ EV-024·EV-026, develop Run `40431452631` | — (Step 4 전) | ✅ develop Run `40431452631` (Suite), 로컬 개별 438 PASS (EV-029) | ✅ develop Run `40431452631` (Suite), 로컬 개별 438 PASS (EV-029) | — (로컬 비교 EV-025·EV-027만, CI Run 없음) | — | — | 없음. 남은 것: Step 4, AUTH-1 서버 로그아웃 구현 (G03-D-23 정책은 APPROVED. 구현·회귀 검증과 jti·Origin·Cookie 조건은 별도 확인) |
-| V2 | 2차 PR #78 `test/workplace-tests` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
-| V3 | 2차 PR #77 `test/schedule-state-consistency` (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
-| V4 | 없음 (Delivery Sheet 시범: `docs/delivery/V4-substitute.md`) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
+| 공통 (M0) | 3차 PR #1 chore/kotlin-setup (MERGED → cdaaa13) | 환경 검증 파일 2개 | UNKNOWN | — | — | — | — | — | — | — | Owner 미지정 (D-NOW-01), DL-003·004·014 승인 기록, M0-FOLLOWUP-01~03 (TECH-STACK-DECISIONS §5-A) |
+| V1 | 3차 PR #19 refactor/v1-auth-kotlin, #26 fix/rq-actor-id-non-null, #22 test/v1-auth-hardening (모두 MERGED), #46 test/v1-auth-kotlin (V1 Test 7개 Kotlin 전환). 이전: 2차 PR #76 test/auth-tests | V1 Production 16개 전부 .kt (domain/user/**, global/security/**, global/rq/**, develop 6ae2727). V1 Test 7개 전부 .kt (#46, EV-031) | 전환 완료 (2026-10-27 당시 확인) | ✅ EV-024·EV-026, develop Run 40431452631 | — (Step 4 전) | ✅ develop Run 40431452631 (Suite), 로컬 개별 438 PASS (EV-029) | ✅ develop Run 40431452631 (Suite), 로컬 개별 438 PASS (EV-029) | — (로컬 비교 EV-025·EV-027만, CI Run 없음) | — | — | 당시 남은 항목: Step 4 및 AUTH-1 검토. 현재 V1 상태는 아래 snapshot을 확인한다. |
+| V2 | 2차 PR #78 test/workplace-tests (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
+| V3 | 2차 PR #77 test/schedule-state-consistency (Java Test, MERGED) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
+| V4 | 없음 (Delivery Sheet 시범: docs/delivery/V4-substitute.md) | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0, Lock 구간은 H6 결과 (D-NOW-04) |
 | V5 | 없음 | 없음 | UNKNOWN | — | — | — | — | — | — | — | M0 |
 
-> **현재 공통 테스트 마이그레이션 확인 (2026-10-28 snapshot):** `origin/develop` `0aec24f367066b88093f94ab05557c224959696c`에는 Java 테스트 소스 17개가 남아 있다. PR #79 Kotlin 소스 검증 snapshot `f86f0777d4cc4ec33d133d65683892ff23ee0e9a`에서는 이 범위가 Kotlin 대응 파일로 이동해 `backend/src/test/java` 추적 파일이 0개다. 이후 PR 브랜치 변경은 문서 두 파일뿐이며 PR #79는 아직 미병합이다. 최신 develop 기준 임시 통합은 `MIGRATION-MATRIX.md` 충돌을 임시로 해결한 뒤 `./gradlew clean check`에서 JUnit XML 70개, 테스트 514, 실패 0, 오류 0, Skip 0으로 완료됐다. PR 브랜치에는 최신 develop과의 문서 충돌이 남아 있고, 문서 후속 Head의 CI는 아직 보고되지 않았다. 따라서 임시 통합 결과는 PR 자체의 병합 가능성이나 PR CI 성공으로 취급하지 않으며, 이 상태는 전체 Migration 완료 판정도 아니다.
+### 2-2. 현재 상태 snapshot (2026-10-28 확인)
 
-**후속 정리 후보 (별도 Task):** PR #79 Head에서 Java 테스트 소스가 0개이므로 `testCompileOnly(lombok)`, `testAnnotationProcessor(lombok)`, `checkstyleTest`가 `NO-SOURCE`인지 재확인한다. 최신 develop에서는 PR #77 병합으로 `src/main/java`도 0개이며 임시 통합 `clean check`에서 `checkstyleMain` 역시 `NO-SOURCE`였다. 따라서 Checkstyle 플러그인·설정과 `compileOnly(lombok)`, `annotationProcessor(lombok)`, `kotlin("plugin.lombok")`의 제거 여부를 별도 Task에서 사용처·DL-004 근거·빌드 효과를 확인해 판단한다. 이번 테스트 Migration PR에서 Gradle 설정은 변경하지 않는다.
+기준 origin/develop은 0aec24f367066b88093f94ab05557c224959696c이다. PR #79의 Base는 933fd88cf4c79072a5ae067070e03f8b3dd977c4로 현재 develop보다 이전이다. 아래 PR Head와 Kotlin 소스 검증 Commit은 목적이 다르므로 각각 구분해 기록한다.
 
-Java 실행 결과 (모든 V 공통): D0-B 조사 당시 Java Snapshot `243f77c`에서 266 Test PASS — EV-002, EV-003. **최종 Java Baseline(`BL-TBD`)이 아니다.** PR #76·#77·#78은 병합됐고 후보 SHA는 `8da2bec`이지만, `8da2bec`(2차 CI Run `39729371810`)와 3차 `cdaaa13`(EV-008)에는 **CI Suite success만** 있고 개별 Test 결과·Test 수 기록이 없다. 최종 Baseline(`BL-TBD`)은 B3 검증 후 선언한다 (DL-013). 이것은 **Java** 검증이며 Kotlin 상태 칸에 쓰지 않는다.
+| 영역 | 현재 확인 내용 | 판정 및 남은 조건 |
+|---|---|---|
+| 공통 테스트 / M0 / PR #79 | 최신 develop에는 backend/src/test/java 추적 파일 17개가 남아 있다. Kotlin 소스 검증 snapshot f86f0777d4cc4ec33d133d65683892ff23ee0e9a에는 Kotlin 대응 파일 17개(테스트 클래스 14개, 보조 코드 3개)가 있고 backend/src/test/java 추적 파일은 0개다. 그 뒤 PR 브랜치 변경은 문서 두 파일뿐이었다. | PR #79는 OPEN이며 미병합이다. 최신 develop과의 병합 시험에서 docs/migration/MIGRATION-MATRIX.md 충돌이 발생했다. 확인 당시 PR Head의 새 CI 체크는 보고되지 않았고, PR은 DIRTY 상태였다. |
+| PR #79 임시 통합 테스트 | 최신 develop과 PR Kotlin 소스 snapshot을 별도 임시 Worktree에서 결합하고 문서 충돌을 임시 해결한 뒤 ./gradlew clean check --no-daemon --gradle-user-home /tmp/switch-pr79-gradle-home을 실행했다. JUnit XML 70개에서 514건 실행, 실패 0, 오류 0, Skip 0이었다. | 로컬 임시 통합 실행 결과다. PR Head의 CI 성공이나 PR 브랜치의 병합 가능 상태를 뜻하지 않는다. 개별 테스트별 Evidence로 보관된 결과가 아니므로 UNIT_TEST_VERIFIED 또는 INTEGRATION_TEST_VERIFIED를 이 결과만으로 PASS 처리하지 않는다. |
+| Java 테스트·Checkstyle 태스크 | 임시 통합 실행에서 compileTestJava, checkstyleTest, checkstyleMain은 NO-SOURCE였다. 최신 develop의 backend/src/main/java 추적 파일 수는 0개였다. | testCompileOnly(lombok), testAnnotationProcessor(lombok), Checkstyle 및 Lombok 설정의 정리 여부는 별도 Task에서 사용처와 기술 결정 근거를 확인한다. 이번 PR에서는 Gradle 설정을 변경하지 않는다. |
+| V1 AUTH-1 서버 로그아웃 | Backend PR #74가 2026-10-28 병합됐고, merge Commit은 115c19275b391f60aea985a4f129ad6df8867d75이다. Issue #62는 종료됐다. Backend Check와 Docker Build CI가 성공했다. | PR #76 Frontend도 2026-10-28 병합됐으며 merge Commit은 eeef2c2155c9b80f2827ee0ba2a111691fabad20이다. 이 병합 사실만으로 배포 환경 검증까지 완료된 것으로 판단하지 않는다. |
+| BackendApplication Kotlin 전환 | PR #77은 2026-10-28 병합됐고 merge Commit은 최신 develop 0aec24f367066b88093f94ab05557c224959696c이다. | 현재 develop의 backend/src/main/java 추적 파일은 0개다. Checkstyle 태스크의 NO-SOURCE 상태와 설정 제거 여부는 별도로 판단한다. |
+
+이번 임시 통합 실행은 문서 변경을 포함한 PR 통합 테스트용 확인이다. 실행 당시 사용한 임시 Worktree의 결과물은 저장소의 영구 Evidence로 보관하지 않았다. 따라서 위 실행 결과는 이 snapshot의 보조 근거로만 사용하고, 개별 PR 테스트의 통과 근거나 PR CI 결과로 대체하지 않는다.
+
+PR #79의 최신 Head 및 상태는 문서 확인 시점에 다시 조회한다. 문서 수정 Commit이 추가되면 PR Head SHA가 달라질 수 있으므로, Kotlin 테스트 코드의 검증 snapshot과 PR의 현재 Head SHA를 같은 값으로 취급하지 않는다.
 
 ## 3. Domain별 필수 Regression Test (재사용할 기존 Test)
 
@@ -121,7 +134,7 @@ S2-6B 보완 (2026-10-25, 제안): ① Java ↔ Kotlin 호출 호환성을 위�
 |---|---|---|---|---|---|---|---|---|
 | IMP-01 | 실제 Security Filter 경계 검증 (AUTH-EV-01) | 안전 위험 (검증 후 필수 가능) | 무토큰 접근 차단 확인 | V1 | 작음 (Test) | 중간 | M0 무관, PR #76 확인 | PENDING |
 | IMP-02 | 동시 ACCEPT 재현 (SUB-EV-05) RR / RC 대조 | 안전 위험 | 대타 중복 확정 방지 | V4 | 작음 (Harness 있음, LOCAL_ONLY) | 중간 | T-02A/B 공유 승인 | PENDING |
-| IMP-03 | 서버 Logout (H1) | 팀 선택 | 보안 | V1 | 중간 | 중간 | G03-D-23 | PENDING |
+| IMP-03 | 서버 Logout (H1) | 완료 기록 | 보안 | V1 | 구현 완료: Backend PR #74 병합, Frontend PR #76 병합, Issue #62 종료 | Backend·Frontend PR CI 성공 | G03-D-23 | DONE |
 | IMP-04 | Membership 종료 최소안 (H2). 구체안 ML-DECISION-01·ML-SUB-STATE-01·ML-CONCURRENCY-01-R은 ② `PROPOSED`, 팀 문서 미작성 | 팀 선택 | 퇴사자 처리 | V2~V5 | 큼 | 큼 | G03-D-11 | PENDING |
 | IMP-05 | DRAFT 조회에 다른 근무지 충돌 boolean 표시 | 팀 선택 (P1 후보) | 관리자 사전 인지 | V3 | 중간 | 중간 | DL-001 | PENDING |
 | IMP-06 | Outbox / Retry (H5) | 팀 선택 (비권장) | 알림 유실 감소 | V5 | 큼 | 큼 | G03-D-22 | PENDING |

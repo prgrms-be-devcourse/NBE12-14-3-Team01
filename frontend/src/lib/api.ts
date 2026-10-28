@@ -60,7 +60,7 @@ export class UnexpectedResponseError extends Error {
 const EXPIRED_TOKEN_CODE = "AUTH-006";
 
 // 재발급하면 안 되는 경로 (무한 반복 방지)
-const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh"];
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh", "/auth/logout"];
 
 // 진행 중인 재발급과 그걸 시작한 로그인 회차, 여러 요청이 동시에 만료돼도 한 번만 부르려고 같이 씀
 let refreshing: { promise: Promise<void>; version: number } | null = null;
@@ -115,7 +115,7 @@ async function request<T>(
 }
 
 // refreshToken 쿠키로 새 accessToken 받아서 저장, 같은 로그인에서 이미 받는 중이면 그 결과를 같이 기다림
-function refreshAccessToken(): Promise<void> {
+export function refreshAccessToken(): Promise<void> {
   if (refreshing && refreshing.version === sessionVersion) {
     return refreshing.promise;
   }

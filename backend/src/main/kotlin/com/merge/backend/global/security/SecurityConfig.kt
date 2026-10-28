@@ -37,6 +37,7 @@ class SecurityConfig(
                         "/auth/signup",
                         "/auth/login",
                         "/auth/refresh",
+                        "/auth/logout",
                     )
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup")

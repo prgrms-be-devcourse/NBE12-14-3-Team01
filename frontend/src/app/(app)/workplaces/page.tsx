@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import {useCallback, useEffect, useRef, useState} from "react";
-import { apiFetch, clearToken } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import { logout } from "@/lib/logout";
 import {useRouter} from "next/navigation";
 import {useCurrentUser} from "@/components/providers/CurrentUserProvider";
 
@@ -30,6 +31,7 @@ export default function WorkplacesPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const listRequestIdRef = useRef(0);
 
   // 로그인한 사람 이름, 동그라미엔 첫 글자
@@ -71,9 +73,14 @@ export default function WorkplacesPage() {
     void fetchWorkplaces();
   }, [fetchWorkplaces]);
 
-  // 토큰 지우고 로그인 화면으로 (뒤로 가기로 못 돌아오게 replace)
-  const handleLogout = () => {
-    clearToken();
+  // 서버 로그아웃 후 로그인 화면으로 (실패해도 이동, 안내는 로그인 화면이 보여줌. 뒤로 가기로 못 돌아오게 replace)
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    await logout();
     router.replace("/login");
   };
 
@@ -216,9 +223,10 @@ export default function WorkplacesPage() {
               <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-xl border border-[#dce8e2] bg-white px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7] hover:text-[#005642]"
+                  disabled={isLoggingOut}
+                  className="rounded-xl border border-[#dce8e2] bg-white px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7] hover:text-[#005642] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                로그아웃
+                {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
               </button>
             </div>
           </div>

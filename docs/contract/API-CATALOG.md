@@ -260,7 +260,8 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | 하지 않는 것 | Access Token 즉시 무효화, 다중 기기 세션, Rotation (AUTH-1 Q2-1, G03-D-24) |
 | 배포 환경 확인 (S3) | Frontend와 Backend의 출처가 다르면(다른 도메인) Refresh Cookie는 `SameSite=None; Secure`여야 전송된다. 이 값과 허용 출처 목록이 운영 배포와 맞는지, `Origin`이 비는 요청(일부 브라우저·직접 호출)이 `Referer`로 처리되는지 확인. 운영 설정값은 배포 담당 확인 (운영 접속 금지) |
 | Frontend | 결과와 관계없이 화면 정리. 서버 무효화가 확인되지 않으면 안내하고 다시 시도 (Q5-1) |
-| Test | AUTH-1 V1-N-01~12 |
+| Test | AUTH-1 V1-N-01~13 (TEST-INVENTORY V1 AUTH-1 절) |
+| 구현 (2026-10-28) | Issue #62 `feat/auth-server-logout` (PR 전, `develop` 미반영). 경로 `POST /auth/logout` 확정, 성공 200 `"로그아웃되었습니다"`·`data: null`. 허용 목록은 `custom.cors.allowed-origins` 재사용 (`application.yml` 변경 없음). **허용 안 된 Origin·`Origin: null`은 기존 CORS가 먼저 403 `Invalid CORS request`(JSON 아님)**, Origin 없음 + Referer 실패·둘 다 없음은 403 `AUTH-007`. 세부는 AUTH-1 "Backend 구현 기록" 절 |
 
 ### 5-2. 기존 API 동작 변경 (모두 승인 대상, Migration 후 Improvement)
 
@@ -417,3 +418,4 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-25 | S3-A: 대타 승인·종료의 "역할 먼저 검사"(W안), M3-T1·T5 기대값 갱신, 새 API-SB-02 (관리자 끝난 대타 요청, P0 후보) — 사용자 잠정 결정, 팀 `PENDING` |
 | 2026-10-25 | S3-B: W안 3단계에 Lock 후 권한 재확인과 1단계가 최종 인가가 아님을 명시, API-SB-02에 경계(`startAt == now`)·`Clock`·DB 식·ID 비노출·만료 비저장·`/api/v1`·ID 혼동 주의 추가 (정적 확인 근거 포함) |
 | 2026-10-25 | S3 Commit 전: W안·M3와 G03-D-04 연결 명시, API-SB-02 DB 식의 적용 전제(대상 필터 후, APPROVED 제외), `hasNewerActiveRequest`의 진행 중 정의, 이름 스냅샷 사실 |
+| 2026-10-28 | API-AU-01 구현 행 추가 (경로·응답 확정, 출처 검사와 CORS 거부 관계), Test ID V1-N-13 추가 |
