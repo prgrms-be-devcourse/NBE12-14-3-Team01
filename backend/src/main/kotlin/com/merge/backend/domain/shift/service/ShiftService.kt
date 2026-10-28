@@ -65,7 +65,7 @@ class ShiftService(
 
         val shiftUserId = shift.member.user.id
 
-        if (shiftUserId != currentUserId) {
+        if (shiftUserId != currentUserId || shift.member.leftAt != null) {
             throw BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS)
         }
         return shift

@@ -90,6 +90,7 @@ interface SubstituteCandidateRepository : JpaRepository<SubstituteCandidate, Lon
         SELECT c
         FROM SubstituteCandidate c
         WHERE c.member.user.id = :userId
+          AND c.member.leftAt IS NULL
           AND c.status = 'ACCEPTED'
           AND c.request.status = 'ACCEPTED'
           AND c.request.shift.startAt > :now

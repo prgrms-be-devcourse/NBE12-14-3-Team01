@@ -180,11 +180,17 @@ class RegularShiftPatternService(
 
     private fun requireManager(workplaceId: Long?) {
         val actorId = rq.actorId
-        val actorMember = workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId)
-            .orElseThrow { BusinessException(RegularShiftErrorCode.MEMBER_NOT_IN_WORKPLACE) }
-        if (actorMember.leftAt != null) {
-            throw BusinessException(RegularShiftErrorCode.MEMBER_NOT_ACTIVE)
-        }
+        val actorMember = workplaceMemberRepository
+            .findByWorkplace_IdAndUser_IdAndLeftAtIsNull(workplaceId, actorId)
+            .orElseThrow {
+                // 종료 소속만 있는 경우의 기존 오류 계약을 단건 이력 조회 없이 보존한다.
+                val errorCode = if (workplaceMemberRepository.existsByWorkplaceIdAndUserId(workplaceId, actorId)) {
+                    RegularShiftErrorCode.MEMBER_NOT_ACTIVE
+                } else {
+                    RegularShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
+                }
+                BusinessException(errorCode)
+            }
         if (actorMember.role != WorkplaceRole.MANAGER) {
             throw BusinessException(RegularShiftErrorCode.MANAGER_REQUIRED)
         }
