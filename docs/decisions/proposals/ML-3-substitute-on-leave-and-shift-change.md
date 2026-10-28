@@ -7,8 +7,8 @@
 | 결정 단계 | **사용자 잠정 결정** (2026-10-23). 팀 승인 전 |
 | ② 정책 | 카드 `PROPOSED`. `DECISION-LOG` G03-D-11·D-15·D-17·D-18·D-22 모두 `PENDING` |
 | ③ 문서 | `DRAFT` (저장소 Proposal 문서. 2026-10-25 이관, 원본 로컬 `drafts/D4-ML-3/`) |
-| 구현 | **근무 변경 시 대타 종료 구현 (2026-10-28, `feat/v4-shift-change-close-requests`, PR 전·`develop` 미반영)**. 세부는 끝의 "V4 구현 기록" 절. 퇴사 처리(ML-3-P·P1·A)와 V3 Command 연결은 없음. Kotlin Migration PR과 분리된 Improvement |
-| ④ / ⑤ | V4-N-08·09(V4 함수 부분)·10·11·17·19·20, V4-N-55~59 `IMPLEMENTED` / `LOCAL_PASSED` (EV-034, TEST-INVENTORY "V4 근무 변경 시 대타 종료" 절). 나머지 신규 Test `SPECIFIED` / `NOT_RUN` |
+| 구현 | **근무 변경 시 대타 종료 구현 (2026-10-28, PR #80 머지)**. V3 공개 근무 취소(PR #87)·담당자 변경(`b411f2e`)이 이 함수를 호출. **퇴사자 후보 처리 구현 (2026-10-29, `feat/v4-leave-candidate-ineligible` `9e80e5a`)**: ML-3-P·P1·A와 거절 경로 종료 판정. V2 퇴사 확정 연결은 없음. 세부는 끝의 "V4 구현 기록" 절들. Kotlin Migration PR과 분리된 Improvement |
+| ④ / ⑤ | V4-N-08·09(V4 함수 부분)·10·11·17·19·20, V4-N-55~59 `IMPLEMENTED` / `LOCAL_PASSED` (EV-034, TEST-INVENTORY "V4 근무 변경 시 대타 종료" 절). V4-N-13~16·22, H6-C5·C6, V4-N-65~71 `IMPLEMENTED` / `LOCAL_PASSED` (EV-038, TEST-INVENTORY "V4 퇴사자 후보 처리" 절). 나머지 신규 Test `SPECIFIED` / `NOT_RUN` |
 | 기준 코드 | 3차 `develop` `31ecaee` (PR #5 병합 후. Production은 `c0427c2`와 같고 Substitute Test만 변경). 정적 확인 |
 | 이관 당시 develop HEAD | `a148a62` (2026-10-25). `backend/src/main`은 `cdaaa13` 이후 변경 0 (이관 시 diff로 확인) |
 | 코드 근거 재검증 | **NO** (S2-1은 이관만 함. 본문의 줄 번호·Test 근거는 위 "기준 코드" 시점 값). 이후 검증 예정: S2-2~S3 |
@@ -165,7 +165,7 @@ ML-2·D-27로 공개 후 근무 인계·취소와 퇴사가 생기면, 지금 �
 | 배포 순서 후보 | ① DB에 새 값 허용 → ② 새 값을 **읽을 수 있는** 앱 배포 (아직 쓰지 않음) → ③ 새 값을 쓰는 기능 활성화 |
 | Rollback 위험 | 새 값이 저장된 뒤 예전 앱으로 되돌리면 Enum 변환 실패로 조회 500 (원문 B+ §5). ② 단계 이후로만 되돌리거나, 되돌릴 때 값을 바꾸는 절차가 필요 |
 | 함께 묶을 변경 | ML-2 Shift 취소 Column, 배정 이력 Table, §4 연결 Column, 알림 Type |
-| 확인 (2026-10-28, 실행) | test Profile(Testcontainers MySQL 9.7.2, `ddl-auto: create`)에서 Hibernate가 `@Enumerated(STRING)`을 **MySQL `ENUM(...)`**으로 만듦: `substitute_request.close_reason` = `enum('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED')`(새 코드에서는 `SHIFT_CHANGED` 포함), `substitute_candidate.status`·`substitute_request.status`·`notification.type`도 ENUM. 예전 값만 있는 ENUM에 `SHIFT_CHANGED` 저장 → `DataIntegrityViolationException / Data truncated` (`sql_mode`에 `STRICT_TRANS_TABLES`). `application-prod.yml`은 `ddl-auto: update`이고 별도 Migration 도구 없음. `update`가 기존 ENUM 허용 값을 바꾸는지는 **실행하지 않음**. → V3 근무 취소·담당자 변경이 종료 함수를 호출하기 전에 운영 DB에 `ALTER TABLE substitute_request MODIFY close_reason ENUM('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED','SHIFT_CHANGED');` 적용 필요 (배포 담당, EV-034). 운영 Column 실제 형식은 여전히 배포 담당 확인 대상 |
+| 확인 (2026-10-28, 실행) | test Profile(Testcontainers MySQL 9.7.2, `ddl-auto: create`)에서 Hibernate가 `@Enumerated(STRING)`을 **MySQL `ENUM(...)`**으로 만듦: `substitute_request.close_reason` = `enum('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED')`(새 코드에서는 `SHIFT_CHANGED` 포함), `substitute_candidate.status`·`substitute_request.status`·`notification.type`도 ENUM. 예전 값만 있는 ENUM에 `SHIFT_CHANGED` 저장 → `DataIntegrityViolationException / Data truncated` (`sql_mode`에 `STRICT_TRANS_TABLES`). `application-prod.yml`은 `ddl-auto: update`이고 별도 Migration 도구 없음. `update`가 기존 ENUM 허용 값을 바꾸는지는 **실행하지 않음**. → V3 근무 취소·담당자 변경이 종료 함수를 호출하기 전에 운영 DB에 `ALTER TABLE substitute_request MODIFY close_reason ENUM('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED','SHIFT_CHANGED');` 적용 필요 (배포 담당, EV-034). 운영 Column 실제 형식은 여전히 배포 담당 확인 대상. **퇴사자 후보 처리 추가 (2026-10-29):** 새 값 `CANDIDATE_INELIGIBLE`·`INELIGIBLE` 때문에 V2 퇴사 확정 배포 전에 `ALTER TABLE substitute_request MODIFY close_reason ENUM('ALL_CANDIDATES_REJECTED','EXPIRED','MANAGER_CLOSED','SHIFT_CHANGED','CANDIDATE_INELIGIBLE');`와 `ALTER TABLE substitute_candidate MODIFY status ENUM('PENDING','REJECTED','ACCEPTED','INELIGIBLE') NOT NULL;` 적용 필요 (EV-038) |
 
 ## 10. H6 경합 후보 (기대 결과 수정본, 모두 `SPECIFIED` / `NOT_RUN`)
 
@@ -280,6 +280,24 @@ ML-3-Q1(G03-D-15 APPROVED)의 "근무 변경 시 활성 요청 `SHIFT_CHANGED` �
 | 운영 DB | `close_reason`이 MySQL ENUM이라 V3 호출 전에 `ALTER` 필요 (§9 확인 행) | §9 |
 | 하지 않은 것 | V3 Command 연결, 알림 Type·발행, 퇴사 처리(P·P1·A), 종료 원인 연결(§4), Frontend `SHIFT_CHANGED` 표시 | — |
 
+## V4 구현 기록 — 퇴사자 후보 처리 (2026-10-29)
+
+ML-3-P·P1·A의 V4 부분. V2 퇴사 확정 Command(API-LV-02)가 같은 Transaction 안에서 부르는 함수로 만들었다 (RELEASE-READINESS-PLAN: C는 V2 주관, V4는 호출 계약 제공). 이 기능만으로는 호출하는 곳이 없다.
+
+| 항목 | 내용 | 근거 |
+|---|---|---|
+| 함수 | `SubstituteCandidateService.closeCandidaciesByMemberLeave(memberId, now)` → `MemberLeaveCandidacyResult` (`closedRequests`: 닫은 요청 ID·요청자 소속 ID, ID 오름차순 / `ineligibleCandidacies`: INELIGIBLE로 바꾼 대기 후보 수) | V4 Owner 결정 (문서에 형식 없음). API-LV-02 `closedRequests`·`ineligibleCandidacies` |
+| 대상 | 그 소속이 PENDING·ACCEPTED 후보로 걸린 OPEN·ACCEPTED Request 중 **근무 시작 전**인 것을 ID 오름차순 `FOR UPDATE` (`findActiveByCandidateMemberIdForUpdate`). 다른 근무지 소속·APPROVED·CLOSED는 건드리지 않음 | §5 (`PENDING → INELIGIBLE` 조건), §7 범위, ML-5 §5-1 |
+| 처리 | 수락자 → Request `CLOSED / CANDIDATE_INELIGIBLE`, 후보 ACCEPTED 유지 (A). 대기 후보 → `INELIGIBLE`, `respondedAt` null (P). OPEN이고 응답 가능 후보(**그 소속을 뺀 현재 소속의 PENDING**) 0명 → `CANDIDATE_INELIGIBLE` 종료 (P1) | ML-3-P·P1·A |
+| Lock 뒤 판단 | Request·Candidate 상태를 Entity가 아니라 DB 값으로 다시 읽어 판단 (Lock 전에 읽힌 Entity의 옛 상태로 수락 기록을 덮지 않기 위해) | ML-5 §4-3 |
+| 퇴사 순서와 무관 | 응답 가능 후보를 셀 때 퇴사자 소속을 ID로 직접 빼므로, V2가 `leftAt`을 이 함수 전·후 어느 쪽에 기록해도 결과가 같다 | — |
+| Transaction | `Propagation.MANDATORY` | ML-3 §6 단일 Transaction |
+| 거절 경로 | 마지막 PENDING 거절로 닫을 때 INELIGIBLE 후보가 있으면 `CANDIDATE_INELIGIBLE` + 새 `SubstituteCandidateIneligibleEvent` (받는 사람 = 요청자 + 현재 관리자), 없으면 기존 `ALL_CANDIDATES_REJECTED` + 기존 Event. 기존 Test 기대값 변경 0 | §3 "같은 종료 판정 규칙", NOTIFICATION-TYPES `SUBSTITUTE_CANDIDATE_INELIGIBLE`(거절 또는 퇴사 처리 안)·NT-T11, G03-D-22 새 알림 6종 |
+| 알림 | 퇴사 함수는 이벤트를 발행하지 않는다 (받는 사람은 퇴사 확정 결과로 V5가 정함, 퇴사자 제외). 거절 경로의 새 Event를 받는 Listener와 `NotificationType`은 **V5 후속**. INELIGIBLE은 이 함수만 만들어 V2 퇴사 확정 전에는 생기지 않으므로 그 전까지 알림 공백은 없다 | NOTIFICATION-TYPES §3-1, V5-N-20 |
+| 결정 수준 | ML-3-A는 DECISION-LOG §4-2 G03-D-15 APPROVED. ML-3-P·P1은 사용자 잠정 결정 (G03-D-12 "단일 Transaction으로 대타 정리", §4-4 "후보자격변경"을 근거로 구현) → **팀 확인 대상** | DECISION-LOG §4 |
+| 운영 DB | `close_reason`·`substitute_candidate.status` ENUM에 새 값 `ALTER` 필요 (§9) | §9 |
+| 하지 않은 것 | V2 퇴사 확정 연결, 대타 생성·수락 시 소속 `FOR SHARE` 재확인(H6-C7, ML-5 Membership Guard), 승인 시 수락자 소속 재확인, 알림 Type, Frontend 새 상태·사유 표시 | — |
+
 ## 16. 변경 이력
 
 | 일자 | 내용 |
@@ -290,3 +308,4 @@ ML-3-Q1(G03-D-15 APPROVED)의 "근무 변경 시 활성 요청 `SHIFT_CHANGED` �
 | 2026-10-25 | 저장소 이관 (메타데이터만 수정). "S1 결정 연결" 절 추가와 머리 표 경로를 링크로 변경 (본문 판단 변경 없음) |
 | 2026-10-25 | S2-5B: "S1 결정 연결"에 V4-N-08·09·14 알림 기대값 연결, V4-N-20 통합 표시 (본문 수정 없음) |
 | 2026-10-28 | 근무 변경 시 대타 종료 구현: 머리 표 구현·④/⑤, §9 확인 행 (MySQL ENUM, 예전 ENUM 저장 실패 재현, `ALTER` 필요), 끝에 "V4 구현 기록" 절 (EV-034) |
+| 2026-10-29 | 퇴사자 후보 처리 구현: 머리 표 구현·④/⑤, §9에 ENUM 2개 ALTER, 끝에 "V4 구현 기록 — 퇴사자 후보 처리" 절 (EV-038). 머리 표의 근무 변경 구현 상태를 PR #80 머지·V3 호출로 갱신 |
