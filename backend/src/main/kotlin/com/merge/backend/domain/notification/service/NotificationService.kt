@@ -164,6 +164,15 @@ class NotificationService(
         }
     }
 
+    // 새 알림 (공개 후 근무 변경, 후보 자격 상실, 가입). 받는 사람·문구는 업무 Transaction 안에서 정해 둔 값 그대로 저장
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun createPlannedNotification(planned: PlannedNotification) {
+        val recipientMember = workplaceMemberRepository.findById(planned.recipientMemberId)
+            .orElseThrow { IllegalStateException("알림 수신자를 찾을 수 없습니다. memberId=${planned.recipientMemberId}") }
+
+        create(recipientMember, planned.type, planned.message)
+    }
+
     @Transactional
     fun markAsRead(
         actorUserId: Long?,
