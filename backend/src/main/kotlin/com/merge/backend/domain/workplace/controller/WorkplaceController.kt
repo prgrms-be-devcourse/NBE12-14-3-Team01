@@ -87,4 +87,15 @@ class WorkplaceController(
             ApiResponse.success("200", "Workplace 초대 코드를 조회했습니다.", response)
         )
     }
+
+    @PostMapping("/{workplaceId}/invite-code")
+    fun regenerateInviteCode(
+        @PathVariable("workplaceId") workplaceId: Long
+    ): ResponseEntity<ApiResponse<WorkplaceInviteCodeResponse>> {
+        val workplace = workplaceService.regenerateInviteCode(workplaceId, rq.actorId)
+        val response = WorkplaceInviteCodeResponse.from(workplace)
+        return ResponseEntity.ok(
+            ApiResponse.success("200", "Workplace 초대 코드를 재발급했습니다.", response)
+        )
+    }
 }
