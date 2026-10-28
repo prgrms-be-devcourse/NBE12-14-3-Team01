@@ -6,10 +6,10 @@
 |---|---|
 | ③ 문서 | `DRAFT`. S2-3B — **B1(퇴사·공개 후 근무 변경)**, **B2(소속·조회·인증) 초안 (2026-10-25)** |
 | ② 정책 | 여기 적힌 새 API와 기존 API 변경은 모두 정책 카드의 **사용자 잠정 결정 / `PROPOSED`**에서 나온 **후보**다. 팀 승인 전. 구현 지시가 아니다 (AI-RULES §3) |
-| 구현 | 없음. Kotlin Migration PR은 기존 API를 그대로 옮긴다. 이 문서의 내용은 Migration 이후 별도 Improvement PR |
-| ④ / ⑤ | 모든 Test `SPECIFIED` / `NOT_RUN` |
+| 구현 | 최초 작성 시 없음. API-LV-01은 PR #90으로 구현·병합됨 (§3-1). 그 밖의 구현 기록은 각 API 절을 따른다. Kotlin Migration과 Improvement는 구분한다 |
+| ④ / ⑤ | 최초 작성 시 모든 Test `SPECIFIED` / `NOT_RUN`. API-LV-01의 구현 Test 연결·실행 상태는 TEST-INVENTORY §4-3, 다른 후속 기록은 각 API 절을 따른다 |
 | 기준 코드 | 3차 `develop` `a148a62` (Production Java = `cdaaa13`). 기존 Endpoint 목록은 Controller 정적 확인 |
-| 이름 | Method·Path·Field 이름은 모두 **후보**다. 기존 Controller·DTO의 명명에 맞춰 S2-3 끝에 확정한다 |
+| 이름 | 최초 작성 시 Method·Path·Field 이름은 모두 **후보**. API-LV-01의 구현 형식은 §3-1, 다른 후속 확정 기록은 각 API 절을 따른다 |
 
 이 문서는 API의 **모양**(무엇을 받고 무엇을 돌려주는가)만 정의한다. 왜 그렇게 정했는지는 정책 카드가 원본이고, 여기서는 한두 줄 요약과 링크만 둔다. ErrorCode 번호는 S2-4의 공통 목록에서 정한다.
 
@@ -61,25 +61,31 @@
 
 ### 3-1. API-LV-01 퇴사 미리보기
 
+**구현 확인 (2026-10-29):** [PR #90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90) 병합 SHA `e039ccf3627c89bab8c7d00ee02e0e65cb90bde6`의 `LeavePreviewController`·`LeavePreviewService`·`LeavePreviewResponse`·`LeavePreviewContextService`를 정적 대조했다 (① `VERIFIED_AS_IS`). 아래는 조회 API의 구현 사실이며 API-LV-02 구현 완료나 미결정 정책의 승인을 뜻하지 않는다.
+
 | 항목 | 내용 |
 |---|---|
+| 구현 상태 | 구현·병합됨 (PR #90). `GET /api/v1/workplaces/{workplaceId}/members/{memberId}/leave-preview`. 정상 조회는 200, `ApiResponse`의 `code = "200"`, `message = "퇴사 미리보기를 조회했습니다."` |
 | 권한 | 그 근무지의 현재 MANAGER (기존 `WPL-003` / `WPL-004`) |
 | Path 변수 | `memberId` = 퇴사 대상의 **현재 WorkplaceMember ID** |
 | 대상 조건 | 같은 근무지, 현재 소속, EMPLOYEE (ML-H2 H2-9). 대상 소속이 없거나 다른 근무지 소속이면 **404** (§1 대상 범위 오류). 같은 근무지의 이미 종료된 소속이면 409 STATE_CONFLICT |
-| 응답 `data` | `member` (ID, 이름, 역할, 가입 시각) / `ongoingShift` (있으면 확정 불가, 종료 시각) / `publishedShifts[]` (근무 ID, 근무표 ID, 시작·종료, 진행 중 대타 유무·상태) / `draftShiftsToDelete[]` (근무 ID, 시작·종료, 근무표 주차) / `candidacies[]` (대상이 다른 사람 근무의 후보로 걸린 요청: 요청 ID, 후보 상태, 퇴사 시 효과) |
-| 비교 정보 (1차 후보) | `previewContext`: 응답의 공식 근무·DRAFT·대타 영향과 실행자/근무지/대상 소속을 묶은 서버 검증 가능 비교 정보. 무결성·기간·재사용 규칙은 G03-D-05 §5-4. 형식은 Command 구현 착수 때 확정 |
+| 응답 `data` | `member`: { `memberId`, `name`, `role`, `joinedAt` } / `canLeave` / `blockingReason` / `ongoingShift` / `publishedShifts[]` / `draftShiftsToDelete[]` / `candidacies[]` / `previewContext` |
+| 퇴사 가능 여부 | 진행 중 공식 근무(`PUBLISHED`·`SCHEDULED`, `startAt ≤ now < endAt`)가 있으면 **200 + `canLeave = false`**, `blockingReason = "ONGOING_SHIFT"`, `ongoingShift`에 해당 근무와 종료 시각 반환. 여러 건이면 종료 시각이 가장 늦은 근무 (동률이면 큰 `shiftId`)를 반환. 없으면 `canLeave = true`, `blockingReason = null`, `ongoingShift = null`. `endAt == now`는 진행 중이 아니다. 조회에서 `WPL-009`를 반환하지 않으며, 확정의 409 계약은 API-LV-02에 유지 |
+| 근무·대타 영향 형식 | `ongoingShift`·`draftShiftsToDelete[]`: { `shiftId`, `memberId`, `scheduleId`, `scheduleStatus`, `shiftStatus`, `weekStartDate`, `startAt`, `endAt` }. `publishedShifts[]`: 같은 근무 식별·상태·시간 필드 (`weekStartDate` 제외) + `activeRequests[]`: { `requestId`, `requesterMemberId`, `status`, `wouldCloseRequest` }. `candidacies[]`: { `candidateId`, `requestId`, `requesterMemberId`, `shift` (위 근무 형식), `requestStatus`, `candidateStatus`, `otherCurrentPendingCandidates`, `wouldBecomeIneligible`, `wouldCloseRequest` }. 효과는 예상값이며 조회로 상태를 바꾸지 않음 |
+| 비교 정보 (발급 구현) | `previewContext`는 문자열 `lv1.<payload>.<signature>`. payload는 JSON을 Base64 URL-safe 무패딩으로 인코딩하고, signature도 같은 인코딩을 사용. JSON 필드: `schemaVersion = 1`, `actorUserId`, `workplaceId`, `memberId` (WorkplaceMember ID), `issuedAt`, `expiresAt` (Instant), `facts` (정규화한 `LeavePreviewFacts`: 소속·공식/진행 중/DRAFT 근무·활성 요청·후보 관계/상태/예상 효과). **`expiresAt = issuedAt + 15분`** |
+| 서명·후속 검증 | `HMAC-SHA256`으로 `lv1.<payload>`를 서명. JWT 비밀키에서 용도 문자열 `switch:leave-preview:v1`을 HMAC해 파생한 별도 서명 키 사용. 로그인 Token이나 확정 권한이 아니다. **서명·만료 검증, 실행자/근무지/대상 결합 확인, 현재 권한·DB 재검증 및 STALE 비교는 후속 API-LV-02 범위**이며 PR #90의 발급 구현과 구분. 재사용·오류 분기 등 미결정 사항은 G03-D-05 §5-4와 Decision Log §4-4 유지 |
 | 넣지 않는 것 | 불가능 시간 충돌 (인계 대상을 고르기 전이라 계산할 수 없음, G03-D-05 §3) |
-| 상태 변경 | 없음 (조회) |
-| 오류 | 403 PERMISSION (`WPL-003`·`WPL-004`) → 404 NOT_FOUND (대상 소속 없음·다른 근무지, 새 code) → 409 STATE_CONFLICT (대상이 MANAGER, 이미 종료된 소속 — 새 WPL code) 순서로 판정 |
-| 데이터 출처 | 대상 소속, 퇴사자 담당 Shift (PUBLISHED·SCHEDULED·시작 전 / DRAFT), 그 근무의 활성 Request, 대상이 Candidate인 활성 Request |
-| Test | ML-4 V2-N-23 (미리보기 내용) 등 ML-4 §10 |
+| 상태 변경 | 없음 (조회). `@Transactional(readOnly = true, isolation = REPEATABLE_READ)`로 표시값과 서명 원본을 같은 조회 기준에서 구성. 명시적 Lock·업무 쓰기 없음 |
+| 오류 | 403 PERMISSION (`WPL-003`·`WPL-004`) → 404 NOT_FOUND (`WPL-006`: 대상 소속 없음·다른 근무지) → 409 STATE_CONFLICT 순서로 판정. 같은 근무지의 대상은 **소속 종료 여부 (`WPL-008`) → 관리자 역할 (`WPL-007`) 순서**로 검사하므로, **이미 종료된 MANAGER 소속에도 `WPL-008`이 반환된다** |
+| 데이터 출처 | 대상 소속, 퇴사자 담당 Shift (PUBLISHED·SCHEDULED·`endAt > now`인 진행 중/미래 근무 및 시각 제한 없는 DRAFT), 미래 공식 근무의 활성 Request, 대상이 PENDING·ACCEPTED Candidate인 활성 Request (같은 근무지의 PUBLISHED·SCHEDULED·시작 전 근무에 한함) |
+| Test | ML-4 V2-N-23 (미리보기 내용) 및 관련 권한·대상·경계·ML-3 예상 효과 검증: [TEST-INVENTORY §4-3](../evidence/TEST-INVENTORY.md#4-3-api-lv-01-퇴사-미리보기-pr-90). 조회 Test와 퇴사 확정 명세의 전체 검증을 구분 |
 
 ### 3-2. API-LV-02 퇴사 확정
 
 | 항목 | 내용 |
 |---|---|
 | 권한 | API-LV-01과 같음 |
-| 요청 | `previewContext` (API-LV-01에서 받은 비교 정보, 1차 필드 후보) / `decisions[]`: { `shiftId`, `shiftStartAt`, `shiftEndAt` (G03-D-05 P2 비교용), `action`: `REASSIGN` + `targetMemberId` (**인계 대상의 현재 WorkplaceMember ID**) 또는 `CANCEL` } / `acknowledgedUnavailableConflicts[]` (G03-D-05 §5-1, 처음에는 빈 목록) / `regenerateInviteCode` (기본 `false`, ML-H2 H2-5) |
+| 요청 | `previewContext` (API-LV-01에서 발급한 문자열을 그대로 전달하는 후보. 발급 형식은 §3-1, 확정 검증은 후속 구현) / `decisions[]`: { `shiftId`, `shiftStartAt`, `shiftEndAt` (G03-D-05 P2 비교용), `action`: `REASSIGN` + `targetMemberId` (**인계 대상의 현재 WorkplaceMember ID**) 또는 `CANCEL` } / `acknowledgedUnavailableConflicts[]` (G03-D-05 §5-1, 처음에는 빈 목록) / `regenerateInviteCode` (기본 `false`, ML-H2 H2-5) |
 | 검사 순서 | ① 권한 → ② 계획 유효성 P1~P5 (G03-D-05 §4-2) → ③ 우회할 수 없는 충돌 (인계 대상의 공식 근무 중복, 다른 근무지, 시작한 근무) → ④ 불가능 시간 확인 범위 (§5-3 겹침 구간 비교) |
 | 성공 응답 | 200. `data`: `leftAt`, `reassignedShifts[]`, `cancelledShifts[]`, `deletedDraftShifts[]`, `closedRequests` (총수와 사유별 수: `SHIFT_CHANGED`, `CANDIDATE_INELIGIBLE`. 세는 규칙은 API-PS-02 `closedSubstituteRequests`와 같다. 한 요청은 사유 하나로만 세므로 사유별 수의 합 = 총수), `ineligibleCandidacies`, `newInviteCode` (재발급했을 때만) |
 | 404 응답 | Path의 대상 소속이 없거나 다른 근무지 (API-LV-01과 같음). 요청 Body의 `targetMemberId`·`shiftId`가 그 근무지에 없거나 다른 근무지 것이어도 같은 404 (존재 여부를 드러내지 않음) |
@@ -426,4 +432,5 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-28 | API-SB-01 구현 행 추가 (경로 확정, 정렬·필드 이름·7일 경계) |
 | 2026-10-29 | API-SC-01 구현 행 추가 (응답 필드, 정렬·7일 경계·마지막 이력 Row 정의) |
 | 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |
+| 2026-10-29 | PR #90 병합 코드 기준 API-LV-01 구현·응답·서명 문자열/15분 유효기간 동기화. API-LV-02 후속 검증 및 Test Inventory 연결 구분 |
 | 2026-10-29 | CHG-02 SUB-05 현재 소속 구현, CHG-03은 PR #82 구현에 Test 연결 (V4-N-36·37, EV-042) |
