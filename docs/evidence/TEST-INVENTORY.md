@@ -494,6 +494,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-29 | TODO 21 현재 동작 고정: V4-N-01·02·03·48 작성 (`LOCAL_PASSED`, EV-041), V4-N-04·V4-N-02 일부는 기존 Test로 충족 표시, V4-T-13·14·23·82·83과 §3-3 환경 근거 갱신, 끝에 "V4 현재 동작 고정" 절 신설 |
 | 2026-10-29 | ML5-T4 (다른 근무지 수락 × 재배정) 양쪽 순서 작성 (`LOCAL_PASSED`, EV-043), "이중 배정" 해석 기록 (ML-5 §7) |
 | 2026-10-29 | 대타 생성·수락·승인 소속 Guard: ML5/H6 행 갱신, 끝에 "V4 대타 소속 Guard" 절 신설. 기존 Mock Test 14개는 준비 코드만 추가 (기대값 그대로) (EV-045) |
+| 2026-10-29 | 소속 Guard (DRAFT 편집·Pattern 복사): 끝에 "V3 DRAFT 소속 Guard" 절 신설 (ML5-T14·T15·R4, EV-046) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -735,3 +736,23 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 - 회귀 (기대값 변경 0): 기존 Test 목록 그대로 통과. 기존 Mock Test 14개(`SubstituteCandidateServiceTest` 수락 6, `SubstituteRequestServiceTest` 승인 6·생성 2)는 새 소속 재확인 조회의 Mock 설정만 추가 (Assertion·기대값 변경 0, AI-RULES §2 "Fixture" 원인)
 - 수락·승인 Guard는 실제 V2 퇴사가 Request를 먼저 잠가 이미 직렬화되는 경로의 방어 조건이다. 대타 생성 Guard는 퇴사의 조회에 보이지 않는 새 Request의 반례 A를 막는다
 - 범위 밖: ML-3 H6-C8 (요청자 퇴사 × 승인, V2·V3 경로), V2 실제 퇴사 Command와의 경합 (V2 Test)
+
+## V3 DRAFT 소속 Guard (ML5-T14·T15·R4, 2026-10-29)
+
+**소속 Guard 전체 (ML-5 §5 규칙 4):** 위 "V4 대타 소속 Guard" 절(PR #105, 대타 생성·수락·승인)과 이 절(PR #106, DRAFT 추가·수정·Pattern 복사)이 한 묶음이다. 두 절 모두 Lock 뒤 대상 소속 `FOR SHARE` → Scalar 재확인 방식이고 같은 Repository 조회(`findByIdForShare`·`findAllByIdInForShare`·`existsCurrentMember`)를 쓴다. 퇴사 확정 POST 활성화(DL-016·Readiness)는 두 절과 별개다.
+
+[ML-5](../decisions/proposals/ML-5-concurrency-and-lock-order.md) §5-1 DRAFT 편집 행, ML-2-INV-02 ("퇴사 확정 후 퇴사자 DRAFT 0건"). 퇴사 확정 POST는 비활성이라 `LeaveConfirmService`를 직접 호출한다. Class: `DraftMembershipGuardConcurrencyTest` (MySQL Testcontainers, test Profile). 기다림 확인은 first를 Commit 전에 멈추고 second가 1초 안에 끝나지 않는 것으로 본다 (#96과 같은 방식).
+
+| Test ID | Method | 확인하는 것 | ⑤ 실행 |
+|---|---|---|---|
+| ML5-T14 (DRAFT 추가) | `draftAddWaitsForLeaveAndIsRejected` | 퇴사가 소속 `FOR UPDATE` 보유 → DRAFT 추가 대기 → 퇴사 Commit 후 `SFT-004`, 퇴사자 DRAFT 0건 | `LOCAL_PASSED` |
+| ML5-T14 (DRAFT 수정) | `draftModifyToLeaverWaitsForLeaveAndIsRejected` | 다른 직원 DRAFT를 퇴사자에게 옮기는 수정 대기 → `SFT-004`, 담당 그대로 | `LOCAL_PASSED` |
+| ML5-T14 (Pattern 복사) | `scheduleCreationWaitsForLeaveAndSkipsLeaverPattern` | 근무표 생성 대기 → 퇴사자 Pattern 제외, 다른 직원 1건만, `shiftCount = 1` | `LOCAL_PASSED` |
+| ML5-T15 (DRAFT 추가) | `leaveWaitsForDraftAddAndBecomesStale` | DRAFT 추가가 소속 `FOR SHARE` 보유 → 퇴사 대기 → 새 DRAFT 발견 `WPL-010`, `leftAt` 그대로 | `LOCAL_PASSED` |
+| ML5-T15 (Pattern 복사) | `leaveWaitsForScheduleCreationAndBecomesStale` | 근무표 생성이 먼저 → 퇴사 `WPL-010` | `LOCAL_PASSED` |
+| ML5-R4 (AS-IS 재현) | (결함 넣기) | Guard를 지운 코드에서 T14 DRAFT 추가·수정·Pattern 복사가 실패 = 퇴사자 DRAFT 생성 재현. DRAFT INSERT는 FK 공유 Lock으로 퇴사 Commit까지 기다린 뒤 **성공**한다 (ML-5 §4-4 "FK Lock만으로는 막지 못한다") | 재현 확인 (EV-046) |
+
+**⑤ 상태의 뜻:**
+- `LOCAL_PASSED`: develop `6ae6683` + #105 위 전체 836/836, 새 Class 3회 반복 (EV-046). `FOR SHARE`만 지우고 재확인을 남겨도 T14가 실패한다 (Lock과 재확인이 둘 다 필요)
+- 회귀: 기존 Test 기대값 변경 0. `ShiftServiceTest`·`ScheduleServiceTest`는 Guard 조회를 Mock에서 "현재 소속"으로 두는 lenient 기본 Stub만 추가
+- 범위 밖: 대타 생성·수락·승인 소속 Guard (V4), 퇴사 확정 POST 활성화 (DL-016·Readiness)

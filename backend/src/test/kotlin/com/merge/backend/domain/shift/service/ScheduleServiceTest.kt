@@ -47,6 +47,9 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.springframework.context.ApplicationEventPublisher
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
+import org.mockito.Mockito
+import org.junit.jupiter.api.BeforeEach
 
 @ExtendWith(MockitoExtension::class)
 class ScheduleServiceTest {
@@ -77,6 +80,15 @@ class ScheduleServiceTest {
 
     @Mock
     private lateinit var applicationEventPublisher: ApplicationEventPublisher
+
+    // Pattern 복사의 소속 Guard(FOR SHARE 재확인)용. Mock에서는 기본으로 "현재 소속" (실제 Lock 동작은 DraftMembershipGuardConcurrencyTest)
+    @Mock
+    private lateinit var workplaceMemberRepository: WorkplaceMemberRepository
+
+    @BeforeEach
+    fun allowCurrentMembership() {
+        Mockito.lenient().`when`(workplaceMemberRepository.existsCurrentMember(any(), any())).thenReturn(true)
+    }
 
     @Mock
     private lateinit var clock: Clock

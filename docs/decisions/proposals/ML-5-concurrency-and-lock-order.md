@@ -130,7 +130,7 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 |---|---|---|---|
 | 근무표 생성 | Workplace | 없음 | — |
 | Publish | Schedule → User | 없음 | — |
-| DRAFT 편집 | Schedule → **담당 소속 `FOR SHARE` + `leftAt` 재확인** | **필수 (2026-10-23 수정).** AS-IS는 `leftAt`을 Lock 없이 확인한다 (`ShiftService.validWorkplaceMember` L230-238). 퇴사 Commit 직전에 확인을 통과한 추가·수정은 **퇴사자 DRAFT 근무를 남겨 ML-2-INV-02를 위반**한다. Publish 안전장치는 공개만 막을 뿐 이 계약을 지키지 못한다. 그래서 담당 소속 `FOR SHARE`로 퇴사의 `FOR UPDATE`와 직렬화하고, 퇴사는 소속 Lock 후 DRAFT를 다시 조회한다 (잠그지 않은 Schedule에서 새 DRAFT가 보이면 409) | V3 변경 |
+| DRAFT 편집 | Schedule → **담당 소속 `FOR SHARE` + `leftAt` 재확인** | **필수 (2026-10-23 수정).** AS-IS는 `leftAt`을 Lock 없이 확인한다 (`ShiftService.validWorkplaceMember` L230-238). 퇴사 Commit 직전에 확인을 통과한 추가·수정은 **퇴사자 DRAFT 근무를 남겨 ML-2-INV-02를 위반**한다. Publish 안전장치는 공개만 막을 뿐 이 계약을 지키지 못한다. 그래서 담당 소속 `FOR SHARE`로 퇴사의 `FOR UPDATE`와 직렬화하고, 퇴사는 소속 Lock 후 DRAFT를 다시 조회한다 (잠그지 않은 Schedule에서 새 DRAFT가 보이면 409) | V3 변경. **구현 (2026-10-29, PR #106):** DRAFT 추가·수정은 Schedule Lock 뒤 담당 소속 `FOR SHARE` → Scalar 재확인 (`existsCurrentMember`), 실패 `SFT-004`. 근무표 생성 Pattern 복사는 Workplace Lock 뒤 대상 소속 ID 오름차순 `FOR SHARE` → Scalar 재확인, 퇴사자 Pattern 제외. 조회는 대타 Guard(PR #105)와 같은 `findByIdForShare`·`findAllByIdInForShare`·`existsCurrentMember`. ML5-T14·T15·R4 `LOCAL_PASSED` (EV-046) |
 | 대타 생성 | Shift → (후보 소속 `FOR SHARE` + 재확인) → INSERT | **후보 소속 Guard 추가** | V4 변경. **구현 (2026-10-29, PR 리뷰 승인 요청 중):** 후보 선정 뒤 **요청자 + 후보** 소속을 ID 오름차순 `FOR SHARE` → 현재 소속을 Scalar로 다시 확인. 요청자가 나갔으면 `NOT_OWN_SHIFT`, 나간 후보는 빼고 INSERT (요청자 포함은 TASK-V2-69 L70) |
 | 대타 수락 | Request → User → 후보 소속 `FOR SHARE` 재확인 | **Guard 추가** | V4 변경. **구현 (2026-10-29):** User Lock 뒤 수락자 소속 `FOR SHARE` → Scalar 재확인, 실패 `SUB-021` |
 | 대타 거절 | Request | 없음 (퇴사가 같은 Request를 잠그므로 직렬화) | ML-3 종료 판정만 변경 |
@@ -222,9 +222,9 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | ML5-T11 (V2-N-12) | 재발급 (Workplace 보유) | 이전 코드 가입 → 대기 후 WPL-001 | 이전 코드 가입 0 |
 | ML5-T12 | 일부러 Deadlock 유도 | — | 503 매핑, Rollback 확인 |
 | ML5-T13 | 승인에서 Request를 Scalar 조회 후 Lock | 다른 Transaction이 CLOSED Commit | 승인이 CLOSED를 보고 거부 (§4-3 해결 확인). 실행: PR #83 `approveRechecksStatusAfterLock` (V4-N-46), `LOCAL_PASSED` |
-| ML5-T14 | 퇴사 (B 소속 `FOR UPDATE`) | B 담당 DRAFT 추가 → 소속 대기 후 거부 | 퇴사 Commit 후 B 담당 DRAFT 0건 (ML-2-INV-02) |
-| ML5-T15 | B 담당 DRAFT 추가 (B 소속 `FOR SHARE`, 다른 근무표) | B 퇴사 → 대기 후 다시 조회 → 새 DRAFT 발견 → 409 | 퇴사 미반영, DRAFT 남음 (다음 시도에서 삭제) |
-| ML5-R4 (AS-IS) | B 담당 DRAFT 추가가 `leftAt` 확인을 통과한 직후 B `leftAt`을 Test 전용으로 Commit | 추가 계속 | 퇴사자 DRAFT 생성 재현 여부 |
+| ML5-T14 | 퇴사 (B 소속 `FOR UPDATE`) | B 담당 DRAFT 추가 → 소속 대기 후 거부 | 퇴사 Commit 후 B 담당 DRAFT 0건 (ML-2-INV-02). 실행: `DraftMembershipGuardConcurrencyTest` (DRAFT 추가·수정·Pattern 복사, 실제 `LeaveConfirmService`), `LOCAL_PASSED` (EV-046) |
+| ML5-T15 | B 담당 DRAFT 추가 (B 소속 `FOR SHARE`, 다른 근무표) | B 퇴사 → 대기 후 다시 조회 → 새 DRAFT 발견 → 409 | 퇴사 미반영, DRAFT 남음 (다음 시도에서 삭제). 실행: 같은 Class (DRAFT 추가·Pattern 복사가 먼저 → 퇴사 `WPL-010`), `LOCAL_PASSED` (EV-046) |
+| ML5-R4 (AS-IS) | B 담당 DRAFT 추가가 `leftAt` 확인을 통과한 직후 B `leftAt`을 Test 전용으로 Commit | 추가 계속 | 퇴사자 DRAFT 생성 재현 여부. 실행: Guard를 지운 코드에서 위 T14가 실패 = 퇴사자 DRAFT 생성 재현 (DRAFT INSERT는 FK 공유 Lock으로 퇴사 Commit까지 기다린 뒤 성공, §4-4 그대로), Guard 코드에서 재현 안 됨 (EV-046) |
 
 ## 7-1. 실험 환경과 범위 (실행 전, 별도 승인 필요)
 
@@ -301,3 +301,4 @@ Deadlock은 없지만 **불변조건이 깨진다.** 원인: 대타 생성은 "�
 | 2026-10-29 | §7 ML5-T1·T2 실행 표시, ML5-T3에 실제 재배정 Command 실행 추가, ML5-T1 "(H6-C1)" 표기와 ML-3 H6-C1의 불일치 기록 (EV-039) |
 | 2026-10-29 | §7 ML5-T4 실행 표시와 "이중 배정" 해석·관찰 기록 (EV-043) |
 | 2026-10-29 | §5 대타 생성·수락·승인 소속 Guard 구현 표시 (생성은 요청자 포함), §7 ML5-R1·T5·T6·T8 실행 표시, ML5-T8/H6-C8 불일치 기록 (EV-045). 순서는 `PROPOSED`라 PR 리뷰 승인으로 채택 요청 |
+| 2026-10-29 | §5-1 DRAFT 편집 행 구현 표시 (DRAFT 추가·수정·Pattern 복사 소속 Guard), §7 ML5-T14·T15·R4 실행 표시 (EV-046). 대타 생성·수락·승인 Guard(V4)는 별도 |

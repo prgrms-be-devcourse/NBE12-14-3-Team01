@@ -510,6 +510,13 @@ class ShiftService(
         if (member.workplace.id != workplaceId || member.leftAt != null) {
             throw BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE)
         }
+        // 소속 Guard (ML-5 §5-1 DRAFT 편집, ML-2-INV-02): Schedule Lock 뒤 담당 소속을 FOR SHARE로 잠가 퇴사와 직렬화한 뒤
+        // DB 값으로 다시 확인한다 (대타 Guard #105와 같은 방식). 위 확인은 Lock 없이 읽은 값이라 그 직후 퇴사가 Commit되면 퇴사자 DRAFT가 남을 수 있다
+        val memberId = requireNotNull(member.id)
+        workplaceMemberRepository.findByIdForShare(memberId)
+        if (!workplaceMemberRepository.existsCurrentMember(memberId, requireNotNull(workplaceId))) {
+            throw BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE)
+        }
         return member
     }
 
