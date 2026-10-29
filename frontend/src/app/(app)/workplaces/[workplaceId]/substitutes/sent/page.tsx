@@ -7,7 +7,12 @@ import PageHeader from "@/components/ui/PageHeader";
 import { ApiError, apiFetch, UnexpectedResponseError } from "@/lib/api";
 
 type RequestStatus = "OPEN" | "ACCEPTED" | "APPROVED" | "CLOSED";
-type CloseReason = "ALL_CANDIDATES_REJECTED" | "EXPIRED" | "MANAGER_CLOSED";
+type CloseReason =
+    | "ALL_CANDIDATES_REJECTED"
+    | "EXPIRED"
+    | "MANAGER_CLOSED"
+    | "SHIFT_CHANGED"
+    | "CANDIDATE_INELIGIBLE";
 
 // 내가 보낸 요청 목록 응답
 type SentSubstituteRequest = {
@@ -108,7 +113,7 @@ function getStatusView(request: SentSubstituteRequest): StatusView {
   if (request.status === "CLOSED" && request.closeReason === "EXPIRED") {
     return {
       label: "기간 만료",
-      description: "근무 시작 전까지 처리되지 않았어요.",
+      description: "근무 시작 시각에 만료되었어요.",
       badgeClassName: GRAY_BADGE,
     };
   }
@@ -121,6 +126,22 @@ function getStatusView(request: SentSubstituteRequest): StatusView {
     };
   }
 
+  if (request.status === "CLOSED" && request.closeReason === "SHIFT_CHANGED") {
+    return {
+      label: "근무 변경",
+      description: "근무가 변경되어 요청이 종료되었어요.",
+      badgeClassName: GRAY_BADGE,
+    };
+  }
+
+  if (request.status === "CLOSED" && request.closeReason === "CANDIDATE_INELIGIBLE") {
+    return {
+      label: "후보 자격 상실",
+      description: "진행할 수 있는 후보가 없어 요청이 종료되었어요. 근무는 그대로이니 필요하면 다시 요청해 주세요.",
+      badgeClassName: RED_BADGE,
+    };
+  }
+
   // 예상 못 한 값이 오면 기본값
   return {
     label: "종료됨",
@@ -129,7 +150,7 @@ function getStatusView(request: SentSubstituteRequest): StatusView {
   };
 }
 
-// 요청·승인·종료 날짜 한 줄. 만료 요청의 closedAt은 서버가 근무 시작 시각으로 보내지만(G03-D-19), 만료 시각 표시는 D19-5 작업에서 따로 넣을 예정이라 여기서는 빼둠
+// 요청·승인·종료 날짜 한 줄. 만료 시각은 getExpiryLine으로 다른 줄에 보여 줌 (G03-D-19 D19-5)
 function getDateLine(request: SentSubstituteRequest): string {
   const parts = [`${formatDateLabel(request.createdAt)} 요청`];
 
@@ -140,13 +161,24 @@ function getDateLine(request: SentSubstituteRequest): string {
   if (
       request.status === "CLOSED" &&
       (request.closeReason === "ALL_CANDIDATES_REJECTED" ||
-          request.closeReason === "MANAGER_CLOSED") &&
+          request.closeReason === "MANAGER_CLOSED" ||
+          request.closeReason === "SHIFT_CHANGED" ||
+          request.closeReason === "CANDIDATE_INELIGIBLE") &&
       request.closedAt
   ) {
     parts.push(`${formatDateLabel(request.closedAt)} 종료`);
   }
 
   return parts.join(" · ");
+}
+
+// 만료 요청의 만료 시각 (서버가 closedAt에 근무 시작 시각을 보냄, G03-D-19). 라벨은 "종료일"이 아니라 "만료 시각"
+function getExpiryLine(request: SentSubstituteRequest): string | null {
+  if (request.status !== "CLOSED" || request.closeReason !== "EXPIRED" || !request.closedAt) {
+    return null;
+  }
+
+  return `만료 시각 ${formatDateLabel(request.closedAt)} (${formatDayLabel(request.closedAt)}) ${formatTimeLabel(request.closedAt)}`;
 }
 
 export default function SentRequestsPage() {
@@ -253,6 +285,7 @@ export default function SentRequestsPage() {
               <div className="space-y-4">
                 {visibleRequests.map((request) => {
                   const statusView = getStatusView(request);
+                  const expiryLine = getExpiryLine(request);
 
                   return (
                       <div
@@ -285,7 +318,13 @@ export default function SentRequestsPage() {
                           {statusView.description}
                         </div>
 
-                        <p className="mt-3 text-xs text-[#9aa5a0]">
+                        {expiryLine && (
+                            <p className="mt-3 text-xs font-bold text-[#66736d]">
+                              {expiryLine}
+                            </p>
+                        )}
+
+                        <p className={`${expiryLine ? "mt-1" : "mt-3"} text-xs text-[#9aa5a0]`}>
                           {getDateLine(request)}
                         </p>
                       </div>
