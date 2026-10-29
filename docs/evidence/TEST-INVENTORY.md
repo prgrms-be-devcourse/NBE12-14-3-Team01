@@ -486,6 +486,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
 | 2026-10-29 | CHG-02·03 SUB-05·07 현재 소속: D22 행에 구현 표시, 끝에 "V4 보낸·수락한 요청 현재 소속" 절 신설 (V4-N-36·37, EV-042) |
 | 2026-10-29 | API-SB-02 관리자 끝난 대타 조회: §5-1 V4-N-49 행에 구현 표시, 끝에 "V4 관리자 끝난 대타 조회" 절 신설 (EV-044) |
+| 2026-10-29 | API-SB-02 PR #104 리뷰 반영: "V4 관리자 끝난 대타 조회" 절에 V4-N-50 Test 2개 (근무 시작된 APPROVED 제외, 수락자 여러 명 `SUB-016`) (EV-044) |
 | 2026-10-29 | 퇴사자 후보 처리: 끝에 "V4 퇴사자 후보 처리" 절 신설 (V4-N-13~16·22, H6-C5·C6, 새 V4-N-65~71), V4-N-06 행·§5-1 H6 행에 연결 (EV-038) |
 | 2026-10-29 | PR #92 리뷰 반영: "V4 퇴사자 후보 처리" 절에 V4-N-72~74 추가 (거절 경로 응답 가능 판정), ⑤ 상태 갱신 (EV-038) |
 | 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
@@ -697,6 +698,8 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 | V4-N-49 | `otherWorkplaceRequestsAreHidden` | 다른 근무지의 끝난 요청은 안 보임 (두 근무지 서로) | `LOCAL_PASSED` |
 | V4-N-50 | `allCloseReasonsListedWithoutApprovedAndActive` | CLOSED 4사유(전원 거절·관리자 종료·근무 변경·후보 자격 상실) 모두 보임, APPROVED·진행 중 안 보임, 근무 변경 종료는 `shiftStatus = CANCELLED`, 수락자 이름(전원 거절은 null) | `LOCAL_PASSED` |
 | V4-N-50 | `expiredRequestSplitsExactlyFromOngoingList` | 근무 시작 1초 전 안 보임·시작 시각부터 `EXPIRED`(`closedAt = startAt`), 두 시각 모두 SUB-06 목록과 겹침 0·합치면 전부, DB 상태·`closedAt` 그대로 | `LOCAL_PASSED` |
+| V4-N-50 | `startedApprovedRequestIsNotListed` | 내일 근무 2건 수락·1건 승인 → 두 근무 시작 뒤(기본 7일 안) 만료 ACCEPTED만 보이고 근무가 시작된 APPROVED는 안 보임 (PR #104 리뷰: 기존 APPROVED Fixture는 근무가 6일 뒤라 Query에 APPROVED를 넣어도 통과) | `LOCAL_PASSED` |
+| V4-N-50 | `duplicatedAcceptersFail` | 만료된 수락 요청의 대기 후보를 DB에서 ACCEPTED로 바꿈(데이터 이상) → 한 명만 고르지 않고 400 `SUB-016` (SUB-06과 같음, ML-3 §3) | `LOCAL_PASSED` |
 | V4-N-51 | `defaultSevenDaysAndCustomPeriod` | 기본 7일 (정확히 7일 포함, 7일 + 1초 제외), 8일 뒤 `from`으로 조회, `from`·`to` 경계 포함 | `LOCAL_PASSED` |
 | V4-N-51 | `pageBoundary` | `size = 2`, 3건 → 2건 `hasNext` true / 1건 false / 0건 false | `LOCAL_PASSED` |
 | V4-N-51 | `invalidParametersAreRejected` | `from > to`, `page = -1`, `size = 0`·`101` → 400 `COM-003`, `size = 100`·`from == to` 허용, 직원은 잘못된 값이어도 403 `WPL-004` 먼저 | `LOCAL_PASSED` |
@@ -711,4 +714,5 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 **⑤ 상태의 뜻:**
 - `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `6d0f8ea` 위 전체 731 → 747/747 (EV-044). CI는 PR 생성 후 기록
 - 회귀 (기대값 변경 0): 기존 Test 731개 목록 그대로 통과
+- PR #104 리뷰 반영 (2026-10-29): 위 V4-N-50 Test 2개 추가, develop `6ae6683` 병합 위 842 / 842 → **844 / 844 PASS** (FAIL 0, 기존 목록 그대로 + 새 2개, 경고 같음, `Deadlock found` 0). 결함 넣기 2가지 (수락자 `associateBy`로 되돌림, Query 상태 조건에 APPROVED 추가) → 각각 새 Test가 잡음 (EV-044)
 - 범위 밖: Frontend "끝난 요청" 탭과 표시 규칙(FRONTEND-CONTRACT §3-4, Test ID 없음), 성능·실행 계획 (USER-PATH-REVIEW §13-4 S4)
