@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
 
@@ -40,6 +40,217 @@ type InviteCodeResponse = {
   inviteCode: string;
 };
 
+type PreviewShift = {
+  shiftId: number;
+  memberId: number;
+  scheduleId: number;
+  scheduleStatus: "DRAFT" | "PUBLISHED";
+  shiftStatus: "SCHEDULED" | "CANCELLED";
+  startAt: string;
+  endAt: string;
+};
+
+type WorkShift = PreviewShift & { weekStartDate: string };
+type RequestStatus = "OPEN" | "ACCEPTED" | "APPROVED" | "CLOSED";
+type CandidateStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "INELIGIBLE";
+
+// API-LV-01 / LeavePreviewResponse. apiFetch가 응답 envelope의 data를 반환한다.
+type LeavePreviewResponse = {
+  member: { memberId: number; name: string; role: MemberRole; joinedAt: string };
+  canLeave: boolean;
+  blockingReason: string | null;
+  ongoingShift: WorkShift | null;
+  publishedShifts: (PreviewShift & {
+    activeRequests: {
+      requestId: number;
+      requesterMemberId: number;
+      status: RequestStatus;
+      wouldCloseRequest: boolean;
+    }[];
+  })[];
+  draftShiftsToDelete: WorkShift[];
+  candidacies: {
+    candidateId: number;
+    requestId: number;
+    requesterMemberId: number;
+    shift: WorkShift;
+    requestStatus: RequestStatus;
+    candidateStatus: CandidateStatus;
+    otherCurrentPendingCandidates: number;
+    wouldBecomeIneligible: boolean;
+    wouldCloseRequest: boolean;
+  }[];
+  previewContext: string;
+};
+
+const requestStatusLabels: Record<RequestStatus, string> = {
+  OPEN: "진행 중", ACCEPTED: "수락 · 승인 대기", APPROVED: "승인됨", CLOSED: "종료됨",
+};
+const candidateStatusLabels: Record<CandidateStatus, string> = {
+  PENDING: "응답 대기", ACCEPTED: "수락", REJECTED: "거절", INELIGIBLE: "후보 자격 상실",
+};
+
+// LocalDateTime은 서버가 전달한 근무지 시각을 그대로 표시한다.
+function formatPreviewTime(value: string) {
+  return value.replace("T", " ").slice(0, 16);
+}
+
+function ShiftSummary({ shift }: { shift: PreviewShift }) {
+  return (
+    <>
+      <p className="font-bold">{formatPreviewTime(shift.startAt)} ~ {formatPreviewTime(shift.endAt)}</p>
+      <p className="mt-1 text-xs text-[#78847f]">
+        근무 #{shift.shiftId} · 근무표 #{shift.scheduleId} · {shift.scheduleStatus === "PUBLISHED" ? "공개" : "초안"}
+        {" · "}{shift.shiftStatus === "SCHEDULED" ? "예정" : "취소"}
+      </p>
+    </>
+  );
+}
+
+function LeavePreviewModal({ workplaceId, member, onClose }: {
+  workplaceId: string;
+  member: Member;
+  onClose: () => void;
+}) {
+  const [preview, setPreview] = useState<LeavePreviewResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    closeButtonRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const loadPreview = async () => {
+      try {
+        const data = await apiFetch<LeavePreviewResponse>(
+          `/workplaces/${workplaceId}/members/${member.id}/leave-preview`,
+          { method: "GET", signal: controller.signal, cache: "no-store" }
+        );
+        if (cancelled) return;
+        if (data.member.memberId !== member.id || data.member.role !== "EMPLOYEE") {
+          setError("퇴사 대상 정보가 일치하지 않습니다. 다시 조회해 주세요.");
+          return;
+        }
+        setPreview(data);
+      } catch (error) {
+        if (cancelled) return;
+        setError(error instanceof ApiError
+          ? `${error.message} (${error.code})`
+          : "퇴사 미리보기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadPreview();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [workplaceId, member.id, attempt]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onClose();
+        if (event.key === "Tab") {
+          const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+          const first = buttons[0];
+          const last = buttons[buttons.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="leave-preview-title" aria-describedby="leave-preview-notice"
+        className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+        <h2 id="leave-preview-title" className="text-xl font-black">퇴사 미리보기</h2>
+        <p className="mt-3 text-sm text-[#66736d]">
+          <strong className="text-[#1f2925]">{preview?.member.name ?? member.name}</strong> · {member.email}
+        </p>
+        <p id="leave-preview-notice" className="mt-4 rounded-xl bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#d95555]">
+          현재는 미리보기만 가능합니다. 실제 퇴사 확정 기능은 비활성 상태이며, 소속·근무·대타 정보는 변경되지 않습니다.
+        </p>
+
+        <div aria-live="polite" aria-busy={loading} className="mt-5 space-y-5 text-sm text-[#66736d]">
+          {loading && <p role="status">퇴사 영향을 조회하는 중입니다...</p>}
+          {error && <div role="alert" className="rounded-xl bg-[#fff7f7] p-4">
+            <p className="text-[#d95555]">{error}</p>
+            <button type="button" disabled={loading} onClick={() => {
+              if (loading) return;
+              setLoading(true);
+              setError("");
+              setPreview(null);
+              setAttempt((value) => value + 1);
+            }} className="mt-3 rounded-lg border border-[#dce8e2] px-3 py-2 font-bold hover:bg-[#f3fbf7] disabled:opacity-50">
+              다시 시도
+            </button>
+          </div>}
+          {preview && <>
+            <p>소속 #{preview.member.memberId} · {preview.member.role === "EMPLOYEE" ? "직원" : "관리자"} · 가입 {formatPreviewTime(preview.member.joinedAt)}</p>
+            <section className={`rounded-xl p-4 ${preview.canLeave ? "bg-[#f3fbf7]" : "bg-[#fff7f7]"}`}>
+              <h3 className="font-bold text-[#1f2925]">{preview.canLeave ? "조회 시점에 진행 중인 근무가 없습니다." : "현재 퇴사할 수 없습니다."}</h3>
+              {!preview.canLeave && <p className="mt-2 text-[#d95555]">
+                {preview.blockingReason === "ONGOING_SHIFT"
+                  ? "진행 중인 공식 근무가 있습니다. 근무 종료 후 다시 조회해 주세요."
+                  : `퇴사 불가 사유: ${preview.blockingReason ?? "서버에서 퇴사 불가로 안내했습니다."}`}
+              </p>}
+              {!preview.canLeave && preview.ongoingShift && <div className="mt-3"><ShiftSummary shift={preview.ongoingShift} /></div>}
+            </section>
+            <p className="text-xs">아래는 조회 시점의 예상 영향입니다. 실제 처리 결과가 아니며, 근무·대타 상태에 따라 달라질 수 있습니다.</p>
+            <section>
+              <h3 className="font-bold text-[#1f2925]">공식 근무 ({preview.publishedShifts.length}건)</h3>
+              <p className="mt-1 text-xs">퇴사 확정 기능 제공 시 근무별 인계 또는 취소 결정이 필요합니다.</p>
+              {preview.publishedShifts.length === 0 && <p className="mt-2">대상 공식 근무가 없습니다.</p>}
+              <ul className="mt-2 space-y-2">{preview.publishedShifts.map((shift) => <li key={shift.shiftId} className="rounded-xl bg-[#f3fbf7] p-4">
+                <ShiftSummary shift={shift} />
+                {shift.activeRequests.length === 0 && <p className="mt-2 text-xs">영향받는 대타 요청 없음</p>}
+                <ul className="mt-2 space-y-1">{shift.activeRequests.map((request) => <li key={request.requestId}>
+                  대타 요청 #{request.requestId} · {requestStatusLabels[request.status]} · {request.wouldCloseRequest ? "종료 예정" : "종료 영향 없음"}
+                </li>)}</ul>
+              </li>)}</ul>
+            </section>
+            <section>
+              <h3 className="font-bold text-[#1f2925]">삭제 예정 DRAFT 근무 ({preview.draftShiftsToDelete.length}건)</h3>
+              {preview.draftShiftsToDelete.length === 0 && <p className="mt-2">삭제 예정인 초안 근무가 없습니다.</p>}
+              <ul className="mt-2 space-y-2">{preview.draftShiftsToDelete.map((shift) => <li key={shift.shiftId} className="rounded-xl bg-[#f3fbf7] p-4">
+                <ShiftSummary shift={shift} />
+              </li>)}</ul>
+            </section>
+            <section>
+              <h3 className="font-bold text-[#1f2925]">대타 후보 영향 ({preview.candidacies.length}건)</h3>
+              {preview.candidacies.length === 0 && <p className="mt-2">영향받는 대타 후보 참여가 없습니다.</p>}
+              <ul className="mt-2 space-y-2">{preview.candidacies.map((candidate) => <li key={candidate.candidateId} className="rounded-xl bg-[#f3fbf7] p-4">
+                <p className="mb-2 font-bold">요청 #{candidate.requestId} · 후보 #{candidate.candidateId}</p>
+                <ShiftSummary shift={candidate.shift} />
+                <p className="mt-2">요청: {requestStatusLabels[candidate.requestStatus]} · 후보: {candidateStatusLabels[candidate.candidateStatus]}</p>
+                <p className="mt-1">다른 현재 대기 후보 {candidate.otherCurrentPendingCandidates}명</p>
+                <p className="mt-1">{candidate.wouldBecomeIneligible ? "후보 자격 상실 예정" : "후보 상태 이력 유지"} · {candidate.wouldCloseRequest ? "요청 종료 예정" : "요청 종료 영향 없음"}</p>
+              </li>)}</ul>
+            </section>
+          </>}
+        </div>
+        <div className="mt-6 flex gap-3">
+          <button ref={closeButtonRef} type="button" onClick={onClose} className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] hover:bg-[#f3fbf7]">닫기</button>
+          <button type="button" disabled className="flex-1 cursor-not-allowed rounded-xl bg-[#d95555] px-4 py-3 text-sm font-bold text-white opacity-50">퇴사 확정 (준비 중)</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function MembersPage() {
   const params = useParams();
@@ -65,8 +276,7 @@ export default function MembersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [memberToEnd, setMemberToEnd] = useState<Member | null>(null);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [memberToEnd, setMemberToEnd] = useState<{ workplaceId: string; member: Member } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +288,8 @@ export default function MembersPage() {
             await apiFetch<MyWorkplaceResponse[]>("/workplaces");
 
         if (cancelled) return;
+
+        setMemberToEnd(null);
 
         const currentWorkplace = workplaces.find(
             (workplace) =>
@@ -169,49 +381,6 @@ export default function MembersPage() {
     setTimeout(() => {
       setShowCopyToast(false);
     }, 2000);
-  };
-
-  const handleEndMembership = () => {
-    if (!memberToEnd) {
-      return;
-    }
-
-    const endedMemberName = memberToEnd.name;
-
-    /*
-     * TODO: P1 소속 종료 API 연동
-     *
-     * 실제 구현에서는 회원 자체를 삭제하지 않고
-     * 해당 WorkplaceMember.leftAt을
-     * 종료 시각으로 변경한다.
-     *
-     * 소속 종료 시 현재 RegularShiftPattern은
-     * 정리해야 한다.
-     *
-     * 이미 생성된 Shift는 자동 삭제하거나
-     * 다른 직원에게 자동 재배정하지 않는다.
-     */
-    setMembers((prev) =>
-        prev.map((member) =>
-            member.id === memberToEnd.id
-                ? {
-                  ...member,
-                  leftAt: new Date().toISOString(),
-                }
-                : member
-        )
-    );
-
-    setMemberToEnd(null);
-    setOpenMenuId(null);
-
-    setSuccessMessage(
-        `${endedMemberName}님의 소속이 종료되었습니다.`
-    );
-
-    setTimeout(() => {
-      setSuccessMessage("");
-    }, 2500);
   };
 
   if (currentAccessStatus === "loading") {
@@ -419,9 +588,13 @@ export default function MembersPage() {
                                     <div className="absolute -left-24 top-10 z-30 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                                       <button
                                           type="button"
-                                          disabled
-                                          title="소속 종료 기능은 준비 중입니다."
-                                          className="w-full cursor-not-allowed px-4 py-3 text-left text-sm font-bold text-[#b0b8b4]"
+                                          onClick={() => {
+                                            if (currentAccessStatus !== "manager" || memberToEnd) return;
+                                            setMemberToEnd({ workplaceId, member });
+                                            setOpenMenuId(null);
+                                          }}
+                                          title="퇴사 영향을 미리 확인합니다. 실제 퇴사 확정은 준비 중입니다."
+                                          className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] hover:bg-[#fff7f7]"
                                       >
                                         소속 종료
                                       </button>
@@ -443,52 +616,15 @@ export default function MembersPage() {
           </div>
         </Card>
 
-        {/* 소속 종료 확인 모달 */}
-        {memberToEnd && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-                <h2 className="text-xl font-black">
-                  소속을 종료할까요?
-                </h2>
-
-                <p className="mt-3 text-sm leading-6 text-[#66736d]">
-                  <strong className="text-[#1f2925]">
-                    {memberToEnd.name}
-                  </strong>
-                  님의 카페 스위치 소속을 종료합니다.
-                </p>
-
-                <div className="mt-5 rounded-xl bg-[#fff7f7] p-4">
-                  <p className="text-sm font-bold text-[#d95555]">
-                    계정 자체가 삭제되는 것은 아니에요.
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                    해당 근무지와의 소속 관계만 종료됩니다.
-                  </p>
-                </div>
-
-                <div className="mt-6 flex gap-3">
-                  <button
-                      type="button"
-                      onClick={() => setMemberToEnd(null)}
-                      className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
-                  >
-                    취소
-                  </button>
-
-                  <button
-                      type="button"
-                      onClick={handleEndMembership}
-                      className="flex-1 rounded-xl bg-[#d95555] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#c54848]"
-                  >
-                    소속 종료
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* 근무지·대상이 바뀌면 기존 모달과 요청을 폐기한다. */}
+        {memberToEnd?.workplaceId === workplaceId && (
+          <LeavePreviewModal
+            key={`${workplaceId}:${memberToEnd.member.id}`}
+            workplaceId={workplaceId}
+            member={memberToEnd.member}
+            onClose={() => setMemberToEnd(null)}
+          />
         )}
-
         {/* 직원 초대 모달 */}
         {showInviteModal && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
@@ -547,13 +683,6 @@ export default function MembersPage() {
                   </button>
                 </div>
               </div>
-            </div>
-        )}
-
-        {/* 성공 토스트 */}
-        {successMessage && (
-            <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white shadow-lg">
-              {successMessage}
             </div>
         )}
 
