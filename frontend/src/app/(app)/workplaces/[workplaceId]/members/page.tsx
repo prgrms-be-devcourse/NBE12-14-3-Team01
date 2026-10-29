@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import { ApiError, apiFetch } from "@/lib/api";
+import LeaveConfirmPanel from "./LeaveConfirmPanel";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
 
@@ -107,10 +108,12 @@ function ShiftSummary({ shift }: { shift: PreviewShift }) {
   );
 }
 
-function LeavePreviewModal({ workplaceId, member, onClose }: {
+function LeavePreviewModal({ workplaceId, member, members, onClose, onLeft }: {
   workplaceId: string;
   member: Member;
+  members: Member[];
   onClose: () => void;
+  onLeft: (newInviteCode: string | null) => void;
 }) {
   const [preview, setPreview] = useState<LeavePreviewResponse | null>(null);
   const [error, setError] = useState("");
@@ -182,7 +185,7 @@ function LeavePreviewModal({ workplaceId, member, onClose }: {
           <strong className="text-[#1f2925]">{preview?.member.name ?? member.name}</strong> · {member.email}
         </p>
         <p id="leave-preview-notice" className="mt-4 rounded-xl bg-[#fff7f7] p-4 text-sm font-bold leading-6 text-[#d95555]">
-          현재는 미리보기만 가능합니다. 실제 퇴사 확정 기능은 비활성 상태이며, 소속·근무·대타 정보는 변경되지 않습니다.
+          아래에서 근무별 처리를 고른 뒤 퇴사를 확정합니다. 확정하기 전까지 소속·근무·대타 정보는 바뀌지 않습니다.
         </p>
 
         <div aria-live="polite" aria-busy={loading} className="mt-5 space-y-5 text-sm text-[#66736d]">
@@ -213,7 +216,7 @@ function LeavePreviewModal({ workplaceId, member, onClose }: {
             <p className="text-xs">아래는 조회 시점의 예상 영향입니다. 실제 처리 결과가 아니며, 근무·대타 상태에 따라 달라질 수 있습니다.</p>
             <section>
               <h3 className="font-bold text-[#1f2925]">공식 근무 ({preview.publishedShifts.length}건)</h3>
-              <p className="mt-1 text-xs">퇴사 확정 기능 제공 시 근무별 인계 또는 취소 결정이 필요합니다.</p>
+              <p className="mt-1 text-xs">아래 근무별 처리 선택에서 근무마다 인계 또는 취소를 골라야 합니다.</p>
               {preview.publishedShifts.length === 0 && <p className="mt-2">대상 공식 근무가 없습니다.</p>}
               <ul className="mt-2 space-y-2">{preview.publishedShifts.map((shift) => <li key={shift.shiftId} className="rounded-xl bg-[#f3fbf7] p-4">
                 <ShiftSummary shift={shift} />
@@ -241,11 +244,22 @@ function LeavePreviewModal({ workplaceId, member, onClose }: {
                 <p className="mt-1">{candidate.wouldBecomeIneligible ? "후보 자격 상실 예정" : "후보 상태 이력 유지"} · {candidate.wouldCloseRequest ? "요청 종료 예정" : "요청 종료 영향 없음"}</p>
               </li>)}</ul>
             </section>
+            {preview.canLeave && <LeaveConfirmPanel
+              workplaceId={workplaceId}
+              preview={preview}
+              members={members.filter((target) => target.leftAt === null).map((target) => ({ id: target.id, name: target.name }))}
+              onStale={() => {
+                setLoading(true);
+                setError("");
+                setPreview(null);
+                setAttempt((value) => value + 1);
+              }}
+              onDone={onLeft}
+            />}
           </>}
         </div>
         <div className="mt-6 flex gap-3">
           <button ref={closeButtonRef} type="button" onClick={onClose} className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] hover:bg-[#f3fbf7]">닫기</button>
-          <button type="button" disabled className="flex-1 cursor-not-allowed rounded-xl bg-[#d95555] px-4 py-3 text-sm font-bold text-white opacity-50">퇴사 확정 (준비 중)</button>
         </div>
       </div>
     </div>
@@ -593,7 +607,7 @@ export default function MembersPage() {
                                             setMemberToEnd({ workplaceId, member });
                                             setOpenMenuId(null);
                                           }}
-                                          title="퇴사 영향을 미리 확인합니다. 실제 퇴사 확정은 준비 중입니다."
+                                          title="퇴사 영향을 확인한 뒤 근무별 처리를 골라 퇴사를 확정합니다."
                                           className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] hover:bg-[#fff7f7]"
                                       >
                                         소속 종료
@@ -622,7 +636,14 @@ export default function MembersPage() {
             key={`${workplaceId}:${memberToEnd.member.id}`}
             workplaceId={workplaceId}
             member={memberToEnd.member}
+            members={members}
             onClose={() => setMemberToEnd(null)}
+            onLeft={(newInviteCode) => {
+              const leftMemberId = memberToEnd.member.id;
+              setMembers((prev) => prev.filter((target) => target.id !== leftMemberId));
+              if (newInviteCode) setInviteCode(newInviteCode);
+              setMemberToEnd(null);
+            }}
           />
         )}
         {/* 직원 초대 모달 */}
