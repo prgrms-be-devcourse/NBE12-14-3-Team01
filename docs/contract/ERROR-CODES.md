@@ -155,7 +155,7 @@
 | `SUB-013` | 409 | DUPLICATE | 이미 진행중인 대체근무 요청이 있습니다 | SubstituteRequestService.validateSubstituteRequest L154 | 정상 | 3 | — |
 | `SUB-014` | 400 | STATE_CONFLICT | 취소된 근무에는 대체근무를 요청할 수 없습니다 | SubstituteCandidateService.validateRespondableCandidate L159<br>SubstituteRequestService.validateSubstituteRequest L141 | **T1-03 (새로 발견)** 후보 응답(Candidate L159)에서 "취소된 근무에는 대체근무를 요청할 수 없습니다" 문구. 요청 생성(L141)에는 맞음. T1-02와 같은 패턴 | 2 | — |
 | `SUB-015` | 404 | INTERNAL | ACCEPTED 상태인 요청의 수락자 정보를 찾을 수 없습니다. | SubstituteRequestService.getAcceptedCandidates L224 | T2 내부 불변식 위반(수락자 없음)을 업무 오류로 응답 (관리자 진행 중 목록) | 1 | — |
-| `SUB-016` | 400 | INTERNAL | 하나의 요청에 대해 수락자가 여러 명 조회되었습니다. | SubstituteRequestService.getAcceptedCandidates L210 | T2 내부 불변식 위반(수락자 여러 명)을 업무 오류로 응답 | 1 | — |
+| `SUB-016` | 400 | INTERNAL | 하나의 요청에 대해 수락자가 여러 명 조회되었습니다. | SubstituteRequestService.getAcceptedCandidates L210, SubstituteRequestService.findClosedRequests (API-SB-02, PR #104 리뷰 반영) | T2 내부 불변식 위반(수락자 여러 명)을 업무 오류로 응답 | 2 | — |
 | `SUB-017` | 400 | STATE_CONFLICT | 이미 종료되었거나 승인된 요청은 종료할 수 없습니다. | SubstituteRequestService.close L382 | 정상 | 2 | — |
 | `SUB-018` | 400 | STATE_CONFLICT | 근무 시작 이후에는 요청을 종료할 수 없습니다. | SubstituteRequestService.close L397 | 정상 | 2 | — |
 | `SUB-019` | 404 | NOT_FOUND | 해당 대타 후보를 찾을 수 없습니다. | SubstituteCandidateService.validateRespondableCandidate L111<br>SubstituteCandidateService.validateRespondableCandidate L125 | 정상 | 1 | — |

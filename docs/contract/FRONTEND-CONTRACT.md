@@ -98,7 +98,7 @@
 | 항목 | 내용 |
 |---|---|
 | 위치 | 승인 관리 화면(`substitutes/admin`)의 "끝난 요청" 탭. 기존 진행 중 목록은 그대로 |
-| API | API-SB-02 (기본 최근 7일, 기간 선택, 페이지) |
+| API | API-SB-02 `GET /api/v1/workplaces/{workplaceId}/substitute-requests/closed?from=&to=&page=&size=` (기본 최근 7일, `from`·`to`는 ISO 날짜시각 예 `2026-10-22T10:00:00`, `page` 0부터, `size` 기본 20·최대 100). 응답 `data = { items, page, size, hasNext }`. 결과는 `outcome`(`CLOSED`·`EXPIRED`) + `closeReason`(만료는 `EXPIRED`). "조치 필요"의 전원 거절·후보 자격 상실 = `outcome = CLOSED` ∧ `closeReason ∈ {ALL_CANDIDATES_REJECTED, CANDIDATE_INELIGIBLE}` (2026-10-29 구현, 팀 승인은 PR 리뷰로 요청 중) |
 | 행 표시 | 근무 날짜·시간, 요청자 (`requesterMembershipEnded`면 "(이전 소속)" — 재가입한 사람도 그 요청의 소속은 끝났으므로 "퇴사"로 단정하지 않음), 결과 문구 (전원 거절 / 후보 자격 상실 / 근무 변경으로 종료 / 관리자 종료 / 승인 전에 근무 시작), 종료 시각, 수락자 (있었으면) |
 | **조치 필요** 표시 | `outcome`이 전원 거절·후보 자격 상실이고 **근무 상태 `SCHEDULED`** ∧ `requesterStillAssigned` ∧ ¬`shiftStarted` ∧ ¬`hasNewerActiveRequest` → "조치 필요" + 담당자 변경(API-PS-03) 바로가기. 취소된 근무·시작한 근무에는 표시하지 않는다 (S3-B). 문구는 "다른 직원 배정을 검토하세요"이며 새 대타 요청이 필요하다는 뜻이 아니다 |
 | **확인 필요** 표시 | `outcome = EXPIRED`이고 수락자가 있었음 → "승인 전에 근무가 시작됨 — 실제 근무자를 확인하세요" (시스템 안 조치 없음, 안내만) |
@@ -242,6 +242,7 @@ STALE은 "제출한 계획이 지금 상태와 맞지 않아 다시 조회해야
 | 2026-10-25 | S3: API ID 표기 정정 — 받은 요청은 SUB-02 (SUB-06은 관리자 진행 중 목록). 기준 V4 Delivery Sheet B1. 내용 변경 없음 |
 | 2026-10-25 | S3-A: 알림 읽음 실패 복구 규칙(§2), 관리자 끝난 대타 요청 탭 §3-4 (조치·확인 필요 표시 규칙), §5 관리자 대체 화면 행. 변경 이력 표 형식 정정 (기존 한 행의 3번째 칸을 내용 칸에 합침, 날짜·내용 불변) |
 | 2026-10-25 | S3-B: §3-4 "조치 필요"에 근무 상태 `SCHEDULED` 조건, 요청자 표시 "(이전 소속)", 서버 재검증 명시 |
+| 2026-10-29 | §3-4 API-SB-02 경로·파라미터·응답 필드 확정 (백엔드 구현 반영, EV-044). 화면 탭은 아직 없음 |
 
 ### 퇴사 미리보기의 1차 확정 흐름 (2026-10-26)
 
