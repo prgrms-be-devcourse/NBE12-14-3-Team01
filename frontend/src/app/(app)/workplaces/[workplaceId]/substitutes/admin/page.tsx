@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState, useCallback} from "react";
+import {useEffect, useState, useCallback, useRef} from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { useParams } from "next/navigation";
@@ -225,6 +225,8 @@ export default function SubstituteAdminPage() {
   const [isClosedLoading, setIsClosedLoading] = useState(() => Boolean(workplaceId));
   const [closedLoadError, setClosedLoadError] = useState<string | null>(null);
   const [closedReloadCount, setClosedReloadCount] = useState(0);
+  // 끝난 요청 조회 차례. 다시 조회·근무지 변경 뒤 늦게 온 "더 보기" 응답은 버림
+  const closedLoadSeq = useRef(0);
 
   useEffect(() => {
     if (!workplaceId) return;
@@ -272,6 +274,7 @@ export default function SubstituteAdminPage() {
     if (!workplaceId) return;
 
     let isIgnore = false;
+    closedLoadSeq.current += 1;
 
     const loadClosedRequests = async () => {
       setIsClosedLoading(true);
@@ -312,6 +315,7 @@ export default function SubstituteAdminPage() {
   // 끝난 요청 다음 페이지
   const handleLoadMoreClosed = async () => {
     if (isClosedLoading) return;
+    const seq = closedLoadSeq.current;
     setIsClosedLoading(true);
 
     try {
@@ -319,17 +323,25 @@ export default function SubstituteAdminPage() {
       const data = await apiFetch<ClosedSubstituteRequestPage>(
           `/workplaces/${workplaceId}/substitute-requests/closed?page=${nextPage}`
       );
-      setClosedRequests((prev) => [...prev, ...data.items]);
+      if (seq !== closedLoadSeq.current) return;
+      // 그 사이 새로 끝난 요청 때문에 밀려서 겹친 행은 빼고 붙임
+      setClosedRequests((prev) => {
+        const seen = new Set(prev.map((request) => request.requestId));
+        return [...prev, ...data.items.filter((request) => !seen.has(request.requestId))];
+      });
       setClosedPage(nextPage);
       setClosedHasNext(data.hasNext);
     } catch (error) {
+      if (seq !== closedLoadSeq.current) return;
       if (error instanceof ApiError) {
         alert(`[${error.code}] ${error.message}`);
       } else {
         alert("끝난 요청을 더 불러오지 못했습니다.");
       }
     } finally {
-      setIsClosedLoading(false);
+      if (seq === closedLoadSeq.current) {
+        setIsClosedLoading(false);
+      }
     }
   };
 
