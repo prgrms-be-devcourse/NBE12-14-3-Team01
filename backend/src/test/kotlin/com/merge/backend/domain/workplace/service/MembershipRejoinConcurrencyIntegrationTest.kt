@@ -91,6 +91,11 @@ class MembershipRejoinConcurrencyIntegrationTest {
     fun removeOnlyThisTestsCommittedFixture() {
         if (!::fixture.isInitialized) return
         committed {
+            // 가입·재가입 알림(WORKPLACE_MEMBER_JOINED)이 관리자 소속을 참조하므로 먼저 지운다
+            jdbc.update(
+                "DELETE FROM notification WHERE recipient_member_id IN (SELECT id FROM workplace_member WHERE workplace_id = ?)",
+                fixture.workplaceId,
+            )
             jdbc.update("DELETE FROM workplace_member WHERE workplace_id = ?", fixture.workplaceId)
             jdbc.update("DELETE FROM workplace WHERE id = ?", fixture.workplaceId)
             jdbc.update("DELETE FROM users WHERE id IN (?, ?)", fixture.managerId, fixture.employeeId)

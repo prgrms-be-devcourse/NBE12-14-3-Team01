@@ -300,10 +300,27 @@ class SubstituteCandidateService(
     // 알림은 내지 않고 결과만 돌려줌. 받는 사람은 퇴사 확정 결과로 V5가 정함 (#80 근무 변경 종료와 같은 방식)
     @Transactional(propagation = Propagation.MANDATORY)
     fun closeCandidaciesByMemberLeave(memberId: Long, now: LocalDateTime): MemberLeaveCandidacyResult {
+        return closeMemberLeaveCandidacies(memberId, now,
+            substituteRequestRepository.findActiveByCandidateMemberIdForUpdate(memberId, now))
+    }
+
+    /** V2 전용: 전체 Request 선점 후 호출한다. 기존 상태 전이를 재사용하고 새 Request는 잠그지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun closeCandidaciesByMemberLeave(
+        memberId: Long, now: LocalDateTime, lockedRequestIds: Set<Long>
+    ): MemberLeaveCandidacyResult {
+        val requests = if (lockedRequestIds.isEmpty()) emptyList() else
+            substituteRequestRepository.findActiveByCandidateMemberIdWithinIds(memberId, now, lockedRequestIds)
+        return closeMemberLeaveCandidacies(memberId, now, requests)
+    }
+
+    private fun closeMemberLeaveCandidacies(
+        memberId: Long, now: LocalDateTime, requests: List<SubstituteRequest>
+    ): MemberLeaveCandidacyResult {
         val closedRequests = mutableListOf<CandidateIneligibleClosedRequest>()
         var ineligibleCandidacies = 0
 
-        substituteRequestRepository.findActiveByCandidateMemberIdForUpdate(memberId, now).forEach { request ->
+        requests.forEach { request ->
             val requestId = requireNotNull(request.id)
 
             // Lock 전에 읽힌 Entity면 상태가 옛 값일 수 있어 DB 값으로 판단

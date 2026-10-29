@@ -2,6 +2,7 @@ package com.merge.backend.domain.shift.service
 
 import com.merge.backend.domain.shift.dto.ShiftRequest
 import com.merge.backend.domain.shift.dto.ShiftReassignRequest
+import com.merge.backend.domain.shift.dto.AcknowledgedUnavailableConflict
 import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
 import com.merge.backend.domain.shift.dto.PublishedShiftConfirmationRequiredResponse
 import com.merge.backend.domain.shift.dto.NewShiftKey
@@ -15,10 +16,13 @@ import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.entity.ShiftStatus.SCHEDULED
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
+import com.merge.backend.domain.shift.event.PublishedShiftChangeKind
+import com.merge.backend.domain.shift.event.PublishedShiftChangedEvent
 import com.merge.backend.domain.shift.repository.ScheduleRepository
 import com.merge.backend.domain.shift.repository.ShiftAssignmentHistoryRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.service.ShiftChangeClosedRequest
 import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.domain.user.repository.UserRepository
 import com.merge.backend.domain.workplace.entity.Workplace
@@ -35,8 +39,10 @@ import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.annotation.Propagation
 
 @Service
 class ShiftService(
@@ -50,6 +56,7 @@ class ShiftService(
     private val shiftAssignmentHistoryRepository: ShiftAssignmentHistoryRepository,
     private val userRepository: UserRepository,
     private val clock: Clock,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
 
     @Transactional(readOnly = true)
@@ -222,7 +229,7 @@ class ShiftService(
         request: PublishedShiftCreateRequest,
         actorId: Long?,
     ): Shift {
-        workplaceMemberService.requireManager(actorId, workplaceId)
+        val actorMember = workplaceMemberService.requireManager(actorId, workplaceId)
         val schedule = validPublishedSchedule(scheduleId, workplaceId)
         val memberId = requirePublishedShiftCreateInput(request.memberId)
         val startAt = requirePublishedShiftCreateInput(request.startAt)
@@ -252,7 +259,12 @@ class ShiftService(
         validateNewShiftUnavailableConflictAcknowledgement(schedule.id, targetMember, startAt, endAt, request)
         validatePublishedShiftNotStarted(startAt)
 
-        return saveShift(schedule, targetMember, startAt, endAt)
+        val shift = saveShift(schedule, targetMember, startAt, endAt)
+
+        // 새 담당에게 SHIFT_ASSIGNED (받는 사람·문구는 알림 쪽에서 정함)
+        publishPublishedShiftChanged(PublishedShiftChangeKind.ADDED, shift, null, targetMember, actorMember, emptyList())
+
+        return shift
     }
 
     @Transactional
@@ -276,6 +288,8 @@ class ShiftService(
             now,
             actorMember,
         )
+
+        publishPublishedShiftChanged(PublishedShiftChangeKind.CANCELLED, shift, shift.member, null, actorMember, closedRequests)
 
         return PublishedShiftCancellationResult(shift, closedRequests.size)
     }
@@ -332,18 +346,88 @@ class ShiftService(
         validateUnavailableConflictAcknowledgement(shift, targetMember, request)
 
         val previousMember = shift.member
-        shift.changeMember(targetMember)
-        shiftAssignmentHistoryRepository.save(
-            ShiftAssignmentHistory(
-                shift,
-                previousMember,
-                targetMember,
-                ShiftAssignmentReason.MANAGER_REASSIGNED,
-                actorMember,
-            ),
+        assignWithHistory(shift, targetMember, ShiftAssignmentReason.MANAGER_REASSIGNED, actorMember)
+
+        publishPublishedShiftChanged(
+            PublishedShiftChangeKind.REASSIGNED, shift, previousMember, targetMember, actorMember, closedRequests,
         )
 
         return PublishedShiftReassignmentResult(shift, closedRequests.size)
+    }
+
+    /** V2가 전체 Request→User→소속을 먼저 잠근다. 기존 Command를 근무별로 호출하지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun validateMemberLeavePlan(
+        plan: MemberLeaveShiftPlan,
+        acknowledgements: List<AcknowledgedUnavailableConflict>
+    ): List<UnavailableConflictResponse> {
+        // 전체 공식 충돌을 먼저 검사하여 뒤쪽 근무의 우회 불가 충돌보다 경고를 먼저 내지 않는다.
+        plan.reassignments.forEach { (shift, target) ->
+            validateShiftOverlap(shift.schedule.id, target.id, target.user.id, shift.startAt, shift.endAt, shift.id)
+        }
+        plan.reassignments.forEachIndexed { index, assignment ->
+            if (plan.reassignments.take(index).any { previous ->
+                    previous.target.user.id == assignment.target.user.id && TimeRangeUtils.overlaps(
+                        previous.shift.startAt, previous.shift.endAt, assignment.shift.startAt, assignment.shift.endAt
+                    )
+                }
+            ) throw BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
+        }
+        return plan.reassignments.mapNotNull { (shift, target) ->
+            findUnacknowledgedUnavailableConflict(shift, target, acknowledgements)
+        }
+    }
+
+    /** 새 Lock을 획득하지 않는다. 관련 Request도 V2가 ID 순서로 이미 잠근 상태여야 한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun applyMemberLeavePlan(
+        plan: MemberLeaveShiftPlan,
+        actor: WorkplaceMember,
+        now: LocalDateTime
+    ): MemberLeaveShiftResult {
+        val reassignments = plan.reassignments.associateBy { requireNotNull(it.shift.id) }
+        val affected = (plan.reassignments.map { it.shift } + plan.cancellations).sortedBy { it.id }
+        val closed = affected.flatMap { shift ->
+            val requests = substituteRequestService.closeActiveRequestsByShiftChange(requireNotNull(shift.id), now)
+            val reassignment = reassignments[shift.id]
+            if (reassignment != null) {
+                assignWithHistory(shift, reassignment.target, ShiftAssignmentReason.MEMBER_LEFT, actor)
+            } else {
+                shift.cancel(ShiftCancellationReason.MEMBER_LEFT, now, actor)
+            }
+            requests
+        }
+        shiftRepository.deleteAll(plan.draftShiftsToDelete)
+        return MemberLeaveShiftResult(closed)
+    }
+
+    private fun assignWithHistory(
+        shift: Shift, target: WorkplaceMember, reason: ShiftAssignmentReason, actor: WorkplaceMember
+    ) {
+        val previous = shift.member
+        shift.changeMember(target)
+        shiftAssignmentHistoryRepository.save(ShiftAssignmentHistory(shift, previous, target, reason, actor))
+    }
+
+    // 공개 후 근무 변경 알림 (NOTIFICATION-TYPES §3). 업무 Transaction 안에서 발행하고 저장은 Commit 후
+    private fun publishPublishedShiftChanged(
+        kind: PublishedShiftChangeKind,
+        shift: Shift,
+        previousMember: WorkplaceMember?,
+        newMember: WorkplaceMember?,
+        actorMember: WorkplaceMember,
+        closedRequests: List<ShiftChangeClosedRequest>,
+    ) {
+        applicationEventPublisher.publishEvent(
+            PublishedShiftChangedEvent(
+                kind = kind,
+                shiftId = shift.id,
+                previousMemberId = previousMember?.id,
+                newMemberId = newMember?.id,
+                actorMemberId = actorMember.id,
+                closedRequests = closedRequests,
+            ),
+        )
     }
 
     //스케줄 관련 예외 검사 메서드
@@ -495,17 +579,31 @@ class ShiftService(
         targetMember: WorkplaceMember,
         request: ShiftReassignRequest,
     ) {
+        val conflict = findUnacknowledgedUnavailableConflict(
+            shift, targetMember, requireNotNull(request.acknowledgedUnavailableConflicts)
+        ) ?: return
+        throw BusinessException(
+            ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED,
+            ConfirmationRequiredResponse(true, listOf(conflict))
+        )
+    }
+
+    private fun findUnacknowledgedUnavailableConflict(
+        shift: Shift,
+        targetMember: WorkplaceMember,
+        acknowledgements: List<AcknowledgedUnavailableConflict>
+    ): UnavailableConflictResponse? {
         val currentOverlaps = normalizeUnavailableOverlaps(
             targetMember.user.id,
             shift.startAt,
             shift.endAt,
         )
         if (currentOverlaps.isEmpty()) {
-            return
+            return null
         }
 
         val acknowledgedOverlaps = normalizeOverlaps(
-            requireNotNull(request.acknowledgedUnavailableConflicts)
+            acknowledgements
                 .asSequence()
                 .filter { it.shiftId == shift.id && it.targetMemberId == targetMember.id }
                 .flatMap { requireNotNull(it.overlaps).asSequence() }
@@ -525,24 +623,16 @@ class ShiftService(
                 }
             }
         ) {
-            return
+            return null
         }
 
-        throw BusinessException(
-            ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED,
-            ConfirmationRequiredResponse(
-                requiresConfirmation = true,
-                unavailableConflicts = listOf(
-                    UnavailableConflictResponse(
-                        shift.id,
-                        shift.startAt,
-                        shift.endAt,
-                        targetMember.id,
-                        targetMember.user.name,
-                        currentOverlaps,
-                    ),
-                ),
-            ),
+        return UnavailableConflictResponse(
+            shift.id,
+            shift.startAt,
+            shift.endAt,
+            targetMember.id,
+            targetMember.user.name,
+            currentOverlaps,
         )
     }
 

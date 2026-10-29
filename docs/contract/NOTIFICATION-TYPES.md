@@ -5,9 +5,9 @@
 | 축 | 상태 |
 |---|---|
 | ③ 문서 | `DRAFT` (S2-4B 초안, 2026-10-25) |
-| ② 정책 | 기존 8종은 **AS-IS 기록**. 새 Type은 정책 카드의 사용자 잠정 결정에서 나온 **후보 (`PROPOSED`)**. 팀 승인 전 |
-| 구현 | 없음. Enum을 바꾸지 않았다. Kotlin Migration은 기존 Type·문구·발행 시점을 그대로 옮긴다 |
-| ④ / ⑤ | 관련 Test 전부 `SPECIFIED` / `NOT_RUN` |
+| ② 정책 | 기존 8종은 **AS-IS 기록**. 새 Type은 최초 작성 당시 후보 (`PROPOSED`)였고, 현재 [Decision Log](../decisions/DECISION-LOG.md) §4-2 G03-D-22 적용 조건("새 알림6종·상세 수신자/합치기 규칙")으로 채택. 같은 행의 "필요한 대체 화면이 해당 기능 묶음에서 구현·검증되어야 완료" 조건은 §8 남은 공백 참고 |
+| 구현 | 최초 작성 당시 없음. **2026-10-29 새 Type 6종 구현** (`feat/v5-shift-notifications`, 아래 §8). 기존 8종의 Type·문구·발행 시점은 그대로 |
+| ④ / ⑤ | 최초 작성 당시 전부 `SPECIFIED` / `NOT_RUN`. 새 Type 구현 Test는 §8 (로컬 실행, PR 기준) |
 | 기준 코드 | 3차 `develop` `a148a62` (Production Java = `cdaaa13`). 정적 확인 |
 | 전달 수준 | **최선 노력** ([G03-D-22](../decisions/proposals/G03-D-22-notification-delivery.md) D22-1~5). 알림은 보조 수단이고, 업무 결과는 대체 조회 화면이 보장한다. Outbox·재시도는 이번 범위 밖 |
 
@@ -126,7 +126,7 @@
 | 수락했던 후보 | `SUBSTITUTE_SHIFT_CHANGED` | 수락한 요청 — 종료 (API-SB-01, 새 API) | API-SB-01 구현 후 가능. **지금 받은 요청 화면은 "대기"·"수락" 탭만 있고 진행 중만 보여 준다** (`received/page.tsx` L51) |
 | PENDING 후보 | **보내지 않음** (§6-3) | 받은 요청 목록에서 사라짐 (G03-D-22 S22-a) | 알림이 없으므로 대체 화면 규칙과 충돌하지 않는다. **이미 열린 화면 처리:** 다시 조회하면 받은 요청 목록에서 빠진다(SUB-02 조건 `Request OPEN`). 그 화면에서 수락·거절을 누르면 서버가 `SUB-023` 409 "더 이상 응답할 수 없는 대타 요청입니다"로 거부한다 (`SubstituteCandidateService` L141-147, Candidate가 PENDING이어도 Request가 OPEN이 아니면 거부). 화면은 목록을 다시 조회한다. PENDING 후보용 종료 내역 화면은 이번 MVP에 넣지 않는다 |
 | 새 담당 | `SHIFT_ASSIGNED` | 예정 근무 (기존) | 가능 |
-| 이전 담당 | `SHIFT_REASSIGNED_AWAY`, `SHIFT_CANCELLED` | 빠진 근무 (API-SC-01, 새 API) | API-SC-01 구현 후 가능 |
+| 이전 담당 | `SHIFT_REASSIGNED_AWAY`, `SHIFT_CANCELLED` | 빠진 근무 (API-SC-01, 새 API) | **가능** (API-SC-01 PR #95 병합) |
 | 실행한 관리자 | 보내지 않음 (§6-3) | 확정 응답 (변경·취소된 근무 수, 종료된 대타 요청 수) | API-LV-02 응답에 `closedRequests`가 있고, API-PS-02·03 응답에 `closedSubstituteRequests`를 추가했다 (API-CATALOG) |
 | 다른 현재 관리자 | 대타 종료 2종 | 관리자 진행 중 목록에서 **사라짐**. 관리자용 종료 요청 목록은 없다 | **약함.** AS-IS의 `SUBSTITUTE_ALL_REJECTED`(관리자 수신)도 같은 상태다. **근무표는 "지금 누가 담당인가"만 보여 주고, "누가 수락했고 왜 종료됐는가"는 보여 주지 않는다** — 근무표가 대타 이력을 대신하지 않는다. 관리자용 종료 내역 조회는 **P1 후보**, 필요 업무가 있는지 S3에서 다시 평가. **해결된 공백이 아니다. S3 차단 조건**이며, S3에서 관리자 업무 경로로 결론을 내기 전에는 알림 정책을 완료로 보지 않는다. G03-D-22의 대체 화면 원칙을 관리자 알림 전체(기존 `SUBSTITUTE_ALL_REJECTED` 포함)에 적용할지도 S3에서 함께 정한다. → **S3-A: 관리자 끝난 대타 요청 조회 API-SB-02 (P0 후보, 팀 `PENDING`)를 대체 화면으로 한다.** `ALL_REJECTED`·`CANDIDATE_INELIGIBLE`·`SHIFT_CHANGED`와 알림 없는 만료까지 포함, `NO_CANDIDATE`는 제외. 구현 전까지 공백은 남는다 |
 | 관리자 | `WORKPLACE_MEMBER_JOINED` | 구성원 목록 (기존) | 가능 |
@@ -205,3 +205,20 @@
 | 2026-10-25 | S3: API ID 표기 정정 (받은 요청 SUB-06 → SUB-02, V4 Delivery Sheet B1 기준). [USER-PATH-REVIEW](USER-PATH-REVIEW.md) §9-4 충돌 X-4 (`CANDIDATE_INELIGIBLE`의 실행한 관리자) 연결 — 본문 결정 변경 없음 |
 | 2026-10-25 | S3-A: 충돌 X-4 해소 (§3-1 `CANDIDATE_INELIGIBLE` 받는 사람, §6-3-2, NT-T14 일치 — 실행자는 관리자 수신에서만 제외), V5-N-20 추가, 다른 관리자 대체 화면을 API-SB-02로 연결 — 사용자 잠정 결정 |
 | 2026-10-25 | S3-B: §6-3-2에 받는 사람 선별 순서 (역할별 집합 → Type 규칙 → 받는 사람별 합치기) 명시 |
+| 2026-10-29 | §8 구현 기록 추가 (새 Type 6종, 발행·계산·저장 방식, 날짜 포함 문구 사용자 결정, 배포 ENUM 주의). 머리 표 구현 행, §3-6 이전 담당 행(API-SC-01 병합) 갱신 |
+
+## 8. 구현 기록 (2026-10-29, V5)
+
+| 항목 | 구현 |
+|---|---|
+| Type | `SHIFT_ASSIGNED`, `SHIFT_CANCELLED`, `SHIFT_REASSIGNED_AWAY`, `SUBSTITUTE_SHIFT_CHANGED`, `SUBSTITUTE_CANDIDATE_INELIGIBLE`, `WORKPLACE_MEMBER_JOINED` (`NotificationType` 끝에 추가). `SUBSTITUTE_EXPIRED`는 그대로 (NT-T8) |
+| 발행 지점 | V3 `ShiftService`의 공개 후 추가(API-PS-01)·취소(API-PS-02)·재배정(API-PS-03) 끝에서 `PublishedShiftChangedEvent` (종료된 요청 목록 = V4 `closeActiveRequestsByShiftChange` 반환값 그대로). V4 거절 경로의 `SubstituteCandidateIneligibleEvent` (#92). V2 가입·재가입 성공 뒤 `WorkplaceMemberJoinedEvent` |
+| 받는 사람 계산 시점 (R1) | 동기 `@EventListener` (`NotificationPlanningListener`)가 **업무 Transaction 안**(발행 시점, Lock 이후)에서 읽기만 하고 받는 사람·문구를 정한다. 예외는 삼켜 업무를 막지 않는다 (R2). 저장은 `PlannedNotificationsEvent`의 `AFTER_COMMIT` Listener |
+| 받는 사람 규칙 | §6-3 순서대로: ① 역할별 집합(근무 알림: 원래/새 담당, 요청자, ACCEPTED 후보, 현재 관리자 − 실행 관리자) → ② Type → ③ 받는 사람별 합치기 (`ShiftChangeNotificationPlanner`, 순수 계산). 모든 역할에서 **현재 소속만** 남긴다. #92 Event는 요청자 퇴사를 거르지 않으므로 계산 때 현재 소속만 남긴다 |
+| 합치기 (§3-4) | 근무 알림을 받는 사람은 대타 종료를 문구에 덧붙여 1건: 요청자·관리자 역할 "진행 중이던 대타 요청도 종료되었습니다.", ACCEPTED 후보 "수락했던 대타 요청은 종료되었습니다." PENDING 후보는 역할 집합에 없어 덧붙이지 않음. 나머지는 요청마다 `SUBSTITUTE_SHIFT_CHANGED` 1건 |
+| 실행 관리자 (§6-3-2) | **관리자 수신 역할에서만** 뺀다. 실행 관리자가 그 근무의 원래 담당·요청자이거나 새 담당이면 그 역할의 알림은 받는다 (문구대로 적용, 별도 결정 아님) |
+| 문구 (사용자 결정 2026-10-29) | 알림 목록이 근무지 이름 + 문구만 보여 주고 이동 기능이 없어 **근무 날짜·시간을 문구에 넣는다**: "10월 30일(금) 09:00~13:00 근무가 취소되었습니다." 새 담당자 이름·ID는 넣지 않음 (NT-T4). 자격 상실은 요청자에게만 "근무는 그대로이니 필요하면 다시 요청해 주세요."를 덧붙임. 가입은 "○○님이 근무지에 가입했습니다." / 같은 근무지에 끝난 소속이 있으면 "다시 가입했습니다." (이름 길이 제한이 없어 50자로 줄임, `message` Column 255) |
+| 저장 (R5, 구현 결정) | 받는 사람마다 별도 `REQUIRES_NEW` Transaction. 한 사람 실패는 로그만 남기고 다른 사람 알림은 저장 |
+| Test | `ShiftChangeNotificationPlannerTest` 11 (§3-4 표, 가입 문구·긴 이름, ACCEPTED/PENDING 새 담당, 취소 합치기, NT-T16 ②, 실행 관리자, R1, NT-T4), `ShiftChangeNotificationIntegrationTest` 8 (실제 V3·V4·V2 Command → MySQL 알림 Row: NT-T10·T13·T14·T5·T2·T6·T11, API-PS-01), `ShiftChangeNotificationFailureIntegrationTest` 2 (NT-T1, R5) |
+| 배포 (운영 DB) | `notification.type`이 MySQL ENUM이면 새 값 6개를 **배포 전에** 추가해야 저장된다 (test DB는 Hibernate가 알파벳순 ENUM 생성). 운영 `SHOW CREATE TABLE notification`으로 기존 값·순서를 확인하고 **기존 순서 그대로 끝에** 6개를 붙인다. 새 값이 저장된 뒤 이전 앱으로 Rollback하면 알림 목록 조회가 실패할 수 있다 (§4) |
+| 남은 공백 | **Decision Log §4-2 완료 조건 미충족 부분:** 다른 현재 관리자의 `SUBSTITUTE_SHIFT_CHANGED`·`SUBSTITUTE_CANDIDATE_INELIGIBLE` 대체 화면(API-SB-02) 미구현 (§3-6, 기존 `SUBSTITUTE_ALL_REJECTED`와 같은 상태) → 관리자 대상 두 알림은 발행하지만 API-SB-02 구현·검증 전까지 "완료"로 기록하지 않는다. 보낸 요청 화면의 `SHIFT_CHANGED`·`CANDIDATE_INELIGIBLE` 사유 문구는 Frontend 후속. 퇴사 확정(API-LV-02) 알림(V5-N-20)은 그 API 구현 때 연결 |

@@ -32,6 +32,7 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.test.util.ReflectionTestUtils
 
 @ExtendWith(MockitoExtension::class)
@@ -49,6 +50,10 @@ class WorkplaceServiceTest {
     @Mock
     private lateinit var user: User
 
+    // 가입 알림 Event 발행용 (알림 저장은 별도 통합 Test에서 확인)
+    @Mock
+    private lateinit var applicationEventPublisher: ApplicationEventPublisher
+
     private lateinit var workplaceService: WorkplaceService
 
     // 가입 시간 검증을 위해 시계를 고정 (한국 시간 09:00)
@@ -63,7 +68,8 @@ class WorkplaceServiceTest {
             clock,
             workplaceRepository,
             workplaceMemberRepository,
-            workplaceMemberService
+            workplaceMemberService,
+            applicationEventPublisher
         )
     }
 

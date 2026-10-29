@@ -2,7 +2,7 @@
 
 > ③ 문서 리뷰: **DRAFT** (D0-C-R 2026-10-23, D0-D 이관). 상태값은 `docs/STATUS-AXES.md`의 ④ 준비, ⑤ 실행 축을 쓴다.
 > 실제 실행 결과는 `docs/evidence/TEST-EVIDENCE.md`(Append-only)에 남기고, 이 Inventory는 EV-ID로 연결만 한다.
-> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (V4 시범, V2는 ML-H1 카드 관련 부분만), §5 Cross-Domain 카드의 임시 Test ID.
+> 구성: §1 필드, §2 규칙, §3 이후 Domain 구역 (V4 시범, V2는 ML-H1 및 API-LV-01 관련 부분), §5 Cross-Domain 카드의 임시 Test ID.
 
 ## 1. 필드
 
@@ -203,9 +203,9 @@ G03-D-19 관련 기존 Test 변경 후보 (승인 전 변경 금지, `PROCESS-CH
 V4-N-07의 "AS-IS 재현"은 새 정책 구현 Test가 아니라 별도 후속 항목(ML-CONCURRENCY-02, 아직 이 Inventory에 없음)이며, V4-N-05와 같이 DL-009가 먼저 결정돼야 한다.
 현재 동작 재현 Test 전반에 대한 일반 승인 규칙은 아직 문서화돼 있지 않다 (위 표는 각 행의 기존 기록을 모은 것이다).
 
-## 4. V2 Workplace — ML-H1 관련 부분
+## 4. V2 Workplace — ML-H1·퇴사 미리보기 관련 부분
 
-V2 구역 전체 목록이 아니다. 정책 카드 [`ML-H1`](../decisions/proposals/ML-H1-membership-history.md)에 연결된 Test만 적었다. V2 전체 Inventory(`V2-T-*` 기존 Test 번호 부여)는 V2 Delivery Sheet를 쓸 때 만든다.
+V2 구역 전체 목록이 아니다. §4-1·4-2는 정책 카드 [`ML-H1`](../decisions/proposals/ML-H1-membership-history.md), §4-3은 API-LV-01에 연결된 Test다. V2 전체 Inventory(`V2-T-*` 기존 Test 번호 부여)는 V2 Delivery Sheet를 쓸 때 만든다.
 
 ### 4-1. 신규 제안 (⑤ 전부 `NOT_RUN`)
 
@@ -230,6 +230,41 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | `service/WorkplaceServiceIntegrationTest.joinWorkplace` | 정상 가입 (DB) | Row 생성, `leftAt` null | — |
 | `controller/WorkplaceControllerTest.rejectDuplicateJoin` | Service가 WPL-002를 던짐 | 409, `code = WPL-002` | — |
 | `repository/WorkplaceMemberRepositoryTest.rejectDuplicateMembershipAtDatabaseLevel` | 같은 조합 두 번 저장 | `DataIntegrityViolationException` | 재가입 구현(ML-H2) 시 기대값 변경 대상. 그때 별도 승인 |
+
+### 4-3. API-LV-01 퇴사 미리보기 (PR #90)
+
+**정적 확인 (2026-10-29):** [PR #90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90) 병합 SHA `e039ccf3627c89bab8c7d00ee02e0e65cb90bde6`의 Test 5개 파일을 기준으로 연결했다. 작업 기준 `cade4495635e4dc855cc769b4a4c658438ab6814`까지 해당 파일 변경 없음. V2 Delivery Sheet는 아직 없으며 API 범위는 [API-CATALOG §3-1](../contract/API-CATALOG.md#3-1-api-lv-01-퇴사-미리보기), 명세 ID 원문은 [ML-4 §10](../decisions/proposals/ML-4-leave-command-and-access.md#10-검증-계약-모두-specified--not_run)과 [ML-3 §11](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md)을 따른다.
+
+공통: 구분 `IMPROVEMENT`, ① `VERIFIED_AS_IS` (소스 확인), 아래 **조회 Test의 ④는 `IMPLEMENTED`**, **⑤는 `UNKNOWN`** (해당 병합 SHA의 개별 Test Report·EV-ID를 이 작업에서 확인하지 않음). 이번 문서 작업에서는 사용자 지시에 따라 Gradle·Test를 실행하지 않았다. PR 본문·리뷰의 실행 보고를 병합 SHA의 개별 `PASSED`로 옮기지 않는다. 정책 승인 범위는 Decision Log §4-2·4-4를 따르며 이 연결로 확대하지 않는다.
+
+경로 기준: `backend/src/test/kotlin/com/merge/backend/domain/workplace/`. 아래 `Service`는 `service/LeavePreviewServiceIntegrationTest`, `Query`는 `repository/LeavePreviewQueryRepositoryTest`, `Controller`는 `controller/LeavePreviewControllerTest`, `Context`는 `service/LeavePreviewContextServiceTest`, `Transaction`은 `service/LeavePreviewTransactionTest`다.
+
+| 명세 ID / 관련 계약 | Class · Method | 종류 · 환경 (소스 설정 기준) | 실제 확인하는 기대값 / 범위 |
+|---|---|---|---|
+| V2-N-23 | `Service.emptyPreview` | INTEGRATION · MYSQL_TC | 대상 소속 정보와 빈 영향 목록 |
+| V2-N-23, V2-N-27 시간 경계 부분 | `Service.classifyShiftsAndPreserveComparisonFacts` | INTEGRATION · MYSQL_TC / REPEATABLE_READ | 진행 중·미래 공식 근무·DRAFT 분리, `startAt == now` 포함·`endAt == now` 제외, 취소 근무 제외, 비교용 식별·상태·시각 보존 |
+| V2-N-23, ML-3 요청자 영향 (V4-N-08·12 관련) | `Service.previewOwnActiveRequestsWithoutChangingDatabase` | INTEGRATION · MYSQL_TC / REPEATABLE_READ | 본인 공식 근무의 OPEN·ACCEPTED 요청에 `wouldCloseRequest=true`. flush·clear 후 DB 상태 불변. 실제 요청 종료·알림은 검증하지 않음 |
+| V2-N-23, ML-3-P·P1 (V4-N-13·15 관련) | `Service.countOnlyCurrentEmployeePendingCandidates` | INTEGRATION · MYSQL_TC / REPEATABLE_READ | 다른 현재 EMPLOYEE PENDING 후보만 집계. 남은 후보 있음/없음에 따른 `wouldCloseRequest=false/true`, `wouldBecomeIneligible=true`, DB 상태 불변 |
+| V2-N-23, ML-3-A·Q1a (V4-N-16 관련) | `Service.distinguishPendingAndAcceptedEffectsOnAcceptedRequests` | INTEGRATION · MYSQL_TC / REPEATABLE_READ | ACCEPTED 요청의 수락 후보는 이력 유지·종료 예상, PENDING 후보는 자격 상실 예상·요청 종료 없음. 실제 DB 전이 없음 |
+| V2-N-23, ML-3 활성 영향 범위 | `Service.excludeInactiveAndForeignCandidacies` | INTEGRATION · MYSQL_TC | CLOSED·APPROVED, 시작한 근무·DRAFT·다른 근무지 후보는 영향에서 제외 |
+| V2-N-24 권한 규칙 관련 (조회 한정) | `Service.rejectOutsiderBeforeLookingUpTarget` | INTEGRATION · MYSQL_TC | 대상 조회보다 먼저 비소속자 `WPL-003` |
+| V2-N-24 권한 규칙 관련 (조회 한정) | `Service.rejectEmployeeActor` | INTEGRATION · MYSQL_TC | 현재 EMPLOYEE 실행자 `WPL-004` |
+| V2-N-24 권한 규칙 관련 (조회 한정) | `Service.rejectEndedManagerActor` | INTEGRATION · MYSQL_TC | 종료된 관리자 소속 `WPL-003` |
+| ML-4 §5·API-LV-01 대상 범위 | `Service.rejectMissingOrForeignTarget` | INTEGRATION · MYSQL_TC | 없는 소속과 다른 근무지 소속 모두 `WPL-006` |
+| V2-N-25 (= V2-N-18) 대상 규칙 관련 (조회 한정) | `Service.rejectManagerTarget` | INTEGRATION · MYSQL_TC | 관리자 퇴사 대상 `WPL-007` |
+| V2-N-26 (V2-N-05 관련) 대상 규칙 관련 (조회 한정) | `Service.rejectEndedTarget` | INTEGRATION · MYSQL_TC | 이미 종료된 퇴사 대상 `WPL-008` |
+| V2-N-23, V2-N-27 시간 경계 부분 | `Query.selectOngoingFutureAndAllDraftShiftsAtTimeBoundaries` | SLICE (DataJpa) · MYSQL_TC | 진행 중·미래 공식 근무와 과거/미래 DRAFT 조회, 종료·취소·다른 담당 제외 |
+| V2-N-23, ML-3 활성 영향 범위 | `Query.selectOnlyTargetAssignmentsOrActiveCandidaciesInThisWorkplace` | SLICE (DataJpa) · MYSQL_TC | 대상 담당 근무 또는 대상의 PENDING·ACCEPTED 후보 요청만 조회, 근무지·상태·시각 제한 및 to-one 조회 확인 |
+| V2-N-23, ML-3 후보 영향 범위 | `Query.fetchPendingAndAcceptedCandidatesWithoutRejectedOrUnrelatedRows` | SLICE (DataJpa) · MYSQL_TC | 지정 요청의 PENDING·ACCEPTED 후보만, REJECTED·무관한 요청 제외 |
+| V2-N-23, V2-N-27 진행 중 표시 관련 | `Controller.serializePreviewWithOngoingShiftAndAllAffectedLists` | SLICE (WebMvc) · MOCK / HTTP (Filter 꺼짐) | 200 응답·`canLeave=false`·`blockingReason=ONGOING_SHIFT`·가장 늦게 끝나는 `ongoingShift` 및 영향 목록·Context 직렬화 |
+| ML-4 §5, V2-N-24·25·26 오류 응답 관련 (조회 한정) | `Controller.preserveErrorEnvelope` | SLICE (WebMvc) · MOCK / HTTP (Filter 꺼짐) | `@EnumSource` 5입력: `WPL-003·004·006·007·008`의 HTTP·code·message·빈 data. 실제 인증 Filter 검증 아님 |
+| V2-N-23 비교 정보, G03-D-05 §5-4 발급 부분 | `Context.bindIdentityOriginalFactsAndFifteenMinuteValidityToPurposeDerivedSignature` | UNIT · NONE | `lv1` 형식, 실행자·근무지·대상·원본·발급/만료 시각(900초), 용도 분리 HMAC 서명. ID가 달라지면 문자열 변경 |
+| V2-N-23 비교 정보, G03-D-05 §5-4 정규화 부분 | `Context.normalizeCandidateOrderAndBindCandidateHistoryAndCurrentMembership` | UNIT · NONE | 후보 순서 변경 시 문자열 동일, 후보 상태·소속 종료 시각 변경 시 문자열 달라짐 |
+| V2-N-23 조회 일관성, G03-D-05 §5-4 원본 범위 | `Transaction.useReadOnlyRepeatableReadAndRestoreDefaultIsolation` | INTEGRATION · MYSQL_TC | 외부 Transaction 없는 proxy 호출에서 read-only·REPEATABLE_READ 확인, 종료 후 READ_COMMITTED·read-only 해제, 빈 영향의 `canLeave=true` |
+
+**정적 집계:** Method 20개 = Service 12 + Query 3 + Controller 2 + Context 2 + Transaction 1. Controller의 매개변수 5입력을 펼치면 예상 사례 24개이며 **실행 건수가 아니다**. MYSQL_TC는 `test` Profile의 Testcontainers MySQL 9.7.2 설정 기준이다. Service 클래스에는 `@Transactional(isolation = REPEATABLE_READ)`가 있으므로, 서비스 proxy의 독립 Transaction 확인은 별도 Transaction Test와 구분한다.
+
+**명세 전체의 상태를 올리지 않는 항목:** `V2-N-23`의 조회 영향 Test는 구현되어 있다. `V2-N-24·25·26`의 퇴사 요청 거부·상태 불변, `V2-N-27`의 **확정 시 409 + 종료 시각**은 위 조회 Test와 관련된 별도 검증이다. 해당 확정 명세를 이 연결만으로 `IMPLEMENTED`로 바꾸지 않는다. 같은 이유로 `V4-N-08·12·13·15·16`의 실제 Request/Candidate 전이·알림, API-LV-02의 서명·만료 거부·현재 권한/DB 재검사·STALE 비교·Rollback·경합도 PR #90의 검증 완료 범위에 포함하지 않는다. 이 절은 다른 PR의 구현·실행 상태를 덮어쓰지 않는다.
 
 ## 5. Cross-Domain 정책 카드의 임시 Test ID (S2에서 정식 번호 부여)
 
@@ -285,7 +320,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | M3-T5 | **V4-N-47** (후보 응답·대타 종료) + **V5-N-18** (알림 읽음) | V4 / V5 | PROPOSED_IMPROVEMENT | Domain별로 나눔 |
 | M3-T6 | 참조: 기존 BASELINE (V4-T-23·36 등, 각 API의 정상 경로 Test) | 각 Domain | BASELINE | 회귀 |
 | NT-T1~T16 | **V5-N-01~16** (번호 그대로) | V5 | T3·T8·T12는 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | §6 |
-| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내) | ML-5 | H6 | `BLOCKED` (ML5-T1·T2·T3·T13, H6-C1·C2·C3·C5·C6은 `LOCAL_PASSED`) |
+| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2·T4, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내) | ML-5 | H6 | `BLOCKED` (ML5-T1·T2·T3·T4·T13, H6-C1·C2·C3·C5·C6은 `LOCAL_PASSED`) |
 | ErrorCode Test 0 (11개) | **V3-N-24~32**, **V4-N-48** | V3 / V4 | MIGRATION | §5-3 |
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
@@ -456,6 +491,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
 | 2026-10-29 | 공개 근무 변경 연결: 끝에 "V4 공개 근무 변경 연결" 절 신설 (V4-N-61·62, V4-N-39, H6-C1~C3, ML5-T1·T2), D21-T6·§5-1 H6·V3-N-33 행에 연결 (EV-039) |
 | 2026-10-29 | TODO 21 현재 동작 고정: V4-N-01·02·03·48 작성 (`LOCAL_PASSED`, EV-041), V4-N-04·V4-N-02 일부는 기존 Test로 충족 표시, V4-T-13·14·23·82·83과 §3-3 환경 근거 갱신, 끝에 "V4 현재 동작 고정" 절 신설 |
+| 2026-10-29 | ML5-T4 (다른 근무지 수락 × 재배정) 양쪽 순서 작성 (`LOCAL_PASSED`, EV-043), "이중 배정" 해석 기록 (ML-5 §7) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -592,7 +628,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 - 회귀 (기대값 변경 0): 기존 Test 584개 목록 그대로 통과 (`rejectCandidate_LastCandidate_ClosesRequest` 포함). 리뷰 반영 때 Mock Test 3곳은 Mock하는 조회 이름만 바꿈 (`existsRespondableCandidateExcept`)
 - 범위 밖: V2 퇴사 확정 경로 Test (V2-N-53), 대타 생성 × 퇴사 (H6-C7, 소속 `FOR SHARE` 필요), 알림 Type·받는 사람 (V5, V5-N-20), 요청자 퇴사 시 본인 근무의 요청 (V3 인계·취소의 `SHIFT_CHANGED`, V4-N-12)
 
-## V4 공개 근무 변경 연결 (V4-N-61·62·39, H6-C1~C3, ML5-T1·T2, 2026-10-29)
+## V4 공개 근무 변경 연결 (V4-N-61·62·39, H6-C1~C3, ML5-T1·T2·T4, 2026-10-29)
 
 V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(`reassignPublishedShift`, `b411f2e`)이 V4 `closeActiveRequestsByShiftChange`(PR #80)를 부르는 실제 경로를 MySQL에서 확인한다. Class: `SubstituteShiftChangeIntegrationTest` (MySQL Testcontainers, test Profile). V3 두 Command의 V3 Test는 Mock 단위 Test뿐이다. V4-N-61·62는 [ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) V4 범위 다음 번호 (V4-N-61~64를 이 연결 Test용으로 예약, PR #92에서 65~부터 사용), H6·ML5는 문서 ID 그대로 (§5-1 "같은 내용이면 기존 ID 참조")
 
@@ -608,9 +644,11 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 | H6-C1 ② | `acceptWaitsForReassignInProgress` | 재배정이 먼저 → 수락 대기 → `REQUEST_NOT_OPEN`, 후보 PENDING | `LOCAL_PASSED` |
 | H6-C2 ① | `reassignWaitsForApproveInProgress` | 승인이 Shift·Request를 잡은 채 → 재배정 대기 → APPROVED 뒤 재배정, `closedSubstituteRequests = 0`, 담당 = 재배정 대상, 이력의 이전 담당 = 수락자, Deadlock 0 (ML5-T3 장면을 실제 재배정 Command로) | `LOCAL_PASSED` |
 | H6-C2 ② | `approveWaitsForReassignInProgress` | 재배정이 먼저 → 승인 대기 → `INVALID_REQUEST`, `SHIFT_CHANGED`, 담당 = 재배정 대상 | `LOCAL_PASSED` |
+| ML5-T4 ① | `reassignWaitsForOtherWorkplaceAccept` | 다른 근무지(W2) 수락이 User B를 잡은 채 → W1에서 B에게 재배정 대기 → 수락 반영 뒤 재배정 진행(담당 = B, 이력 1건) → W2 승인 `CONFLICT_SHIFT`, W2 담당 = 요청자. B의 공식 배정 1개 | `LOCAL_PASSED` |
+| ML5-T4 ② | `otherWorkplaceAcceptWaitsForReassign` | W1 재배정이 User B를 잡은 채 → W2 수락 대기 → `CONFLICT_SHIFT`, B PENDING, W2 요청 OPEN. B의 공식 배정 1개 | `LOCAL_PASSED` |
 
 **⑤ 상태의 뜻:**
-- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `cade449` 위 전체 629/629 (EV-039). CI는 PR 생성 후 기록
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `cade449` 위 전체 629/629 (EV-039). ML5-T4는 develop `e429343` 위 전체 729 → 731/731 (EV-043). CI는 PR 생성 후 기록
 - 회귀 (기대값 변경 0): 기존 Test 619개 목록 그대로 통과. Production 코드 변경 없음
 - 문서 불일치 (기록만, AI-RULES §3): [ML-5](../decisions/proposals/ML-5-concurrency-and-lock-order.md) §7은 ML5-T1 옆에 "(H6-C1)"이라고 적었지만 ML-3 §10 H6-C1은 "인계 × **수락**"이다. 이 절은 ML5-T1(인계 × 생성)과 H6-C1(인계 × 수락)을 따로 실행했다
 - 범위 밖: H6-C4 (관리자 두 명 동시 재배정, 배정 이력 순서 = V3 소유), 종료 알림 Type·받는 사람·합치기 (V5), V3-N-33 알림·화면까지의 전체 경로 (V3)

@@ -63,6 +63,7 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import org.springframework.context.ApplicationEventPublisher
 
 @ExtendWith(MockitoExtension::class)
 class ShiftServiceTest {
@@ -92,6 +93,10 @@ class ShiftServiceTest {
 
     @Mock
     private lateinit var clock: Clock
+
+    // 공개 후 변경 알림 Event 발행용 (알림 저장은 별도 통합 Test에서 확인)
+    @Mock
+    private lateinit var applicationEventPublisher: ApplicationEventPublisher
 
     @Test
     @DisplayName("SCH-01 - Pattern에서 전달된 정보로 SCHEDULED Shift를 저장한다")

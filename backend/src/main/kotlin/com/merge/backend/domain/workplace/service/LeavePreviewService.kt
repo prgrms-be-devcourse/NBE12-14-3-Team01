@@ -11,6 +11,7 @@ import java.time.Clock
 import java.time.LocalDateTime
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
@@ -32,6 +33,11 @@ class LeavePreviewService(
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun getPreviewFacts(actorUserId: Long, workplaceId: Long, memberId: Long): LeavePreviewFacts =
         readFacts(actorUserId, workplaceId, memberId, LocalDateTime.now(clock))
+
+    /** 확정의 기존 쓰기 Transaction에 참여한다. 미리보기의 RR Transaction은 새로 만들지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun readForConfirmation(actorUserId: Long, workplaceId: Long, memberId: Long, now: LocalDateTime): LeavePreviewFacts =
+        readFacts(actorUserId, workplaceId, memberId, now)
 
     private fun readFacts(
         actorUserId: Long,

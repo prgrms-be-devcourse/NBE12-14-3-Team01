@@ -1,6 +1,8 @@
 package com.merge.backend.domain.workplace.entity
 
 import com.merge.backend.domain.user.entity.User
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
+import com.merge.backend.global.exception.BusinessException
 import com.merge.backend.global.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -51,6 +53,13 @@ class WorkplaceMember @JvmOverloads constructor(
 
     var leftAt: LocalDateTime? = leftAt
         protected set
+
+    /** 전체 퇴사 Transaction의 마지막 소속 변경. 근무·대타 정리는 호출자가 먼저 완료한다. */
+    fun endMembership(endedAt: LocalDateTime) {
+        if (leftAt != null) throw BusinessException(WorkplaceErrorCode.MEMBERSHIP_ALREADY_ENDED)
+        if (role != WorkplaceRole.EMPLOYEE) throw BusinessException(WorkplaceErrorCode.MANAGER_CANNOT_LEAVE)
+        leftAt = endedAt
+    }
 
     @field:GeneratedColumn("CASE WHEN left_at IS NULL THEN 1 END")
     @field:Column(insertable = false, updatable = false)
