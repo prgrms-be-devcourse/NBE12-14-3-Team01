@@ -123,7 +123,7 @@ class SubstituteMembershipGuardTest {
     }
 
     @Test
-    @DisplayName("대타 생성이 후보 소속을 잡고 있으면 퇴사가 기다렸다가 새로 생긴 후보를 INELIGIBLE로 정리한다")
+    @DisplayName("대타 생성이 후보 소속을 잡고 있으면 퇴사가 기다렸다가 새로 생긴 후보를 INELIGIBLE로 정리한다 (V4 정리 함수 기준)")
     fun leaveWaitsForCreateInProgress() {
         // given
         val f = createFixture()

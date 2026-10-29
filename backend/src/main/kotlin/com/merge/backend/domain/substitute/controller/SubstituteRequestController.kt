@@ -2,6 +2,7 @@ package com.merge.backend.domain.substitute.controller
 
 import com.merge.backend.domain.substitute.dto.AcceptedClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.AcceptedPendingSubstituteRequestResponse
+import com.merge.backend.domain.substitute.dto.ClosedSubstituteRequestPageResponse
 import com.merge.backend.domain.substitute.dto.ReceivedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCloseResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse
@@ -10,10 +11,13 @@ import com.merge.backend.domain.substitute.service.SubstituteCandidateService
 import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.global.dto.ApiResponse
 import com.merge.backend.global.rq.Rq
+import java.time.LocalDateTime
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -77,6 +81,24 @@ class SubstituteRequestController(
 
         return ResponseEntity.status(200).body(
             ApiResponse.success("200", "진행 중인 대타 요청을 조회했습니다.", response),
+        )
+    }
+
+    // API-SB-02 - MANAGER: 끝난 대타 요청 조회 (종료·만료, 기본 최근 7일, 페이지)
+    @GetMapping("/workplaces/{workplaceId}/substitute-requests/closed")
+    fun getClosedRequests(
+        @PathVariable workplaceId: Long,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) from: LocalDateTime?,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) to: LocalDateTime?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+    ): ResponseEntity<ApiResponse<ClosedSubstituteRequestPageResponse>> {
+        val actorId = rq.actorId
+
+        val response = substituteRequestService.findClosedRequests(workplaceId, actorId, from, to, page, size)
+
+        return ResponseEntity.ok(
+            ApiResponse.success("200", "끝난 대타 요청을 조회했습니다.", response),
         )
     }
 
