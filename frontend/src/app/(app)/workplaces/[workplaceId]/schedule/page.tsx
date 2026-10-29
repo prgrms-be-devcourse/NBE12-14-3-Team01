@@ -1237,7 +1237,8 @@ export default function SchedulePage() {
     }
 
     if (err.code === PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED_CODE) {
-      setPublishedShiftError("이미 시작했거나 취소된 근무는 변경할 수 없습니다. 최신 근무표를 다시 불러옵니다.");
+      window.alert("이미 시작했거나 취소된 근무는 변경할 수 없습니다. 최신 근무표를 다시 불러옵니다.");
+      closePublishedShiftModal();
       refreshScheduleAfterPublishedChange();
       return;
     }
