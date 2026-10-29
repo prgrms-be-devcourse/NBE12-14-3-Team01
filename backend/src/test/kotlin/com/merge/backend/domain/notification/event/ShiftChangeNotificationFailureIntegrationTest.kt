@@ -44,6 +44,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import com.merge.backend.domain.workplace.service.WorkplaceService
 
 // 새 알림 저장 실패가 업무 결과를 바꾸지 않고(NT-T1, R2), 한 사람의 실패가 다른 사람의 알림을 막지 않는다(R5)
 // SubstituteNotificationAfterCommitIntegrationTest와 같은 Spy 설정이라 Spring Context를 함께 쓴다
@@ -64,6 +65,7 @@ class ShiftChangeNotificationFailureIntegrationTest {
     @Autowired private lateinit var transactionManager: PlatformTransactionManager
     @Autowired private lateinit var jdbcTemplate: JdbcTemplate
     @Autowired private lateinit var testClock: TestClock
+    @Autowired private lateinit var workplaceService: WorkplaceService
 
     @BeforeEach
     fun fixClock() {
@@ -107,6 +109,33 @@ class ShiftChangeNotificationFailureIntegrationTest {
         assertThat(typesOf(f.requesterMemberId, since)).isEmpty()
         assertThat(typesOf(f.accepterMemberId, since)).containsExactly(NotificationType.SUBSTITUTE_SHIFT_CHANGED.name)
         assertThat(typesOf(f.otherManagerMemberId, since)).containsExactly(NotificationType.SUBSTITUTE_SHIFT_CHANGED.name)
+    }
+
+    @Test
+    @DisplayName("V2-N-22: 가입 알림 저장이 실패해도 가입은 Commit되고 구성원 목록에 새 소속이 보인다")
+    fun joinNotificationFailureDoesNotChangeJoin() {
+        // given: 관리자 1명인 근무지, 가입 알림 저장만 실패
+        val suffix = UUID.randomUUID().toString().substring(0, 8)
+        val (workplaceId, inviteCode, managerUserId) = requireNotNull(
+            TransactionTemplate(transactionManager).execute {
+                val workplace = workplaceRepository.save(Workplace("가입 알림 실패 테스트 매장 $suffix", "NJ-$suffix"))
+                val manager = saveMember(workplace, "manager-$suffix", WorkplaceRole.MANAGER)
+                Triple(requireNotNull(workplace.id), workplace.inviteCode, requireNotNull(manager.user.id))
+            },
+        )
+        val newcomer = userRepository.save(User("newcomer-$suffix@test.com", "password-hash", "새직원"))
+        val since = maxNotificationId()
+        doAnswer { throw IllegalStateException("injected join notification failure") }
+            .`when`(notificationRepository).save(argThat<Notification> { type == NotificationType.WORKPLACE_MEMBER_JOINED })
+
+        // when
+        val joined = workplaceService.joinWorkplace(inviteCode, newcomer)
+
+        // then
+        assertThat(jdbcTemplate.queryForObject("SELECT left_at IS NULL FROM workplace_member WHERE id = ?", Boolean::class.java, joined.id))
+            .isTrue()
+        assertThat(workplaceService.getWorkplaceMembers(workplaceId, managerUserId).map { it.id }).contains(joined.id)
+        assertThat(notificationCountSince(since)).isZero()
     }
 
     private fun maxNotificationId(): Long =
