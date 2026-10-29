@@ -7,6 +7,7 @@ import com.merge.backend.domain.shift.service.ShiftService
 import com.merge.backend.domain.workplace.dto.request.LeaveConfirmRequest
 import com.merge.backend.domain.workplace.dto.response.LeaveConfirmResponse
 import com.merge.backend.domain.workplace.dto.response.LeavePreviewResponse
+import com.merge.backend.domain.workplace.event.MemberLeaveConfirmedEvent
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
 import com.merge.backend.global.dto.ValidationErrorResponse
@@ -16,6 +17,7 @@ import java.time.Clock
 import java.time.LocalDateTime
 import jakarta.validation.Validator
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -31,7 +33,8 @@ class LeaveConfirmService(
     private val writer: LeaveMembershipWriter,
     private val integration: ObjectProvider<LeaveConfirmationIntegration>,
     private val clock: Clock,
-    private val validator: Validator
+    private val validator: Validator,
+    private val applicationEventPublisher: ApplicationEventPublisher
 ) {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun confirm(actorUserId: Long, workplaceId: Long, memberId: Long, request: LeaveConfirmRequest): LeaveConfirmResponse {
@@ -87,6 +90,19 @@ class LeaveConfirmService(
             "V4 실제 처리 결과가 검증한 퇴사 영향과 다릅니다."
         }
         val completed = writer.complete(locked.members.getValue(memberId), now, plan.regenerateInviteCode)
+
+        // 알림: leftAt 기록 뒤에 발행해야 퇴사자가 받는 사람(현재 소속)에서 빠진다. 저장은 Commit 후 (V5-N-20)
+        applicationEventPublisher.publishEvent(
+            MemberLeaveConfirmedEvent(
+                workplaceId = workplaceId,
+                leaverMemberId = memberId,
+                actorMemberId = requireNotNull(actor.id),
+                reassignments = plan.reassignments.map { MemberLeaveConfirmedEvent.Reassignment(it.shift.shiftId, it.targetMemberId) },
+                cancelledShiftIds = plan.cancellations.map { it.shiftId },
+                shiftChangedRequestsByShiftId = shiftResult.closedRequestsByShiftId,
+                candidateIneligibleRequests = candidateResult.closedRequests,
+            ),
+        )
         return LeaveConfirmResponse(
             completed.leftAt,
             plan.reassignments.map { LeavePreviewResponse.WorkShift.from(it.shift.copy(memberId = it.targetMemberId)) },

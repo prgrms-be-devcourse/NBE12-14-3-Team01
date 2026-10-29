@@ -387,8 +387,10 @@ class ShiftService(
     ): MemberLeaveShiftResult {
         val reassignments = plan.reassignments.associateBy { requireNotNull(it.shift.id) }
         val affected = (plan.reassignments.map { it.shift } + plan.cancellations).sortedBy { it.id }
+        val closedByShiftId = linkedMapOf<Long, List<ShiftChangeClosedRequest>>()
         val closed = affected.flatMap { shift ->
             val requests = substituteRequestService.closeActiveRequestsByShiftChange(requireNotNull(shift.id), now)
+            closedByShiftId[requireNotNull(shift.id)] = requests
             val reassignment = reassignments[shift.id]
             if (reassignment != null) {
                 assignWithHistory(shift, reassignment.target, ShiftAssignmentReason.MEMBER_LEFT, actor)
@@ -398,7 +400,7 @@ class ShiftService(
             requests
         }
         shiftRepository.deleteAll(plan.draftShiftsToDelete)
-        return MemberLeaveShiftResult(closed)
+        return MemberLeaveShiftResult(closed, closedByShiftId)
     }
 
     private fun assignWithHistory(

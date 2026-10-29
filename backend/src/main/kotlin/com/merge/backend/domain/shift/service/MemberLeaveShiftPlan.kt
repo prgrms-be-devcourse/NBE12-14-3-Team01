@@ -13,4 +13,8 @@ data class MemberLeaveShiftPlan(
     data class Reassignment(val shift: Shift, val target: WorkplaceMember)
 }
 
-data class MemberLeaveShiftResult(val closedRequests: List<ShiftChangeClosedRequest>)
+data class MemberLeaveShiftResult(
+    val closedRequests: List<ShiftChangeClosedRequest>,
+    // 알림 계산용: 근무마다 그 근무에서 SHIFT_CHANGED로 종료된 요청 (NOTIFICATION-TYPES §3-5 근무 단위)
+    val closedRequestsByShiftId: Map<Long, List<ShiftChangeClosedRequest>> = emptyMap(),
+)
