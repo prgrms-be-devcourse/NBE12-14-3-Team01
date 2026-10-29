@@ -63,11 +63,14 @@ class SubstituteRequestService(
         val shift = validateSubstituteRequest(shiftId, actorUserId)
 
         // 조건에 맞는 대타 후보들을 먼저 찾음
-        val candidates = substituteCandidateService.findCandidates(
+        val foundCandidates = substituteCandidateService.findCandidates(
             requireNotNull(shift.schedule.workplace.id), // 대상 근무지 ID
             requireNotNull(shift.member.id), // 대타를 요청한 멤버 ID
             shift, // 대타가 필요한 Shift
         )
+
+        // 후보를 고른 뒤 퇴사가 Commit될 수 있어, 소속을 잠그고 다시 확인한 후보만 넣음 (ML-5 §4-4 반례 A)
+        val candidates = guardMemberships(shift, foundCandidates)
 
         // 후보가 한 명도 없으면 Request 자체를 만들지 않음
         if (candidates.isEmpty()) {
@@ -113,6 +116,28 @@ class SubstituteRequestService(
             )
 
         return requests.map { request -> SentSubstituteRequestResponse.from(request, now) }
+    }
+
+    // 소속 Guard: 요청자·후보 소속을 ID 오름차순 FOR SHARE로 잠가 퇴사(소속 FOR UPDATE)와 직렬화한 뒤
+    // 현재 소속을 DB 값으로 다시 확인. 요청자가 나갔으면 거부, 나간 후보는 빼고 돌려줌 (ML-5 §5 대타 생성 행, TASK-V2-69 L70)
+    private fun guardMemberships(shift: Shift, candidates: List<WorkplaceMember>): List<WorkplaceMember> {
+        val workplaceId = requireNotNull(shift.schedule.workplace.id)
+        val requesterMemberId = requireNotNull(shift.member.id)
+        val candidateIds = candidates.map { requireNotNull(it.id) }
+
+        workplaceMemberRepository.findAllByIdInForShare((candidateIds + requesterMemberId).sorted())
+
+        if (!workplaceMemberRepository.existsCurrentMember(requesterMemberId, workplaceId)) {
+            throw BusinessException(SubstituteRequestErrorCode.NOT_OWN_SHIFT)
+        }
+
+        if (candidateIds.isEmpty()) {
+            return candidates
+        }
+
+        val currentIds = workplaceMemberRepository.findCurrentEmployeeIdsIn(candidateIds, workplaceId).toSet()
+
+        return candidates.filter { it.id in currentIds }
     }
 
     private fun validateSubstituteRequest(shiftId: Long, actorUserId: Long): Shift {
@@ -342,6 +367,13 @@ class SubstituteRequestService(
         val candidateUserId = requireNotNull(acceptedMember.user.id)
 
         userService.getByIdForUpdate(candidateUserId)
+
+        // 소속 Guard: 수락자 소속을 FOR SHARE로 잠가 퇴사와 직렬화한 뒤 DB 값으로 다시 확인 (ML-5 §5 대타 승인 행, ML5-T8)
+        val guardedMemberId = requireNotNull(acceptedMember.id)
+        workplaceMemberRepository.findByIdForShare(guardedMemberId)
+        if (workplaceMemberRepository.findCurrentEmployeeIdsIn(listOf(guardedMemberId), workplaceId).isEmpty()) {
+            throw BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE)
+        }
 
         // 현재를 기준으로 대체 근무 시작 시간이 지나거나 같다면 (now >= startAt)
         val validationNow = LocalDateTime.now(clock)

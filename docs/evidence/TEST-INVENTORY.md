@@ -320,7 +320,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | M3-T5 | **V4-N-47** (후보 응답·대타 종료) + **V5-N-18** (알림 읽음) | V4 / V5 | PROPOSED_IMPROVEMENT | Domain별로 나눔 |
 | M3-T6 | 참조: 기존 BASELINE (V4-T-23·36 등, 각 API의 정상 경로 Test) | 각 Domain | BASELINE | 회귀 |
 | NT-T1~T16 | **V5-N-01~16** (번호 그대로) | V5 | T3·T8·T12는 MIGRATION, 나머지 PROPOSED_IMPROVEMENT | §6 |
-| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2·T4, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내) | ML-5 | H6 | `BLOCKED` (ML5-T1·T2·T3·T4·T13, H6-C1·C2·C3·C5·C6은 `LOCAL_PASSED`) |
+| ML5-T1~T15, ML5-R1~R4, H6-C1~C8 | 보류 (H6). ML5-T10 = V2-N-07, ML5-T11 = V2-N-12 (기존). 예외: ML5-T3(H6-C2) = PR #83 `SubstituteApprovePermissionLockTest``.approveAndShiftFirstHandoverDoNotDeadlock`, ML5-T13 = V4-N-46 장면. ML5-T1·T2·T4, H6-C1 ①②·C2 ①②·C3 = `SubstituteShiftChangeIntegrationTest` (실제 V3 취소·재배정 Command). H6-C5·C6 = `SubstituteMemberLeaveTest` (퇴사 흉내). ML5-R1·T5·T6·T8, H6-C5·C7 = `SubstituteMembershipGuardTest` (소속 Guard) | ML-5 | H6 | `BLOCKED` (ML5-R1·T1·T2·T3·T4·T5·T6·T8·T13, H6-C1·C2·C3·C5·C6·C7은 `LOCAL_PASSED`) |
 | ErrorCode Test 0 (11개) | **V3-N-24~32**, **V4-N-48** | V3 / V4 | MIGRATION | §5-3 |
 
 번호 사용 결과: V2-N-41~52, V3-N-20~32, V4-N-27~48, V5-N-01~18 (신설), V4-T-53~93 (기존 Test).
@@ -493,6 +493,7 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-29 | 공개 근무 변경 연결: 끝에 "V4 공개 근무 변경 연결" 절 신설 (V4-N-61·62, V4-N-39, H6-C1~C3, ML5-T1·T2), D21-T6·§5-1 H6·V3-N-33 행에 연결 (EV-039) |
 | 2026-10-29 | TODO 21 현재 동작 고정: V4-N-01·02·03·48 작성 (`LOCAL_PASSED`, EV-041), V4-N-04·V4-N-02 일부는 기존 Test로 충족 표시, V4-T-13·14·23·82·83과 §3-3 환경 근거 갱신, 끝에 "V4 현재 동작 고정" 절 신설 |
 | 2026-10-29 | ML5-T4 (다른 근무지 수락 × 재배정) 양쪽 순서 작성 (`LOCAL_PASSED`, EV-043), "이중 배정" 해석 기록 (ML-5 §7) |
+| 2026-10-29 | 대타 생성·수락·승인 소속 Guard: ML5/H6 행 갱신, 끝에 "V4 대타 소속 Guard" 절 신설. 기존 Mock Test 14개는 준비 코드만 추가 (기대값 그대로) (EV-045) |
 
 ## 미리보기 STALE 정책의 후속 검증 명세 (2026-10-26)
 
@@ -716,3 +717,21 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 - 회귀 (기대값 변경 0): 기존 Test 731개 목록 그대로 통과
 - PR #104 리뷰 반영 (2026-10-29): 위 V4-N-50 Test 2개 추가, develop `6ae6683` 병합 위 842 / 842 → **844 / 844 PASS** (FAIL 0, 기존 목록 그대로 + 새 2개, 경고 같음, `Deadlock found` 0). 결함 넣기 2가지 (수락자 `associateBy`로 되돌림, Query 상태 조건에 APPROVED 추가) → 각각 새 Test가 잡음 (EV-044)
 - 범위 밖: Frontend "끝난 요청" 탭과 표시 규칙(FRONTEND-CONTRACT §3-4, Test ID 없음), 성능·실행 계획 (USER-PATH-REVIEW §13-4 S4)
+
+## V4 대타 소속 Guard (ML5-R1·T5·T6·T8, H6-C5·C7, 2026-10-29)
+
+[ML-5](../decisions/proposals/ML-5-concurrency-and-lock-order.md) §4-4·§5·§7, [ML-3](../decisions/proposals/ML-3-substitute-on-leave-and-shift-change.md) §10. V2 퇴사 확정 POST 활성화 조건 (`docs/delivery/TASK-V2-69-leave-confirm.md` L70-71). Class: `SubstituteMembershipGuardTest` (MySQL Testcontainers, test Profile). 퇴사는 "소속 Row만 잠그고 `leftAt` 기록"으로 흉내 내 소속 Guard만으로 직렬화되는지 본다 (실제 V2 퇴사는 Request를 먼저 잠근다)
+
+| Test ID | Method | 확인하는 것 | ⑤ 실행 |
+|---|---|---|---|
+| ML5-R1 / H6-C7 ① | `createWaitsForCandidateLeaveAndSkipsLeftCandidate` | B 퇴사가 Commit 전 → 대타 생성이 B 소속 Lock을 기다림 → 퇴사 Commit 뒤 B는 후보가 아니고 C만 PENDING (반례 A 차단) | `LOCAL_PASSED` |
+| ML5-T6 / H6-C7 ② | `leaveWaitsForCreateInProgress` | 대타 생성이 B 소속 `FOR SHARE`를 잡은 채 → 퇴사 대기 → 생성 Commit 뒤 퇴사가 새 요청의 B를 INELIGIBLE로 정리, 요청 OPEN (V2 실제 경로의 409는 V2 범위) | `LOCAL_PASSED` |
+| (요청자) | `createWaitsForRequesterLeave` | 요청자 퇴사가 Commit 전 → 대타 생성 대기 → `NOT_OWN_SHIFT`, 요청 0건 | `LOCAL_PASSED` |
+| ML5-T5 / H6-C5 | `acceptWaitsForLeaveOfCandidate` | 후보 B 퇴사가 Commit 전 → 수락 대기 → `SUB-021`, 요청 OPEN, B PENDING | `LOCAL_PASSED` |
+| ML5-T8 | `approveWaitsForLeaveOfAccepter` | 수락자 B 퇴사가 Commit 전 → 승인 대기 → `SFT-004`, 요청 ACCEPTED, 근무 담당 = 요청자 | `LOCAL_PASSED` |
+
+**⑤ 상태의 뜻:**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `63c46d1` 위 전체 803 → 808/808, 최신 develop `6ae6683` 위 826 → 831/831 (EV-045). CI는 PR 생성 후 기록
+- 회귀 (기대값 변경 0): 기존 Test 목록 그대로 통과. 기존 Mock Test 14개(`SubstituteCandidateServiceTest` 수락 6, `SubstituteRequestServiceTest` 승인 6·생성 2)는 새 소속 재확인 조회의 Mock 설정만 추가 (Assertion·기대값 변경 0, AI-RULES §2 "Fixture" 원인)
+- 수락·승인 Guard는 실제 V2 퇴사가 Request를 먼저 잠가 이미 직렬화되는 경로의 방어 조건이다. 대타 생성 Guard는 퇴사의 조회에 보이지 않는 새 Request의 반례 A를 막는다
+- 범위 밖: ML-3 H6-C8 (요청자 퇴사 × 승인, V2·V3 경로), V2 실제 퇴사 Command와의 경합 (V2 Test)

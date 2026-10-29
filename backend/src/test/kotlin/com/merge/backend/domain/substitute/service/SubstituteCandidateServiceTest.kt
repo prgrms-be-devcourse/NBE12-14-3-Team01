@@ -255,6 +255,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
 
             val manager = member(40L, 140L, WorkplaceRole.MANAGER)
             given(
@@ -421,6 +422,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
             ReflectionTestUtils.setField(shift, "startAt", now.minusMinutes(1))
 
             // when & then
@@ -433,6 +435,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
             ReflectionTestUtils.setField(shift, "startAt", now)
 
             // when & then
@@ -445,6 +448,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
             given(
                 shiftRepository.existsOverlappingOfficialShift(
                     CANDIDATE_USER_ID, ScheduleStatus.PUBLISHED,
@@ -462,6 +466,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
             given(
                 unavailableTimeRepository.existsOverlappingUnavailableTime(
                     CANDIDATE_USER_ID, shift.startAt, shift.endAt,
@@ -478,6 +483,7 @@ class SubstituteCandidateServiceTest {
 
             // given
             givenRespondableCandidate()
+            givenCandidateStillMember()
             given(
                 substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
                     CANDIDATE_USER_ID, shift.startAt, shift.endAt, now,
@@ -647,6 +653,12 @@ class SubstituteCandidateServiceTest {
             .willReturn(request)
         given(substituteCandidateRepository.findById(CANDIDATE_ID))
             .willReturn(Optional.of(candidate))
+    }
+
+    // 소속 Guard: 수락자 소속을 잠근 뒤 DB에서 다시 확인해도 현재 EMPLOYEE
+    private fun givenCandidateStillMember() {
+        given(workplaceMemberRepository.findCurrentEmployeeIdsIn(listOf(CANDIDATE_MEMBER_ID), WORKPLACE_ID))
+            .willReturn(listOf(CANDIDATE_MEMBER_ID))
     }
 
     // 지정한 에러코드로 실패하고, 상태 변경 / 이벤트 발행이 일어나지 않았는지 확인
