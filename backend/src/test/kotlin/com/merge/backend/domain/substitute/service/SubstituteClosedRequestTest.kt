@@ -13,6 +13,7 @@ import com.merge.backend.domain.substitute.entity.RequestCloseReason
 import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
+import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository
 import com.merge.backend.domain.user.entity.User
@@ -215,6 +216,38 @@ class SubstituteClosedRequestTest {
         // then: 조회는 계산된 만료를 DB에 저장하지 않음
         assertThat(storedStatus(expiring.requestId)).isEqualTo(RequestStatus.ACCEPTED)
         assertThat(storedClosedAt(expiring.requestId)).isNull()
+    }
+
+    // V4-N-50
+    @Test
+    @DisplayName("근무가 시작된 승인 요청은 기간 안이어도 보이지 않고 같은 시각의 만료 요청만 보인다")
+    fun startedApprovedRequestIsNotListed() {
+        // given: 내일 근무 2건 수락, 그중 1건 승인
+        val place = newPlace()
+        val approved = createRequest(place, daysUntilShift = 1)
+        substituteRequestService.approve(approved.requestId, place.managerUserId)
+        val expiring = createRequest(place, daysUntilShift = 1)
+
+        // when: 두 근무 모두 시작된 뒤 (기본 7일 안)
+        testClock.setInstant(approved.startAt.plusHours(1).atZone(testClock.zone).toInstant())
+
+        // then
+        assertThat(closedOf(place).items.map { it.requestId }).containsExactly(expiring.requestId)
+        assertThat(storedStatus(approved.requestId)).isEqualTo(RequestStatus.APPROVED)
+    }
+
+    // V4-N-50
+    @Test
+    @DisplayName("한 요청에 수락자가 여러 명이면 한 명만 고르지 않고 SUB-016으로 실패한다")
+    fun duplicatedAcceptersFail() {
+        // given: 만료된 수락 요청의 대기 후보를 DB에서 직접 ACCEPTED로 (정상 흐름으로는 생기지 않는 데이터 이상)
+        val place = newPlace()
+        val r = createRequest(place, daysUntilShift = 1)
+        jdbcTemplate.update("UPDATE substitute_candidate SET status = 'ACCEPTED' WHERE id = ?", r.otherCandidateId)
+        testClock.setInstant(r.startAt.atZone(testClock.zone).toInstant())
+
+        // when & then
+        assertError(SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_DUPLICATED) { closedOf(place) }
     }
 
     // V4-N-51

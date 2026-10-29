@@ -204,9 +204,22 @@ class SubstituteRequestService(
         }
 
         // 수락자: 끝난 요청은 수락자가 없을 수 있어 getAcceptedCandidates(ACCEPTED 요청 전용)를 쓰지 않음
+        // 여러 명이면 한 명만 고르지 않고 SUB-06과 같이 오류 (ML-3 §3)
         val accepterByRequestId = substituteCandidateRepository
             .findByRequestIdInAndStatus(requests.map { requireNotNull(it.id) }, CandidateStatus.ACCEPTED)
-            .associateBy { requireNotNull(it.request.id) }
+            .groupBy { requireNotNull(it.request.id) }
+            .mapValues { (requestId, accepters) ->
+                if (accepters.size > 1) {
+                    log.error(
+                        "끝난 요청(requestId={})에 수락자가 {}명 조회되었습니다. candidateIds={}",
+                        requestId,
+                        accepters.size,
+                        accepters.map { candidate -> candidate.id },
+                    )
+                    throw BusinessException(SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_DUPLICATED)
+                }
+                accepters.single()
+            }
 
         // 같은 근무의 진행 중 요청 ID (더 최근 = 요청 ID가 더 큼)
         val activeRequestIdsByShiftId = substituteRequestRepository
