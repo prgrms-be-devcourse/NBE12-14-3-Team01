@@ -5,12 +5,18 @@ import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftCancellationReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
+import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.service.PublishedShiftCancellationResult
 import com.merge.backend.domain.shift.service.PublishedShiftReassignmentResult
 import com.merge.backend.domain.shift.service.ShiftService
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.workplace.entity.WorkplaceMember
 import com.merge.backend.global.rq.Rq
+import com.merge.backend.global.dto.ConfirmationRequiredResponse
+import com.merge.backend.global.dto.UnavailableConflictOverlap
+import com.merge.backend.global.dto.UnavailableConflictResponse
+import com.merge.backend.global.exception.BusinessException
+import com.merge.backend.global.exception.GlobalExceptionHandler
 import java.time.LocalDateTime
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -21,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.given
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
+import org.hamcrest.Matchers.nullValue
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -46,6 +53,7 @@ class ShiftControllerTest {
     fun setUp() {
         mockMvc = MockMvcBuilders
             .standaloneSetup(shiftController)
+            .setControllerAdvice(GlobalExceptionHandler())
             .build()
     }
 
@@ -210,5 +218,101 @@ class ShiftControllerTest {
             org.mockito.kotlin.any<PublishedShiftCreateRequest>(),
             org.mockito.kotlin.eq(actorId),
         )
+    }
+
+    @Test
+    fun 공개_Shift_취소의_시작_후_변경_오류는_SFT020_409_계약을_반환한다() {
+        given(rq.actorId).willReturn(200L)
+        given(shiftService.cancelPublishedShift(1L, 10L, 100L, 200L))
+            .willThrow(BusinessException(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED))
+
+        mockMvc.perform(post("/workplaces/1/schedules/10/shifts/100/cancel"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("SFT-020"))
+            .andExpect(jsonPath("$.data").value(nullValue()))
+    }
+
+    @Test
+    fun 공개_Shift_재배정의_동일_담당자_오류는_SFT022_409_계약을_반환한다() {
+        given(rq.actorId).willReturn(200L)
+        given(shiftService.reassignPublishedShift(
+            org.mockito.kotlin.eq(1L), org.mockito.kotlin.eq(10L), org.mockito.kotlin.eq(100L),
+            org.mockito.kotlin.any(), org.mockito.kotlin.eq(200L),
+        )).willThrow(BusinessException(ShiftErrorCode.SAME_SHIFT_MEMBER_REASSIGNMENT))
+
+        mockMvc.perform(
+            post("/workplaces/1/schedules/10/shifts/100/reassign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"targetMemberId":20,"acknowledgedUnavailableConflicts":[]}"""),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("SFT-022"))
+            .andExpect(jsonPath("$.data").value(nullValue()))
+    }
+
+    @Test
+    fun 공개_Shift_재배정의_불가능_시간_확인_요청은_SFT021_409과_확인_데이터를_반환한다() {
+        given(rq.actorId).willReturn(200L)
+        val data = ConfirmationRequiredResponse(
+            requiresConfirmation = true,
+            unavailableConflicts = listOf(
+                UnavailableConflictResponse(
+                    100L,
+                    LocalDateTime.of(2026, 10, 30, 9, 0),
+                    LocalDateTime.of(2026, 10, 30, 18, 0),
+                    20L,
+                    "직원",
+                    listOf(UnavailableConflictOverlap(
+                        LocalDateTime.of(2026, 10, 30, 10, 0),
+                        LocalDateTime.of(2026, 10, 30, 11, 0),
+                    )),
+                ),
+            ),
+        )
+        given(shiftService.reassignPublishedShift(
+            org.mockito.kotlin.eq(1L), org.mockito.kotlin.eq(10L), org.mockito.kotlin.eq(100L),
+            org.mockito.kotlin.any(), org.mockito.kotlin.eq(200L),
+        )).willThrow(BusinessException(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT_CONFIRMATION_REQUIRED, data))
+
+        mockMvc.perform(
+            post("/workplaces/1/schedules/10/shifts/100/reassign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"targetMemberId":20,"acknowledgedUnavailableConflicts":[]}"""),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("SFT-021"))
+            .andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+            .andExpect(jsonPath("$.data.unavailableConflicts[0].shiftId").value(100L))
+            .andExpect(jsonPath("$.data.unavailableConflicts[0].overlaps[0].startAt").value("2026-10-30T10:00:00"))
+    }
+
+    @Test
+    fun 공개_Shift_추가의_동일_스케줄_중복은_SFT009_400_계약을_반환한다() {
+        assertPublishedShiftCreateError(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME, "SFT-009")
+    }
+
+    @Test
+    fun 공개_Shift_추가의_다른_근무지_중복은_SFT010_400_계약을_반환한다() {
+        assertPublishedShiftCreateError(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME, "SFT-010")
+    }
+
+    private fun assertPublishedShiftCreateError(errorCode: ShiftErrorCode, code: String) {
+        given(rq.actorId).willReturn(200L)
+        given(shiftService.createPublishedShift(
+            org.mockito.kotlin.eq(1L), org.mockito.kotlin.eq(10L),
+            org.mockito.kotlin.any<PublishedShiftCreateRequest>(), org.mockito.kotlin.eq(200L),
+        )).willThrow(BusinessException(errorCode))
+
+        mockMvc.perform(
+            post("/workplaces/1/schedules/10/published-shifts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"memberId":20,"startAt":"2026-10-30T09:00:00","endAt":"2026-10-30T18:00:00","acknowledgedUnavailableConflicts":[]}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value(code))
+            .andExpect(jsonPath("$.data").value(nullValue()))
     }
 }
