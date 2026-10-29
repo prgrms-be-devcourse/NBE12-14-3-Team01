@@ -58,7 +58,20 @@ function formatHourMinute(value: string) {
   return value.replace("T", " ").slice(11, 16);
 }
 
-export default function LeaveConfirmPanel({ workplaceId, preview, members, onStale, onDone }: {
+type LeaveConfirmPanelProps = {
+  workplaceId: string;
+  preview: LeaveConfirmPreview;
+  members: LeaveTargetMember[];
+  onStale: () => void;
+  onDone: (newInviteCode: string | null) => void;
+};
+
+// 새 미리보기(previewContext가 바뀜)가 오면 선택·충돌 확인·오류를 모두 처음부터 다시 시작한다 (WPL-010 재조회 등)
+export default function LeaveConfirmPanel(props: LeaveConfirmPanelProps) {
+  return <LeaveConfirmForm key={props.preview.previewContext} {...props} />;
+}
+
+function LeaveConfirmForm({ workplaceId, preview, members, onStale, onDone }: {
   workplaceId: string;
   preview: LeaveConfirmPreview;
   members: LeaveTargetMember[]; // 현재 구성원 (퇴사자 제외는 이 컴포넌트가 함)
