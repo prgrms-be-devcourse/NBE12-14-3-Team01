@@ -100,3 +100,13 @@ V3는 기존 공식 충돌·불가능 시간 구간 병합/포함 비교를 재�
 - POST 활성화와 전체 Lock·동시성 검증은 미완료다. V3의 `ScheduleService.createDraftSchedule` 및 `ShiftService.create`·`modify`에서 새 DRAFT 소속 Guard가 필요하고, V4의 `SubstituteRequestService.create` / `SubstituteCandidateService.findCandidates`·`createCandidates`에서 새 후보 소속 Guard가 필요하다. 생성/수정 직전 소속 FOR SHARE 후 최신 `leftAt`을 재확인해야 한다.
 - `ScheduleService.publishSchedule`, `SubstituteCandidateService.acceptCandidate`, `SubstituteRequestService.approve`도 User Lock 이후 소속 FOR SHARE/최신 재확인이 없으므로 담당자 검토가 필요하다. 이미 포착된 대상은 공통 Schedule 또는 Request Lock으로 직렬화되는 경로가 있어, 추가 Lock의 독립적 필요성과 전체 순서는 실제 경합 테스트로 확인한다. 공개 후 추가·재배정에는 이미 소속 FOR SHARE가 있으나 퇴사와의 통합 경합 검증은 별도다.
 - DL-016의 공식 근무 충돌 400/409 및 유효하지 않은 Context의 오류 분기는 여전히 PENDING이다. V5 알림·Frontend는 이번 범위 밖이다.
+
+## POST 활성화 (2026-10-29, V5 인계)
+
+- 근거: #102 승인 Comment 6-4 체크리스트. 소속 Guard 1~3번 완료 — 대타 생성·수락·승인 (PR #105), DRAFT 추가·수정·Pattern 복사 (PR #106). 공개 후 추가·재배정은 #91·#93에서 이미 소속 `FOR SHARE`.
+- `MembershipGuardLeaveConfirmationReadiness` Bean 추가 → `LeaveConfirmController` 등록 (`@ConditionalOnBean(LeaveConfirmationIntegration, LeaveConfirmationReadiness)` 그대로).
+- 오류 code는 바꾸지 않음: 공식 근무 충돌 = 기존 `SFT-009`/`SFT-010`, 원본(Context) 검증 실패 = `WPL-010`. DL-016은 이 상태를 리뷰어 추천으로 두고 **팀 기록 필요**.
+- 알림 연결 (체크리스트 4번, V5-N-20): `writer.complete`(leftAt 기록) **뒤** `MemberLeaveConfirmedEvent` 발행. V3 결과는 근무별 종료 요청(`closedRequestsByShiftId`), V4 결과는 자격 상실 요청자(`CandidacyCleanup.closedRequests`)를 보존. 받는 사람은 근무마다 `ShiftChangeNotificationPlanner`(인계 = REASSIGNED, 취소 = CANCELLED)와 자격 상실(요청자 + 실행자를 뺀 현재 관리자).
+- 기대값 변경 (의도된 활성화): `LeaveConfirmServiceIntegrationTest`의 "Controller 미등록" 확인 4곳 → "Readiness와 연동 Bean이 있을 때 등록"으로 변경, Test 이름 정리. 연동 부재 시 쓰기 전 중단 시나리오는 그대로 유지.
+- 새 Test `LeaveConfirmHttpIntegrationTest` (실제 Security Filter·JWT·context path): 인증 없음 401, 직원 403 `WPL-004`, HTTP 미리보기 → 확정 → 인계·취소·DRAFT 삭제·SHIFT_CHANGED 1·CANDIDATE_INELIGIBLE 2·소속 종료 Commit, 알림 (인계받은 직원 `SHIFT_ASSIGNED`, 수락자 `SUBSTITUTE_SHIFT_CHANGED`, 요청자 자격 상실, 다른 관리자 3건, 실행 관리자는 자기 요청의 요청자 알림 1건만, 퇴사자 0건).
+- 남은 것: G03-D-05 D05-T3·T4·T5·T5b·T5c·T10·T11, D21-T8 (확인 목록 변경 경우), V2-N-30 (퇴사 후 각 API), Frontend 퇴사 확정 화면.

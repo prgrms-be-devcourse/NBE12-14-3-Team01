@@ -3,11 +3,13 @@ package com.merge.backend.domain.notification.event
 import com.merge.backend.domain.notification.entity.NotificationType
 import com.merge.backend.domain.notification.service.PlannedNotification
 import com.merge.backend.domain.notification.service.ShiftChangeNotificationPlanner
+import com.merge.backend.domain.shift.event.PublishedShiftChangeKind
 import com.merge.backend.domain.shift.event.PublishedShiftChangedEvent
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.substitute.event.SubstituteCandidateIneligibleEvent
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository
 import com.merge.backend.domain.workplace.entity.WorkplaceRole
+import com.merge.backend.domain.workplace.event.MemberLeaveConfirmedEvent
 import com.merge.backend.domain.workplace.event.WorkplaceMemberJoinedEvent
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 import org.slf4j.LoggerFactory
@@ -44,6 +46,50 @@ class NotificationPlanningListener(
             currentManagerMemberIds = managerIds,
             currentMemberIds = currentMemberIds(candidateIds),
         )
+    }
+
+    // 퇴사 확정 (API-LV-02). 근무마다 따로 계산한다 (§3-5): 인계 = REASSIGNED, 취소 = CANCELLED (퇴사자는 leftAt이 기록돼 현재 소속에서 빠짐).
+    // 퇴사자가 후보였던 요청의 CANDIDATE_INELIGIBLE은 요청자 + 실행 관리자를 뺀 현재 관리자 (§6-3-2 S3-A, V5-N-20)
+    @EventListener
+    fun planMemberLeaveConfirmed(event: MemberLeaveConfirmedEvent) = planSafely(event) {
+        val managerIds = currentManagerIds(event.workplaceId)
+        val shiftNotices = event.reassignments.map { it.shiftId to it.targetMemberId } + event.cancelledShiftIds.map { it to null }
+
+        val shiftNotifications = shiftNotices.flatMap { (shiftId, targetMemberId) ->
+            val shift = shiftRepository.findById(shiftId).orElseThrow()
+            val closed = event.shiftChangedRequestsByShiftId[shiftId].orEmpty()
+            val candidateIds = listOfNotNull(event.leaverMemberId, targetMemberId) +
+                closed.flatMap { listOfNotNull(it.requesterMemberId, it.acceptedMemberId) } + managerIds
+
+            ShiftChangeNotificationPlanner.plan(
+                kind = if (targetMemberId != null) PublishedShiftChangeKind.REASSIGNED else PublishedShiftChangeKind.CANCELLED,
+                shiftStartAt = shift.startAt,
+                shiftEndAt = shift.endAt,
+                previousMemberId = event.leaverMemberId,
+                newMemberId = targetMemberId,
+                actorMemberId = event.actorMemberId,
+                closedRequests = closed,
+                currentManagerMemberIds = managerIds,
+                currentMemberIds = currentMemberIds(candidateIds),
+            )
+        }
+
+        val ineligibleNotifications = event.candidateIneligibleRequests.flatMap { closed ->
+            val request = substituteRequestRepository.findById(closed.requestId).orElseThrow()
+            val shiftLabel = ShiftChangeNotificationPlanner.shiftLabel(request.shift.startAt, request.shift.endAt)
+            val recipients = currentMemberIds(listOf(closed.requesterMemberId) + (managerIds - event.actorMemberId))
+
+            recipients.map { recipientId ->
+                val message = if (recipientId == closed.requesterMemberId) {
+                    "$shiftLabel 근무의 대타 요청이 응답할 수 있는 후보가 없어 종료되었습니다. 근무는 그대로이니 필요하면 다시 요청해 주세요."
+                } else {
+                    "$shiftLabel 근무의 대타 요청이 응답할 수 있는 후보가 없어 종료되었습니다."
+                }
+                PlannedNotification(recipientId, NotificationType.SUBSTITUTE_CANDIDATE_INELIGIBLE, message)
+            }
+        }
+
+        shiftNotifications + ineligibleNotifications
     }
 
     // 거절로 응답 가능한 후보가 없어진 종료 (#92). 받는 사람은 V4가 정한 요청자 + 현재 관리자에서 현재 소속만 남긴다
