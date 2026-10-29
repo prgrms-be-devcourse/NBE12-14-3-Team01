@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect, useState, useCallback} from "react";
+import Link from "next/link";
 import Card from "@/components/ui/Card";
 import { useParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -28,7 +29,47 @@ export type SubstituteRequestItem = {
   acceptedMember: AcceptedMemberResponse | null;
 };
 
-type Tab = "WAITING" | "APPROVAL";
+// 끝난 요청 (API-SB-02). 서버는 판단하지 않고 사실 Field만 줌, 표시 규칙은 FRONTEND-CONTRACT §3-4
+type CloseReason =
+    | "ALL_CANDIDATES_REJECTED"
+    | "EXPIRED"
+    | "MANAGER_CLOSED"
+    | "SHIFT_CHANGED"
+    | "CANDIDATE_INELIGIBLE";
+
+type ClosedSubstituteRequestItem = {
+  requestId: number;
+  shiftId: number;
+  startAt: string;
+  endAt: string;
+  shiftStatus: "SCHEDULED" | "CANCELLED";
+  outcome: "CLOSED" | "EXPIRED";
+  closeReason: CloseReason | null;
+  closedAt: string; // 효력 종료 시각 (만료는 근무 시작 시각)
+  requesterName: string;
+  requesterMembershipEnded: boolean;
+  accepterName: string | null;
+  requesterStillAssigned: boolean;
+  shiftStarted: boolean;
+  hasNewerActiveRequest: boolean;
+};
+
+type ClosedSubstituteRequestPage = {
+  items: ClosedSubstituteRequestItem[];
+  page: number;
+  size: number;
+  hasNext: boolean;
+};
+
+type ClosedResultView = {
+  label: string;
+  badgeClassName: string;
+};
+
+type Tab = "WAITING" | "APPROVAL" | "CLOSED";
+
+const RED_BADGE = "bg-[#ffeaea] text-[#d95555]";
+const GRAY_BADGE = "bg-[#f3f5f4] text-[#66736d]";
 
 // 서버의 LocalDateTime 문자열을 KST(UTC+9) Date 객체로 해석
 function parseAsKst(isoString: string | null): Date | null {
@@ -108,6 +149,60 @@ function getInitial(name: string | null | undefined) {
   return name ? name.trim().slice(0, 1) : "";
 }
 
+// 끝난 시각 (MM.DD (요일) HH:mm). closedAt의 소수점 초는 떼고 읽음
+function formatClosedAt(isoString: string): string {
+  const closedDate = parseAsKst(isoString.split(".")[0]);
+  if (!closedDate) return "-";
+
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).formatToParts(closedDate);
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const dayNum = parts.find((p) => p.type === "day")?.value || "";
+  const dayName = parts.find((p) => p.type === "weekday")?.value || "";
+
+  return `${month}.${dayNum} (${dayName}) ${formatKstTime(closedDate)}`;
+}
+
+// 끝난 요청의 결과 문구 (FRONTEND-CONTRACT §3-4 행 표시)
+function getClosedResultView(request: ClosedSubstituteRequestItem): ClosedResultView {
+  switch (request.closeReason) {
+    case "ALL_CANDIDATES_REJECTED":
+      return { label: "전원 거절", badgeClassName: RED_BADGE };
+    case "CANDIDATE_INELIGIBLE":
+      return { label: "후보 자격 상실", badgeClassName: RED_BADGE };
+    case "SHIFT_CHANGED":
+      return { label: "근무 변경으로 종료", badgeClassName: GRAY_BADGE };
+    case "MANAGER_CLOSED":
+      return { label: "관리자 종료", badgeClassName: GRAY_BADGE };
+    case "EXPIRED":
+      return { label: "승인 전에 근무 시작", badgeClassName: GRAY_BADGE };
+    default:
+      return { label: "종료됨", badgeClassName: GRAY_BADGE };
+  }
+}
+
+// 조치 필요: 전원 거절·후보 자격 상실로 끝났고, 그 근무를 아직 요청자가 맡고 있고, 시작 전이고, 새 요청도 없음 (§3-4, 취소·시작한 근무 제외)
+function needsAction(request: ClosedSubstituteRequestItem): boolean {
+  return (
+      request.outcome === "CLOSED" &&
+      (request.closeReason === "ALL_CANDIDATES_REJECTED" ||
+          request.closeReason === "CANDIDATE_INELIGIBLE") &&
+      request.shiftStatus === "SCHEDULED" &&
+      request.requesterStillAssigned &&
+      !request.shiftStarted &&
+      !request.hasNewerActiveRequest
+  );
+}
+
+// 확인 필요: 수락자가 있었는데 승인 전에 근무가 시작됨 (안내만, 시스템 안 조치 없음)
+function needsCheck(request: ClosedSubstituteRequestItem): boolean {
+  return request.outcome === "EXPIRED" && request.accepterName !== null;
+}
+
 export default function SubstituteAdminPage() {
   const routeParams = useParams();
   const workplaceId = routeParams?.workplaceId as string;
@@ -122,6 +217,14 @@ export default function SubstituteAdminPage() {
 
   // 재시도 트리거용 상태
   const [retryCount, setRetryCount] = useState(0);
+
+  // 끝난 요청은 따로 불러서, 실패해도 다른 탭은 그대로 보이게 함 (기본 최근 7일, 페이지 단위)
+  const [closedRequests, setClosedRequests] = useState<ClosedSubstituteRequestItem[]>([]);
+  const [closedPage, setClosedPage] = useState(0);
+  const [closedHasNext, setClosedHasNext] = useState(false);
+  const [isClosedLoading, setIsClosedLoading] = useState(() => Boolean(workplaceId));
+  const [closedLoadError, setClosedLoadError] = useState<string | null>(null);
+  const [closedReloadCount, setClosedReloadCount] = useState(0);
 
   useEffect(() => {
     if (!workplaceId) return;
@@ -164,6 +267,71 @@ export default function SubstituteAdminPage() {
       isIgnore = true;
     }
   }, [workplaceId, retryCount]);
+
+  useEffect(() => {
+    if (!workplaceId) return;
+
+    let isIgnore = false;
+
+    const loadClosedRequests = async () => {
+      setIsClosedLoading(true);
+      setClosedLoadError(null);
+
+      try {
+        const data = await apiFetch<ClosedSubstituteRequestPage>(
+            `/workplaces/${workplaceId}/substitute-requests/closed?page=0`
+        );
+        if (!isIgnore) {
+          setClosedRequests(data.items);
+          setClosedPage(0);
+          setClosedHasNext(data.hasNext);
+        }
+      } catch (error) {
+        if (!isIgnore) {
+          setClosedRequests([]);
+          setClosedHasNext(false);
+          if (error instanceof ApiError) {
+            setClosedLoadError(`[${error.code}] ${error.message}`);
+          } else {
+            setClosedLoadError("끝난 요청 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.");
+          }
+        }
+      } finally {
+        if (!isIgnore) {
+          setIsClosedLoading(false);
+        }
+      }
+    };
+
+    loadClosedRequests();
+    return () => {
+      isIgnore = true;
+    };
+  }, [workplaceId, closedReloadCount]);
+
+  // 끝난 요청 다음 페이지
+  const handleLoadMoreClosed = async () => {
+    if (isClosedLoading) return;
+    setIsClosedLoading(true);
+
+    try {
+      const nextPage = closedPage + 1;
+      const data = await apiFetch<ClosedSubstituteRequestPage>(
+          `/workplaces/${workplaceId}/substitute-requests/closed?page=${nextPage}`
+      );
+      setClosedRequests((prev) => [...prev, ...data.items]);
+      setClosedPage(nextPage);
+      setClosedHasNext(data.hasNext);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        alert(`[${error.code}] ${error.message}`);
+      } else {
+        alert("끝난 요청을 더 불러오지 못했습니다.");
+      }
+    } finally {
+      setIsClosedLoading(false);
+    }
+  };
 
   // Esc 키 모달 닫기
   useEffect(() => {
@@ -226,6 +394,7 @@ export default function SubstituteAdminPage() {
           prev.filter((req) =>
               req.requestId !== requestId));
       setSelectedRequest(null);
+      setClosedReloadCount((prev) => prev + 1);
       alert("요청이 종료되었습니다.");
     } catch (error) {
       if (error instanceof ApiError) {
@@ -283,6 +452,19 @@ export default function SubstituteAdminPage() {
           >
             승인 필요 {approvalCount}
           </button>
+
+          <button
+              type="button"
+              onClick={() => handleTabChange("CLOSED")}
+              disabled={isSubmitting}
+              className={`rounded-full px-4 py-2 text-sm font-bold transition disabled:opacity-50 ${
+                  tab === "CLOSED"
+                      ? "bg-[#005642] text-white"
+                      : "text-[#66736d] hover:bg-[#f3fbf7]"
+              }`}
+          >
+            끝난 요청
+          </button>
         </div>
 
         <Card>
@@ -292,12 +474,140 @@ export default function SubstituteAdminPage() {
                 <div>근무 일시</div>
                 <div>요청자</div>
                 <div>수락자</div>
-                <div>상태</div>
-                <div className="text-right">관리</div>
+                <div>{tab === "CLOSED" ? "결과" : "상태"}</div>
+                <div className="text-right">{tab === "CLOSED" ? "안내" : "관리"}</div>
               </div>
 
-              {/* 1. 로딩 중 */}
-              {isLoading ? (
+              {/* 끝난 요청 탭: 행에서 승인·종료하지 않고 거절 후보도 보여 주지 않음 (§3-4) */}
+              {tab === "CLOSED" ? (
+                  closedRequests.length === 0 && isClosedLoading ? (
+                      <div className="flex min-h-[200px] items-center justify-center text-sm text-[#78847f]">
+                        끝난 요청을 불러오는 중입니다...
+                      </div>
+                  ) : closedLoadError ? (
+                      <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-sm text-[#d95555]">
+                        <p>{closedLoadError}</p>
+                        <button
+                            type="button"
+                            onClick={() => setClosedReloadCount((prev) => prev + 1)}
+                            className="rounded-lg border border-[#f1cccc] bg-white px-4 py-2 text-xs font-bold text-[#d95555] hover:bg-[#fff5f5]"
+                        >
+                          다시 시도
+                        </button>
+                      </div>
+                  ) : closedRequests.length === 0 ? (
+                      <div className="flex min-h-[200px] items-center justify-center text-sm text-[#78847f]">
+                        최근 7일 동안 끝난 요청이 없습니다.
+                      </div>
+                  ) : (
+                      <>
+                        {closedRequests.map((request) => {
+                          const { date, day, timeRange, hours } = formatShiftDateTime(
+                              request.startAt,
+                              request.endAt
+                          );
+                          const resultView = getClosedResultView(request);
+
+                          return (
+                              <div
+                                  key={request.requestId}
+                                  className="grid min-h-[88px] grid-cols-[1.25fr_1fr_1fr_1fr_1fr] items-center border-b border-[#edf2ef] px-3 last:border-b-0"
+                              >
+                                <div>
+                                  <p className="font-black">
+                                    {date} ({day})
+                                  </p>
+                                  <p className="mt-1 text-sm text-[#78847f]">
+                                    {timeRange}{" "}
+                                    <span className="text-xs text-[#9aa5a0]">({hours}h)</span>
+                                  </p>
+                                </div>
+
+                                {/* 요청 당시 소속이 끝났으면 "(이전 소속)". 재가입했어도 퇴사로 단정하지 않음 */}
+                                <div className="flex items-center gap-3">
+                                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f3fbf7] font-black text-[#005642]">
+                                    {getInitial(request.requesterName)}
+                                  </div>
+                                  <p className="font-bold">
+                                    {request.requesterName}
+                                    {request.requesterMembershipEnded && (
+                                        <span className="ml-1 text-xs font-semibold text-[#9aa5a0]">(이전 소속)</span>
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  {request.accepterName ? (
+                                      <div className="flex items-center gap-3">
+                                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
+                                          {getInitial(request.accepterName)}
+                                        </div>
+                                        <p className="font-bold">{request.accepterName}</p>
+                                      </div>
+                                  ) : (
+                                      <p className="text-sm text-[#9aa5a0]">없음</p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${resultView.badgeClassName}`}>
+                                    {resultView.label}
+                                  </span>
+                                  <p className="mt-2 text-xs text-[#9aa5a0]">
+                                    {request.outcome === "EXPIRED"
+                                        ? `만료 시각 ${formatClosedAt(request.closedAt)}`
+                                        : `${formatClosedAt(request.closedAt)} 종료`}
+                                  </p>
+                                </div>
+
+                                {/* 표시는 안내일 뿐. 바로가기로 실행하는 담당자 변경은 서버가 그 시점에 다시 검증함 */}
+                                <div className="text-right">
+                                  {needsAction(request) ? (
+                                      <>
+                                        <span className="rounded-full bg-[#fff1d7] px-3 py-1 text-xs font-bold text-[#a96d09]">
+                                          조치 필요
+                                        </span>
+                                        <p className="mt-2 text-xs text-[#66736d]">다른 직원 배정을 검토하세요</p>
+                                        <Link
+                                            href={`/workplaces/${workplaceId}/schedule`}
+                                            className="mt-1 inline-block text-xs font-bold text-[#005642] underline"
+                                        >
+                                          근무표에서 담당자 변경
+                                        </Link>
+                                      </>
+                                  ) : needsCheck(request) ? (
+                                      <>
+                                        <span className="rounded-full bg-[#e7efff] px-3 py-1 text-xs font-bold text-[#4a73c9]">
+                                          확인 필요
+                                        </span>
+                                        <p className="mt-2 text-xs text-[#66736d]">
+                                          승인 전에 근무가 시작됨 — 실제 근무자를 확인하세요
+                                        </p>
+                                      </>
+                                  ) : (
+                                      <p className="text-sm text-[#9aa5a0]">-</p>
+                                  )}
+                                </div>
+                              </div>
+                          );
+                        })}
+
+                        {closedHasNext && (
+                            <div className="flex justify-center pt-4">
+                              <button
+                                  type="button"
+                                  onClick={handleLoadMoreClosed}
+                                  disabled={isClosedLoading}
+                                  className="rounded-lg border border-[#dce8e2] px-4 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {isClosedLoading ? "불러오는 중..." : "더 보기"}
+                              </button>
+                            </div>
+                        )}
+                      </>
+                  )
+              ) : isLoading ? (
+                  /* 1. 로딩 중 */
                   <div className="flex min-h-[200px] items-center justify-center text-sm text-[#78847f]">
                     요청 목록을 불러오는 중입니다...
                   </div>
