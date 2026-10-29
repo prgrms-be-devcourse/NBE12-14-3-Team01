@@ -94,7 +94,7 @@
 - 미리보기 조회 API는 소속·근무·대타 상태를 변경하지 않고 예상 영향과 서명된 `previewContext`를 반환합니다 ([#90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90)).
 - 퇴사 확정 POST는 핵심 로직이 구현된 [#102](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/102) 당시에는 **비활성**이었습니다. 이후 [#112](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/112)가 병합되어 최신 `develop`에는 활성화 구성과 퇴사 확정 알림 연결이 반영되어 있습니다.
 - 퇴사 미리보기는 [#107](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/107)에서 직원 목록의 '소속 종료' 메뉴와 모달에 Frontend 연동을 완료했습니다.
-- 퇴사 확정은 [#113](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/113)에서 Frontend 컴포넌트(`LeaveConfirmPanel`) 구현을 완료했으나, 실제 미리보기 모달과의 연결은 아직 미완료입니다. 운영 환경의 POST 활성화 여부는 별도로 확인해야 합니다.
+- 퇴사 확정은 [#113](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/113)에서 Frontend 컴포넌트(`LeaveConfirmPanel`)를 구현했고, 미리보기 모달과의 연결까지 완료했습니다 (직원 목록 → 소속 종료 → 미리보기 → 근무별 인계·취소 → 확정 → 결과). 운영 환경의 POST 활성화 여부는 별도로 확인해야 합니다.
 
 </details>
 
