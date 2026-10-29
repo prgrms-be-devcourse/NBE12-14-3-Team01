@@ -333,7 +333,7 @@ H1-d를 구현할 때 기대값이 그대로여야 하는 기존 Test다. ⑤ �
 | V2-N-54 | UP-01 재가입 후 이전 소속 격리 | V2 | USER-PATH-REVIEW §2 |
 | V3-N-33 | UP-03 공개 근무 취소·담당자 변경 + 대타 종료 + 알림 | V3 | USER-PATH-REVIEW §4. 대타 부분 = V4-N-61·62 (관련, "V4 공개 근무 변경 연결" 절). 알림·전체 경로는 V3 소유 그대로 |
 | V5-N-19 | UP-07 알림 ↔ 대체 화면 일치 | V5 | USER-PATH-REVIEW §8 (S3-A: 관리자 행은 API-SB-02 포함) |
-| V4-N-49 | API-SB-02 권한: 현재 MANAGER만. 직원 403 `WPL-004`, 비구성원 403 `WPL-003`, 다른 근무지 요청 미포함 | V4 | API-CATALOG API-SB-02 (S3-A) |
+| V4-N-49 | API-SB-02 권한: 현재 MANAGER만. 직원 403 `WPL-004`, 비구성원 403 `WPL-003`, 다른 근무지 요청 미포함 | V4 | API-CATALOG API-SB-02 (S3-A) **2026-10-29 작성·`LOCAL_PASSED` (EV-044, 아래 "V4 관리자 끝난 대타 조회" 절, V4-N-50~54 같음)** |
 | V4-N-50 | API-SB-02 대상: CLOSED 모든 사유 + 계산된 만료(`startAt ≤ now`, 경계 `startAt == now` 포함) 포함, APPROVED·진행 중 제외, SUB-06 목록과 겹침 0 | V4 | 같음 |
 | V4-N-51 | API-SB-02 기간·정렬·페이지: 기본 7일, `from`으로 7일 이전도 조회, 효력 종료 시각 내림차순 + ID 동률 처리, 페이지 경계 | V4 | 같음 |
 | V4-N-52 | API-SB-02 사실 Field: `requesterStillAssigned`·`shiftStarted`·`hasNewerActiveRequest` 각 참·거짓 경우 | V4 | 같음 |
@@ -485,6 +485,8 @@ V5 기존 Test(`NotificationServiceTest` 14개 등)의 V5-T 번호는 V5 Deliver
 | 2026-10-28 | PR #83 대타 승인 W안·Lock 순서: §5-4 V4-T-26·74 변경됨 표시, V4-T-26 기대값·나눈 Method, V4-T-74 이름·줄, §5-1 V4-N-44~46·ML5-T3·T13 `LOCAL_PASSED` (EV-035). V4-T-24는 준비 코드만 변경 (기대값 그대로) |
 | 2026-10-28 | G03-D-19 만료 `closedAt = startAt`: V4-T-02 기대값·V4-T-03 확인 추가 표시, V4-N-23~26 ② APPROVED·④ 작성·⑤ `LOCAL_PASSED` (EV-036), §5-4 V4-T-02 행 변경됨 |
 | 2026-10-29 | CHG-02·03 SUB-05·07 현재 소속: D22 행에 구현 표시, 끝에 "V4 보낸·수락한 요청 현재 소속" 절 신설 (V4-N-36·37, EV-042) |
+| 2026-10-29 | API-SB-02 관리자 끝난 대타 조회: §5-1 V4-N-49 행에 구현 표시, 끝에 "V4 관리자 끝난 대타 조회" 절 신설 (EV-044) |
+| 2026-10-29 | API-SB-02 PR #104 리뷰 반영: "V4 관리자 끝난 대타 조회" 절에 V4-N-50 Test 2개 (근무 시작된 APPROVED 제외, 수락자 여러 명 `SUB-016`) (EV-044) |
 | 2026-10-29 | 퇴사자 후보 처리: 끝에 "V4 퇴사자 후보 처리" 절 신설 (V4-N-13~16·22, H6-C5·C6, 새 V4-N-65~71), V4-N-06 행·§5-1 H6 행에 연결 (EV-038) |
 | 2026-10-29 | PR #92 리뷰 반영: "V4 퇴사자 후보 처리" 절에 V4-N-72~74 추가 (거절 경로 응답 가능 판정), ⑤ 상태 갱신 (EV-038) |
 | 2026-10-29 | V4-N-21 (실패 경로 제외): "V4 종료된 대타 조회" 절에 행 추가, 실제 V3 재배정으로 확인 (EV-040). 실패 경로 미구현 기록 |
@@ -686,6 +688,35 @@ V3 공개 근무 취소(`ShiftService.cancelPublishedShift`, PR #87)·재배정(
 - 회귀 (기대값 변경 0): 기존 Test 681개 목록 그대로 통과. V4-T-47·48 (`SubstituteRequestServiceTest` `$SentRequestsTest`)의 Mock 대상 메서드 이름과 `SubstituteRequestConcurrencyTest`의 활성 요청 세기 헬퍼 호출 이름만 바뀜 (Assertion 변경 0이라 §5-4 표에 넣지 않음)
 - 같은 근무지 재가입 × SUB-07은 PR #82 `MembershipRejoinCompatibilityIntegrationTest.acceptedSubstituteFromEndedMembershipIsExcludedAfterRejoin`이 이미 확인 (참조)
 - 결함 넣기: SUB-05 조회에서 현재 소속 조건 제거 → V4-N-37 FAIL. 첫 작성(develop `cade449`)에서 SUB-07 `c.member.leftAt IS NULL` 삭제 → V4-N-36·PR #82 Test FAIL
+
+## V4 관리자 끝난 대타 조회 (API-SB-02, V4-N-49~54, 2026-10-29)
+
+[API-CATALOG](../contract/API-CATALOG.md) API-SB-02, [USER-PATH-REVIEW](../contract/USER-PATH-REVIEW.md) §9-0 결정 C. Class: `SubstituteClosedRequestTest` (MySQL Testcontainers, test Profile), `SubstituteClosedRequestControllerTest` (`@WebMvcTest`, HTTP 부분). API-SB-02는 사용자 잠정 결정이고 팀 승인은 PR 리뷰로 요청 중이다
+
+| Test ID | Method | 확인하는 것 | ⑤ 실행 |
+|---|---|---|---|
+| V4-N-49 | `onlyCurrentManagerCanList` | 현재 관리자만 조회. 직원 403 `WPL-004`, 다른 근무지 관리자·퇴사한 관리자·없는 근무지 403 `WPL-003` | `LOCAL_PASSED` |
+| V4-N-49 | `otherWorkplaceRequestsAreHidden` | 다른 근무지의 끝난 요청은 안 보임 (두 근무지 서로) | `LOCAL_PASSED` |
+| V4-N-50 | `allCloseReasonsListedWithoutApprovedAndActive` | CLOSED 4사유(전원 거절·관리자 종료·근무 변경·후보 자격 상실) 모두 보임, APPROVED·진행 중 안 보임, 근무 변경 종료는 `shiftStatus = CANCELLED`, 수락자 이름(전원 거절은 null) | `LOCAL_PASSED` |
+| V4-N-50 | `expiredRequestSplitsExactlyFromOngoingList` | 근무 시작 1초 전 안 보임·시작 시각부터 `EXPIRED`(`closedAt = startAt`), 두 시각 모두 SUB-06 목록과 겹침 0·합치면 전부, DB 상태·`closedAt` 그대로 | `LOCAL_PASSED` |
+| V4-N-50 | `startedApprovedRequestIsNotListed` | 내일 근무 2건 수락·1건 승인 → 두 근무 시작 뒤(기본 7일 안) 만료 ACCEPTED만 보이고 근무가 시작된 APPROVED는 안 보임 (PR #104 리뷰: 기존 APPROVED Fixture는 근무가 6일 뒤라 Query에 APPROVED를 넣어도 통과) | `LOCAL_PASSED` |
+| V4-N-50 | `duplicatedAcceptersFail` | 만료된 수락 요청의 대기 후보를 DB에서 ACCEPTED로 바꿈(데이터 이상) → 한 명만 고르지 않고 400 `SUB-016` (SUB-06과 같음, ML-3 §3) | `LOCAL_PASSED` |
+| V4-N-51 | `defaultSevenDaysAndCustomPeriod` | 기본 7일 (정확히 7일 포함, 7일 + 1초 제외), 8일 뒤 `from`으로 조회, `from`·`to` 경계 포함 | `LOCAL_PASSED` |
+| V4-N-51 | `pageBoundary` | `size = 2`, 3건 → 2건 `hasNext` true / 1건 false / 0건 false | `LOCAL_PASSED` |
+| V4-N-51 | `invalidParametersAreRejected` | `from > to`, `page = -1`, `size = 0`·`101` → 400 `COM-003`, `size = 100`·`from == to` 허용, 직원은 잘못된 값이어도 403 `WPL-004` 먼저 | `LOCAL_PASSED` |
+| V4-N-51 | `SubstituteClosedRequestControllerTest` 3개 | 파라미터 없으면 null·0·20 전달, ISO 날짜시각·page·size 전달, 형식 오류 400 `COM-003` (Service 호출 0) | `LOCAL_PASSED` |
+| V4-N-52 | `requesterStillAssignedFact` | 담당 변경 전 true, 다른 직원으로 변경 뒤 false | `LOCAL_PASSED` |
+| V4-N-52 | `shiftStartedFact` | 시작 1초 전 false, 시작 시각 true | `LOCAL_PASSED` |
+| V4-N-52 | `hasNewerActiveRequestFact` | 같은 근무 새 요청 진행 중 → true, 새 요청도 종료 → 둘 다 false, 세 번째 요청이 근무 시작으로 만료 → false | `LOCAL_PASSED` |
+| V4-N-53 | `requesterMembershipBoundary` | 요청자 퇴사 → `requesterMembershipEnded` true, 재가입해 새 소속이 그 근무를 맡아도 true·`requesterStillAssigned` false (새 소속과 합치지 않음) | `LOCAL_PASSED` |
+| V4-N-53 | `onlyAllowedFields` | 응답 필드 목록 고정 (User ID·소속 ID·근무지 정보 없음), 거절 후보 이름 없음. JSON에 `requesterMemberId`·`workplaceId` 없음은 Controller Test | `LOCAL_PASSED` |
+| V4-N-54 | `mixedEffectiveTimeOrderInDatabase` | CLOSED `closedAt`과 만료 `startAt`을 섞어 정렬, 같은 시각은 요청 ID 내림차순, `size = 1` 페이지로 넘겨도 같은 순서 (MySQL `CASE` 정렬 + `limit ?,?`) | `LOCAL_PASSED` |
+
+**⑤ 상태의 뜻:**
+- `LOCAL_PASSED`: 로컬 macOS·Temurin 25에서 develop `6d0f8ea` 위 전체 731 → 747/747 (EV-044). CI는 PR 생성 후 기록
+- 회귀 (기대값 변경 0): 기존 Test 731개 목록 그대로 통과
+- PR #104 리뷰 반영 (2026-10-29): 위 V4-N-50 Test 2개 추가, develop `6ae6683` 병합 위 842 / 842 → **844 / 844 PASS** (FAIL 0, 기존 목록 그대로 + 새 2개, 경고 같음, `Deadlock found` 0). 결함 넣기 2가지 (수락자 `associateBy`로 되돌림, Query 상태 조건에 APPROVED 추가) → 각각 새 Test가 잡음 (EV-044)
+- 범위 밖: Frontend "끝난 요청" 탭과 표시 규칙(FRONTEND-CONTRACT §3-4, Test ID 없음), 성능·실행 계획 (USER-PATH-REVIEW §13-4 S4)
 
 ## V4 대타 소속 Guard (ML5-R1·T5·T6·T8, H6-C5·C7, 2026-10-29)
 

@@ -256,6 +256,7 @@ ML-2 D27-5 "진행 중(OPEN·ACCEPTED) 또는 승인된 대타가 있는 근무�
 | 비용 (추정) | API 1, 효력 종료 시각을 계산·정렬하는 Query 1 (`COALESCE`), DTO 1, Test 6개, 승인 관리 화면 탭 1 |
 | 등급 | **P0 후보** (묶음 B) |
 | Test | V4-N-49~54 |
+| 구현 (2026-10-29, 구현, 팀 승인은 PR 리뷰로 요청 중) | `feat/v4-manager-closed-requests`, Test V4-N-49~54 (EV-044). 경로 확정 `GET /workplaces/{workplaceId}/substitute-requests/closed?from=&to=&page=&size=` (`SubstituteRequestController`, SUB-06 옆). 문서에 없어 V4 Owner가 정한 것: `from`·`to` = ISO 날짜시각, 둘 다 포함, 기본 `from = now − 7일`·`to = now` / `page` 0부터, `size` 기본 20·최대 100, `from > to`·범위 밖 → 400 `COM-003` / 응답 `data = { items, page, size, hasNext }` (전체 개수 없음) / 만료는 `outcome = EXPIRED`·`closeReason = EXPIRED`·`closedAt = startAt` (API-SB-01·SUB-05와 같은 표기) / 없는 근무지는 `requireManager`만으로 403 `WPL-003` (§1 권한 먼저. SUB-06의 404 `WPL-005` 선검사는 따르지 않음. PR #104 리뷰에서 현재 동작(AS-IS)으로 확인) / `hasNewerActiveRequest`의 "더 최근" = 요청 ID가 더 큼 / 한 요청에 수락자가 여러 명이면 한 명만 고르지 않고 400 `SUB-016` (SUB-06 `getAcceptedCandidates`와 같음, ML-3 §3 "여러 명이면 오류". PR #104 리뷰 반영. API-SB-01의 같은 실패 경로(V4-N-21)는 오류 code 팀 결정 대상 그대로) |
 
 #### API-AU-01 서버 로그아웃
 
@@ -434,3 +435,5 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-28 | CHG-06 대타 승인 구현 표시 (§2 표, §5-4 구현 문단, PR #83). 대타 종료 등 다른 API는 그대로 |
 | 2026-10-29 | PR #90 병합 코드 기준 API-LV-01 구현·응답·서명 문자열/15분 유효기간 동기화. API-LV-02 후속 검증 및 Test Inventory 연결 구분 |
 | 2026-10-29 | CHG-02 SUB-05 현재 소속 구현, CHG-03은 PR #82 구현에 Test 연결 (V4-N-36·37, EV-042) |
+| 2026-10-29 | API-SB-02 구현 행 추가 (경로 확정, 기간·페이지 파라미터, 응답 필드, 사실 Field 정의, 없는 근무지 403). 팀 승인은 PR 리뷰로 요청 중 (EV-044) |
+| 2026-10-29 | API-SB-02 PR #104 리뷰 반영: 수락자 여러 명 → `SUB-016`, 없는 근무지 403은 AS-IS로 확인 (EV-044) |
