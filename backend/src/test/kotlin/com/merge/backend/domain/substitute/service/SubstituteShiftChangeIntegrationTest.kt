@@ -8,6 +8,7 @@ import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftAssignmentReason
 import com.merge.backend.domain.shift.entity.ShiftStatus
 import com.merge.backend.domain.shift.entity.UnavailableTime
+import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ScheduleRepository
 import com.merge.backend.domain.shift.repository.ShiftAssignmentHistoryRepository
 import com.merge.backend.domain.shift.repository.ShiftRepository
@@ -161,6 +162,34 @@ class SubstituteShiftChangeIntegrationTest {
         assertThat(substituteRequestService.create(f.shiftId, f.targetUserId).requestCreated).isTrue()
         assertBusinessError(SubstituteRequestErrorCode.REQUEST_NOT_OPEN) {
             substituteCandidateService.acceptCandidate(f.candidates[0].candidateId, f.candidates[0].userId)
+        }
+    }
+
+    @Test
+    @DisplayName("재배정 검증이 대타 종료 뒤 실패하면 실제 DB의 대타 상태·담당자·배정 이력도 모두 롤백된다")
+    fun reassignValidationFailureRollsBackClosedSubstituteRequestAndShiftChanges() {
+        // given: 활성 OPEN 요청과 새 담당자의 같은 Schedule 겹침 근무
+        val f = createFixture(withRequest = true)
+        inTransaction {
+            val schedule = scheduleRepository.findById(f.scheduleId).orElseThrow()
+            val target = workplaceMemberRepository.findById(f.targetMemberId).orElseThrow()
+            shiftRepository.save(Shift(schedule, target, f.startAt, f.startAt.plusHours(1), ShiftStatus.SCHEDULED))
+        }
+
+        // when: V4 종료 호출 뒤 SFT-009 검증이 실패해야 한다
+        assertBusinessError(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME) {
+            shiftService.reassignPublishedShift(
+                f.workplaceId, f.scheduleId, f.shiftId, reassignTo(f.targetMemberId), f.managerUserId,
+            )
+        }
+
+        // then: Mockito가 아닌 MySQL Commit 상태로 원자적 롤백을 확인
+        inTransaction {
+            val request = findRequest(f.requestId)
+            assertThat(request.status).isEqualTo(RequestStatus.OPEN)
+            assertThat(request.closeReason).isNull()
+            assertThat(findShift(f.shiftId).member.id).isNotEqualTo(f.targetMemberId)
+            assertThat(shiftAssignmentHistoryRepository.findAllByShift_IdOrderByCreateDateAsc(f.shiftId)).isEmpty()
         }
     }
 

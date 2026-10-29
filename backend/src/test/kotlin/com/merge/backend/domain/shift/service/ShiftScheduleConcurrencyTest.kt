@@ -2,6 +2,7 @@ package com.merge.backend.domain.shift.service
 
 import com.merge.backend.domain.notification.repository.NotificationRepository
 import com.merge.backend.domain.shift.dto.ShiftRequest
+import com.merge.backend.domain.shift.dto.PublishedShiftCreateRequest
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.ScheduleStatus
 import com.merge.backend.domain.shift.entity.Shift
@@ -146,6 +147,41 @@ class ShiftScheduleConcurrencyTest {
     }
 
     @Test
+    @DisplayName("공개된 같은 Schedule에 같은 직원의 겹치는 근무를 동시에 추가해도 MySQL 최종 상태에는 하나만 저장된다")
+    fun concurrentPublishedCreateAllowsOnlyOneLocalOverlappingShift() {
+        val fixture = createPublishedShiftFixture("published-local")
+        val request = PublishedShiftCreateRequest(fixture.memberId, fixture.startAt, fixture.endAt, emptyList())
+        val errors = concurrentlyCreatePublishedShift(fixture, fixture, request, request)
+
+        assertThat(errors.count { it == null }).isEqualTo(1)
+        assertBusinessError(errors.first { it != null }, ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
+        assertThat(shiftRepository.findBySchedule_IdOrderByStartAtAscIdAsc(fixture.scheduleId)
+            .count { it.member.id == fixture.memberId && it.startAt == fixture.startAt && it.endAt == fixture.endAt })
+            .isEqualTo(1)
+    }
+
+    @Test
+    @DisplayName("서로 다른 근무지에서 같은 직원의 겹치는 공개 근무를 동시에 추가해도 MySQL 최종 상태에는 하나만 저장된다")
+    fun concurrentPublishedCreateAllowsOnlyOneGlobalOverlappingShift() {
+        val fixture = createCrossWorkplacePublishedShiftFixture("published-global")
+        val firstRequest = PublishedShiftCreateRequest(
+            fixture.first.memberId, fixture.first.startAt, fixture.first.endAt, emptyList(),
+        )
+        val secondRequest = PublishedShiftCreateRequest(
+            fixture.second.memberId, fixture.second.startAt, fixture.second.endAt, emptyList(),
+        )
+        val errors = concurrentlyCreatePublishedShift(fixture.first, fixture.second, firstRequest, secondRequest)
+
+        assertThat(errors.count { it == null }).isEqualTo(1)
+        assertBusinessError(errors.first { it != null }, ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
+        val created = listOf(fixture.first, fixture.second).sumOf { published ->
+            shiftRepository.findBySchedule_IdOrderByStartAtAscIdAsc(published.scheduleId)
+                .count { it.member.id == published.memberId && it.startAt == published.startAt && it.endAt == published.endAt }
+        }
+        assertThat(created).isEqualTo(1)
+    }
+
+    @Test
     @DisplayName("Schedule 공개와 Shift 담당자 수정이 동시에 요청되어도 최종 담당자와 알림 수신자가 일치한다")
     fun publishAndModifyKeepAssigneeAndNotificationConsistent() {
         val fixture = createFixture("publish-modify")
@@ -244,6 +280,53 @@ class ShiftScheduleConcurrencyTest {
         }
     }
 
+    private fun concurrentlyCreatePublishedShift(
+        firstFixture: PublishedShiftFixture,
+        secondFixture: PublishedShiftFixture,
+        firstRequest: PublishedShiftCreateRequest,
+        secondRequest: PublishedShiftCreateRequest,
+    ): List<Throwable?> {
+        val executor = Executors.newFixedThreadPool(2)
+        val ready = CountDownLatch(2)
+        val start = CountDownLatch(1)
+        try {
+            val first = executor.submit<Throwable?> {
+                runPublishedCreate(ready, start, firstFixture, firstRequest)
+            }
+            val second = executor.submit<Throwable?> {
+                runPublishedCreate(ready, start, secondFixture, secondRequest)
+            }
+            assertThat(ready.await(3, TimeUnit.SECONDS)).isTrue()
+            start.countDown()
+            return listOf(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS))
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun runPublishedCreate(
+        ready: CountDownLatch,
+        start: CountDownLatch,
+        fixture: PublishedShiftFixture,
+        request: PublishedShiftCreateRequest,
+    ): Throwable? {
+        ready.countDown()
+        start.await()
+        return try {
+            shiftService.createPublishedShift(fixture.workplaceId, fixture.scheduleId, request, fixture.managerUserId)
+            null
+        } catch (throwable: Throwable) {
+            throwable
+        }
+    }
+
+    private fun assertBusinessError(error: Throwable?, expected: ShiftErrorCode) {
+        assertThat(error)
+            .isInstanceOf(BusinessException::class.java)
+            .extracting("errorCode")
+            .isEqualTo(expected)
+    }
+
     private fun runCreateSchedule(ready: CountDownLatch, start: CountDownLatch, fixture: ScheduleCreationFixture, weekStartDate: LocalDate): Throwable? {
         ready.countDown()
         start.await()
@@ -283,6 +366,47 @@ class ShiftScheduleConcurrencyTest {
         )
     })
 
+    private fun createPublishedShiftFixture(suffix: String): PublishedShiftFixture = requireNotNull(
+        TransactionTemplate(transactionManager).execute {
+            val now = LocalDateTime.now()
+            val startAt = now.plusDays(7).withHour(10).withMinute(0).withSecond(0).withNano(0)
+            val workplace = workplaceRepository.save(Workplace("공개 근무 동시성 매장 $suffix", "PUBLISHED-$suffix"))
+            val managerUser = userRepository.save(User("published-manager-$suffix@test.com", "password-hash", "manager"))
+            val employeeUser = userRepository.save(User("published-employee-$suffix@test.com", "password-hash", "employee"))
+            workplaceMemberRepository.save(WorkplaceMember(workplace, managerUser, WorkplaceRole.MANAGER, now.minusDays(1)))
+            val member = workplaceMemberRepository.save(WorkplaceMember(workplace, employeeUser, WorkplaceRole.EMPLOYEE, now.minusDays(1)))
+            val schedule = Schedule(workplace, startAt.toLocalDate().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)))
+                .also { it.publish(now) }
+                .let { scheduleRepository.save(it) }
+            PublishedShiftFixture(
+                requireNotNull(workplace.id), requireNotNull(schedule.id), requireNotNull(managerUser.id),
+                requireNotNull(member.id), startAt, startAt.plusHours(4),
+            )
+        },
+    )
+
+    private fun createCrossWorkplacePublishedShiftFixture(suffix: String): CrossWorkplacePublishedShiftFixture = requireNotNull(
+        TransactionTemplate(transactionManager).execute {
+            val now = LocalDateTime.now()
+            val startAt = now.plusDays(7).withHour(10).withMinute(0).withSecond(0).withNano(0)
+            val employeeUser = userRepository.save(User("cross-employee-$suffix@test.com", "password-hash", "employee"))
+            fun create(workplaceSuffix: String): PublishedShiftFixture {
+                val workplace = workplaceRepository.save(Workplace("교차 공개 근무 매장 $workplaceSuffix", "CROSS-$workplaceSuffix"))
+                val manager = userRepository.save(User("cross-manager-$workplaceSuffix@test.com", "password-hash", "manager"))
+                workplaceMemberRepository.save(WorkplaceMember(workplace, manager, WorkplaceRole.MANAGER, now.minusDays(1)))
+                val member = workplaceMemberRepository.save(WorkplaceMember(workplace, employeeUser, WorkplaceRole.EMPLOYEE, now.minusDays(1)))
+                val schedule = Schedule(workplace, startAt.toLocalDate().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)))
+                    .also { it.publish(now) }
+                    .let { scheduleRepository.save(it) }
+                return PublishedShiftFixture(
+                    requireNotNull(workplace.id), requireNotNull(schedule.id), requireNotNull(manager.id),
+                    requireNotNull(member.id), startAt, startAt.plusHours(4),
+                )
+            }
+            CrossWorkplacePublishedShiftFixture(create("$suffix-a"), create("$suffix-b"))
+        },
+    )
+
     private fun createScheduleCreationFixture(suffix: String): ScheduleCreationFixture =
         requireNotNull(
             TransactionTemplate(transactionManager).execute {
@@ -321,6 +445,20 @@ class ShiftScheduleConcurrencyTest {
         val replacementMemberId: Long,
         val scheduleId: Long,
         val shiftId: Long
+    )
+
+    private data class PublishedShiftFixture(
+        val workplaceId: Long,
+        val scheduleId: Long,
+        val managerUserId: Long,
+        val memberId: Long,
+        val startAt: LocalDateTime,
+        val endAt: LocalDateTime,
+    )
+
+    private data class CrossWorkplacePublishedShiftFixture(
+        val first: PublishedShiftFixture,
+        val second: PublishedShiftFixture,
     )
 
     private data class ScheduleCreationFixture(val workplaceId: Long, val managerUserId: Long)

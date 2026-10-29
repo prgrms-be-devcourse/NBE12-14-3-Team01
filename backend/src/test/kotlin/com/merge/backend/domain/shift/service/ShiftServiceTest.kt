@@ -1479,6 +1479,119 @@ class ShiftServiceTest {
         verify(shiftRepository, never()).save(any())
     }
 
+    @Test
+    fun reassignPublishedShift_RejectsNonManagerBeforeAcquiringPublishedShiftLocks() {
+        val fixture = publishedShiftReassignmentFixture(withAuthorization = false)
+        val exception = BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED)
+        given(workplaceMemberService.requireManager(fixture.actorId, fixture.workplaceId)).willThrow(exception)
+
+        assertThatThrownBy {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }.isSameAs(exception)
+
+        verifyNoInteractions(scheduleRepository, shiftRepository, substituteRequestService, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsTargetMemberOutsideWorkplace() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(fixture.targetScope.workplaceId).willReturn(fixture.workplaceId + 1)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.NOT_FOUND_ERROR)
+        verifyNoInteractions(substituteRequestService, userRepository, shiftAssignmentHistoryRepository)
+        verify(fixture.shift, never()).changeMember(any())
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsEndedTargetMember() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(fixture.targetMember.leftAt).willReturn(fixture.now)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.NOT_FOUND_ERROR)
+        verify(fixture.shift, never()).changeMember(any())
+        verifyNoInteractions(shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsStartedShiftWithSft020() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(fixture.shift.startAt).willReturn(fixture.now)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(substituteRequestService, userRepository, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsDraftScheduleWithSft020() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(fixture.schedule.status).willReturn(ScheduleStatus.DRAFT)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.PUBLISHED_SHIFT_CHANGE_NOT_ALLOWED)
+        verifyNoInteractions(shiftRepository, substituteRequestService, userRepository, shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsLocalScheduleOverlapWithSft009() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(shiftRepository.existsOverlappingInSchedule(
+            fixture.scheduleId, fixture.targetMemberId, fixture.startAt, fixture.endAt, fixture.shiftId,
+        )).willReturn(true)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME)
+        verify(fixture.shift, never()).changeMember(any())
+        verifyNoInteractions(shiftAssignmentHistoryRepository)
+    }
+
+    @Test
+    fun reassignPublishedShift_RejectsGlobalOfficialShiftOverlapWithSft010() {
+        val fixture = publishedShiftReassignmentFixture()
+        given(shiftRepository.existsOverlappingOfficialShift(
+            fixture.targetUserId, ScheduleStatus.PUBLISHED, fixture.startAt, fixture.endAt, fixture.shiftId,
+        )).willReturn(true)
+
+        val exception = assertThrows<BusinessException> {
+            shiftService.reassignPublishedShift(
+                fixture.workplaceId, fixture.scheduleId, fixture.shiftId, fixture.request(), fixture.actorId,
+            )
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
+        verify(fixture.shift, never()).changeMember(any())
+        verifyNoInteractions(shiftAssignmentHistoryRepository)
+    }
+
     private fun newShiftAcknowledgement(
         fixture: PublishedShiftCreateFixture,
         startAt: LocalDateTime,
@@ -1487,6 +1600,95 @@ class ShiftServiceTest {
         NewShiftKey(fixture.scheduleId, fixture.memberId, fixture.startAt, fixture.endAt),
         listOf(UnavailableOverlap(startAt, endAt)),
     )
+
+    private fun publishedShiftReassignmentFixture(
+        withAuthorization: Boolean = true,
+    ): PublishedShiftReassignmentFixture {
+        val now = LocalDateTime.of(2026, 10, 28, 15, 0)
+        val fixture = PublishedShiftReassignmentFixture(
+            workplaceId = 1L,
+            scheduleId = 10L,
+            shiftId = 100L,
+            targetMemberId = 20L,
+            targetUserId = 30L,
+            actorId = 200L,
+            now = now,
+            startAt = now.plusHours(1),
+            endAt = now.plusHours(5),
+            workplace = mock(),
+            schedule = mock(),
+            shift = mock(),
+            actorMember = mock(),
+            previousMember = mock(),
+            targetMember = mock(),
+            targetUser = mock(),
+            targetScope = mock(),
+        )
+        Mockito.lenient().`when`(clock.instant()).thenReturn(now.toInstant(ZoneOffset.UTC))
+        Mockito.lenient().`when`(clock.zone).thenReturn(ZoneOffset.UTC)
+        if (withAuthorization) {
+            Mockito.lenient().`when`(workplaceMemberService.requireManager(fixture.actorId, fixture.workplaceId))
+                .thenReturn(fixture.actorMember)
+        }
+        Mockito.lenient().`when`(scheduleRepository.findByIdForUpdate(fixture.scheduleId))
+            .thenReturn(Optional.of(fixture.schedule))
+        Mockito.lenient().`when`(fixture.schedule.workplace).thenReturn(fixture.workplace)
+        Mockito.lenient().`when`(fixture.schedule.id).thenReturn(fixture.scheduleId)
+        Mockito.lenient().`when`(fixture.workplace.id).thenReturn(fixture.workplaceId)
+        Mockito.lenient().`when`(fixture.schedule.status).thenReturn(ScheduleStatus.PUBLISHED)
+        Mockito.lenient().`when`(shiftRepository.findByIdForUpdate(fixture.shiftId)).thenReturn(Optional.of(fixture.shift))
+        Mockito.lenient().`when`(fixture.shift.id).thenReturn(fixture.shiftId)
+        Mockito.lenient().`when`(fixture.shift.schedule).thenReturn(fixture.schedule)
+        Mockito.lenient().`when`(fixture.shift.status).thenReturn(ShiftStatus.SCHEDULED)
+        Mockito.lenient().`when`(fixture.shift.startAt).thenReturn(fixture.startAt)
+        Mockito.lenient().`when`(fixture.shift.endAt).thenReturn(fixture.endAt)
+        Mockito.lenient().`when`(fixture.shift.member).thenReturn(fixture.previousMember)
+        Mockito.lenient().`when`(fixture.previousMember.id).thenReturn(10L)
+        Mockito.lenient().`when`(workplaceMemberRepository.findScopeById(fixture.targetMemberId))
+            .thenReturn(fixture.targetScope)
+        Mockito.lenient().`when`(fixture.targetScope.workplaceId).thenReturn(fixture.workplaceId)
+        Mockito.lenient().`when`(fixture.targetScope.userId).thenReturn(fixture.targetUserId)
+        Mockito.lenient().`when`(substituteRequestService.closeActiveRequestsByShiftChange(fixture.shiftId, fixture.now))
+            .thenReturn(emptyList())
+        Mockito.lenient().`when`(userRepository.findByIdForUpdate(fixture.targetUserId)).thenReturn(Optional.of(fixture.targetUser))
+        Mockito.lenient().`when`(workplaceMemberRepository.findByIdForShare(fixture.targetMemberId))
+            .thenReturn(Optional.of(fixture.targetMember))
+        Mockito.lenient().`when`(fixture.targetMember.workplace).thenReturn(fixture.workplace)
+        Mockito.lenient().`when`(fixture.targetMember.leftAt).thenReturn(null)
+        Mockito.lenient().`when`(fixture.targetMember.user).thenReturn(fixture.targetUser)
+        Mockito.lenient().`when`(fixture.targetMember.id).thenReturn(fixture.targetMemberId)
+        Mockito.lenient().`when`(fixture.targetUser.id).thenReturn(fixture.targetUserId)
+        Mockito.lenient().`when`(shiftRepository.existsOverlappingInSchedule(
+            fixture.scheduleId, fixture.targetMemberId, fixture.startAt, fixture.endAt, fixture.shiftId,
+        )).thenReturn(false)
+        Mockito.lenient().`when`(shiftRepository.existsOverlappingOfficialShift(
+            fixture.targetUserId, ScheduleStatus.PUBLISHED, fixture.startAt, fixture.endAt, fixture.shiftId,
+        )).thenReturn(false)
+        Mockito.lenient().`when`(unavailableTimeRepository.findByUserId(fixture.targetUserId)).thenReturn(emptyList())
+        return fixture
+    }
+
+    private data class PublishedShiftReassignmentFixture(
+        val workplaceId: Long,
+        val scheduleId: Long,
+        val shiftId: Long,
+        val targetMemberId: Long,
+        val targetUserId: Long,
+        val actorId: Long,
+        val now: LocalDateTime,
+        val startAt: LocalDateTime,
+        val endAt: LocalDateTime,
+        val workplace: Workplace,
+        val schedule: Schedule,
+        val shift: Shift,
+        val actorMember: WorkplaceMember,
+        val previousMember: WorkplaceMember,
+        val targetMember: WorkplaceMember,
+        val targetUser: User,
+        val targetScope: WorkplaceMemberScope,
+    ) {
+        fun request() = ShiftReassignRequest(targetMemberId, emptyList())
+    }
 
     private fun publishedShiftCreateFixture(
         withTargetLocks: Boolean = true,
