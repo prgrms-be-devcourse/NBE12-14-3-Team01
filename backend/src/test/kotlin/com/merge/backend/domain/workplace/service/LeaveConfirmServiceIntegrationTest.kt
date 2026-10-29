@@ -14,6 +14,8 @@ import com.merge.backend.domain.substitute.entity.RequestStatus
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate
 import com.merge.backend.domain.substitute.entity.SubstituteRequest
 import com.merge.backend.domain.substitute.entity.CandidateStatus
+import com.merge.backend.domain.substitute.service.SubstituteCandidateService
+import com.merge.backend.domain.substitute.service.SubstituteRequestService
 import com.merge.backend.domain.user.entity.User
 import com.merge.backend.domain.workplace.controller.LeaveConfirmController
 import com.merge.backend.domain.workplace.dto.request.LeaveConfirmRequest
@@ -24,6 +26,7 @@ import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode
 import com.merge.backend.global.config.TestClock
 import com.merge.backend.global.config.TestTimeConfig
 import com.merge.backend.global.dto.ConfirmationRequiredResponse
+import com.merge.backend.global.dto.UnavailableConflictResponse
 import com.merge.backend.global.dto.ValidationErrorResponse
 import com.merge.backend.global.exception.BusinessException
 import com.merge.backend.global.exception.GlobalExceptionHandler
@@ -85,6 +88,8 @@ class LeaveConfirmServiceIntegrationTest {
     @Autowired private lateinit var context: ApplicationContext
     @Autowired private lateinit var jdbc: JdbcTemplate
     @Autowired private lateinit var candidacyAdapter: LeaveCandidacyAdapter
+    @Autowired private lateinit var candidateService: SubstituteCandidateService
+    @Autowired private lateinit var requestService: SubstituteRequestService
     @MockitoSpyBean private lateinit var writer: LeaveMembershipWriter
     private lateinit var tx: TransactionTemplate
     private lateinit var now: LocalDateTime
@@ -203,6 +208,82 @@ class LeaveConfirmServiceIntegrationTest {
                 LeaveConfirmRequest.Overlap(it.startAt, it.endAt)
             })
         )))
+    }
+
+    @Test
+    fun newConflictOnAnotherPairReturnsFullLatestListWithoutWrites() {
+        // G03-D-05 D05-T3·D21-T8: 확인한 뒤 다른 (근무, 인계 대상) 쌍에 새 충돌 → 409와 최신 목록 2건, DB 변경 0
+        unavailable(now.plusDays(1).plusHours(1), now.plusDays(1).plusHours(2))
+        val command = command { true }
+        val firstWarning = confirmationRequired(command)
+        assertThat(firstWarning.map { it.shiftId }).containsExactly(first)
+        unavailable(now.plusDays(2).plusHours(1), now.plusDays(2).plusHours(2))
+        val latest = confirmationRequired(command.copy(acknowledgedUnavailableConflicts = acknowledge(firstWarning)))
+        assertThat(latest.map { it.shiftId }).containsExactlyInAnyOrder(first, second)
+        assertUnchanged()
+        service.confirm(actorUser, wp, leaving, command.copy(acknowledgedUnavailableConflicts = acknowledge(latest)))
+    }
+
+    @Test
+    fun deletedUnavailableTimeStillPassesWithPreviousAcknowledgement() {
+        // D05-T4: 확인 뒤 불가능 시간 삭제 → 줄어든 충돌이므로 이전 목록으로 성공
+        val id = unavailable(now.plusDays(1).plusHours(1), now.plusDays(1).plusHours(2))
+        val command = command()
+        val warning = confirmationRequired(command)
+        tx.executeWithoutResult { entityManager.remove(entityManager.find(UnavailableTime::class.java, id)) }
+        service.confirm(actorUser, wp, leaving, command.copy(acknowledgedUnavailableConflicts = acknowledge(warning)))
+        tx.executeWithoutResult { assertThat(entityManager.find(Shift::class.java, first).member.id).isEqualTo(target) }
+    }
+
+    @Test
+    fun movedUnavailableTimeBeyondAcknowledgedRangeRequiresConfirmationAgain() {
+        // D05-T5: 겹침 1~2시 → 2~5시로 바뀌면 근무 끝(4시)에서 잘린 2~4시를 다시 확인해야 한다
+        val id = unavailable(now.plusDays(1).plusHours(1), now.plusDays(1).plusHours(2))
+        val command = command()
+        val warning = confirmationRequired(command)
+        tx.executeWithoutResult {
+            entityManager.remove(entityManager.find(UnavailableTime::class.java, id))
+            persist(UnavailableTime(entityManager.find(User::class.java, targetUser), now.plusDays(1).plusHours(2), now.plusDays(1).plusHours(5)))
+        }
+        val latest = confirmationRequired(command.copy(acknowledgedUnavailableConflicts = acknowledge(warning))).single()
+        assertThat(latest.overlaps.map { it.startAt to it.endAt })
+            .containsExactly(now.plusDays(1).plusHours(2) to now.plusDays(1).plusHours(4))
+        assertUnchanged()
+    }
+
+    @Test
+    fun splitUnavailableTimeWithSameMergedOverlapPasses() {
+        // D05-T5b: 1~3시 한 건을 1~2시·2~3시 두 건으로 나눠도 합친 겹침이 같으므로 성공
+        val id = unavailable(now.plusDays(1).plusHours(1), now.plusDays(1).plusHours(3))
+        val command = command()
+        val warning = confirmationRequired(command)
+        tx.executeWithoutResult {
+            entityManager.remove(entityManager.find(UnavailableTime::class.java, id))
+            val user = entityManager.find(User::class.java, targetUser)
+            persist(UnavailableTime(user, now.plusDays(1).plusHours(1), now.plusDays(1).plusHours(2)))
+            persist(UnavailableTime(user, now.plusDays(1).plusHours(2), now.plusDays(1).plusHours(3)))
+        }
+        service.confirm(actorUser, wp, leaving, command.copy(acknowledgedUnavailableConflicts = acknowledge(warning)))
+    }
+
+    @Test
+    fun substituteApprovedAfterPreviewMakesPlanStale() {
+        // D05-T5c: 미리보기 뒤 퇴사자 근무의 대타가 실제 수락·승인 Command로 승인됨 → 409 STALE, 퇴사 쓰기 0
+        val command = command()
+        val candidateId = tx.execute {
+            entityManager.createQuery("SELECT c.id FROM SubstituteCandidate c WHERE c.request.id = :id", Long::class.javaObjectType)
+                .setParameter("id", requestId).singleResult
+        }!!
+        candidateService.acceptCandidate(candidateId, targetUser)
+        requestService.approve(requestId, actorUser)
+        assertThat(assertThrows<BusinessException> { service.confirm(actorUser, wp, leaving, command) }.errorCode)
+            .isEqualTo(WorkplaceErrorCode.STALE_LEAVE_PLAN)
+        tx.executeWithoutResult {
+            assertThat(entityManager.find(WorkplaceMember::class.java, leaving).leftAt).isNull()
+            assertThat(entityManager.find(Shift::class.java, first).member.id).isEqualTo(target)
+            assertThat(entityManager.find(Shift::class.java, second).status).isEqualTo(ShiftStatus.SCHEDULED)
+            assertThat(entityManager.find(Shift::class.java, draft)).isNotNull()
+        }
     }
 
     @Test
@@ -604,11 +685,27 @@ class LeaveConfirmServiceIntegrationTest {
         return second.get(15, TimeUnit.SECONDS)
     }
 
-    private fun command(): LeaveConfirmRequest {
+    private fun command(reassign: (Long) -> Boolean = { it == first }): LeaveConfirmRequest {
         val original = preview.getPreview(actorUser, wp, leaving)
         return LeaveConfirmRequest(original.previewContext, original.publishedShifts.map {
             LeaveConfirmRequest.Decision(it.shiftId, it.startAt, it.endAt,
-                if (it.shiftId == first) "REASSIGN" else "CANCEL", if (it.shiftId == first) target else null)
+                if (reassign(it.shiftId)) "REASSIGN" else "CANCEL", if (reassign(it.shiftId)) target else null)
+        })
+    }
+
+    private fun unavailable(startAt: LocalDateTime, endAt: LocalDateTime): Long = requireNotNull(tx.execute {
+        persist(UnavailableTime(entityManager.find(User::class.java, targetUser), startAt, endAt)).id
+    })
+
+    private fun confirmationRequired(command: LeaveConfirmRequest): List<UnavailableConflictResponse> {
+        val error = assertThrows<BusinessException> { service.confirm(actorUser, wp, leaving, command) }
+        assertThat(error.errorCode).isEqualTo(WorkplaceErrorCode.LEAVE_UNAVAILABLE_CONFLICT_CONFIRMATION_REQUIRED)
+        return requireNotNull((error.data as ConfirmationRequiredResponse).unavailableConflicts)
+    }
+
+    private fun acknowledge(conflicts: List<UnavailableConflictResponse>) = conflicts.map { conflict ->
+        LeaveConfirmRequest.AcknowledgedUnavailableConflict(conflict.shiftId, conflict.targetMemberId, conflict.overlaps.map {
+            LeaveConfirmRequest.Overlap(it.startAt, it.endAt)
         })
     }
 
