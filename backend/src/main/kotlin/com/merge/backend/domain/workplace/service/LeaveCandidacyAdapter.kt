@@ -35,7 +35,7 @@ class LeaveCandidacyAdapter(
         }
         val result = candidates.closeCandidaciesByMemberLeave(memberId, now, activeIds)
         return LeaveConfirmationIntegration.CandidacyCleanup(
-            result.closedRequests.map { it.requestId }.toSet(), result.ineligibleCandidacies
+            result.closedRequests.map { it.requestId }.toSet(), result.ineligibleCandidacies, result.closedRequests
         )
     }
 }

@@ -145,6 +145,8 @@ class LeaveConfirmServiceIntegrationTest {
         assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue()
         tx.executeWithoutResult {
             for (query in listOf(
+                // POST 활성화로 퇴사 확정이 알림(V5-N-20)을 만들므로 소속보다 먼저 지운다
+                "DELETE FROM Notification n WHERE n.recipientMember.workplace.id = :wp",
                 "DELETE FROM ShiftAssignmentHistory h WHERE h.shift.schedule.workplace.id = :wp",
                 "DELETE FROM SubstituteCandidate c WHERE c.request.shift.schedule.workplace.id = :wp",
                 "DELETE FROM SubstituteRequest r WHERE r.shift.schedule.workplace.id = :wp",
@@ -314,15 +316,14 @@ class LeaveConfirmServiceIntegrationTest {
     }
 
     @Test
-    fun missingV4BridgeBlocksCandidacyCleanupBeforeAllWritesAndPostIsNotExposed() {
+    fun missingV4BridgeBlocksCandidacyCleanupBeforeAllWrites() {
         tx.executeWithoutResult {
             val shift = persist(Shift(entityManager.find(Schedule::class.java, published), entityManager.find(WorkplaceMember::class.java, target),
                 now.plusDays(3), now.plusDays(3).plusHours(4), ShiftStatus.SCHEDULED))
             val request = persist(SubstituteRequest(shift, shift.member, RequestStatus.OPEN))
             persist(SubstituteCandidate(request, entityManager.find(WorkplaceMember::class.java, leaving)))
         }
-        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
-        // 연동 Bean이 실제 존재하는 현재에도 기존 "연동 부재" 실패 시나리오를 명시적으로 보존한다.
+        // 2026-10-29 POST 활성화 뒤에도 기존 "연동 부재" 실패 시나리오(쓰기 전 중단)를 명시적으로 보존한다.
         val serviceTarget = AopTestUtils.getUltimateTargetObject<LeaveConfirmService>(service)
         val originalProvider = ReflectionTestUtils.getField(serviceTarget, "integration")
         ReflectionTestUtils.setField(serviceTarget, "integration",
@@ -337,18 +338,19 @@ class LeaveConfirmServiceIntegrationTest {
     }
 
     @Test
-    fun actualV4IntegrationDoesNotActivatePostWithoutGuardReadiness() {
+    fun postIsRegisteredWithV4IntegrationAndGuardReadiness() {
+        // 2026-10-29 활성화: 소속 Guard(#105·#106) 뒤 Readiness Bean 제공. 두 Bean이 모두 있을 때만 Controller가 등록된다
         assertThat(context.getBeansOfType(LeaveConfirmationIntegration::class.java)).hasSize(1)
-        assertThat(context.getBeansOfType(LeaveConfirmationReadiness::class.java)).isEmpty()
-        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+        assertThat(context.getBeansOfType(LeaveConfirmationReadiness::class.java)).hasSize(1)
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).hasSize(1)
     }
 
     @Test
-    fun standaloneHttpRequestCommitsRealV2V3V4TransactionWithoutRegisteringPost() {
+    fun standaloneHttpRequestCommitsRealV2V3V4Transaction() {
         val (requestId, candidateId) = addCandidacy()
         val rq = mock<Rq>()
         whenever(rq.actorId).thenReturn(actorUser)
-        // 테스트에서만 Controller 객체를 직접 연결한다. 운영 Readiness Bean이나 경로는 등록하지 않는다.
+        // Controller 객체를 직접 연결한 MockMvc (Filter 없이). Security Filter를 거치는 실제 경로는 LeaveConfirmHttpIntegrationTest
         val mvc = MockMvcBuilders.standaloneSetup(LeaveConfirmController(service, rq))
             .setControllerAdvice(GlobalExceptionHandler()).build()
         val body = jacksonObjectMapper().writeValueAsString(command())
@@ -359,7 +361,7 @@ class LeaveConfirmServiceIntegrationTest {
             .andExpect(jsonPath("$.data.closedRequests.byReason.SHIFT_CHANGED").value(1))
             .andExpect(jsonPath("$.data.closedRequests.byReason.CANDIDATE_INELIGIBLE").value(1))
             .andExpect(jsonPath("$.data.ineligibleCandidacies").value(1))
-        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).hasSize(1)
         tx.executeWithoutResult {
             assertThat(entityManager.find(WorkplaceMember::class.java, leaving).leftAt).isEqualTo(now)
             assertThat(entityManager.find(SubstituteCandidate::class.java, candidateId).status).isEqualTo(CandidateStatus.INELIGIBLE)
@@ -386,7 +388,7 @@ class LeaveConfirmServiceIntegrationTest {
             .andExpect(jsonPath("$.data.unavailableConflicts[0].overlaps[0].startAt").value("2026-10-30T12:00:00"))
             .andExpect(jsonPath("$.data.unavailableConflicts[0].unavailableTimeId").doesNotExist())
         assertUnchanged()
-        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).isEmpty()
+        assertThat(context.getBeansOfType(LeaveConfirmController::class.java)).hasSize(1)
     }
 
     @Test
