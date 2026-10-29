@@ -7,6 +7,8 @@ import com.merge.backend.domain.shift.exception.ScheduleErrorCode
 import com.merge.backend.domain.shift.exception.ShiftErrorCode
 import com.merge.backend.domain.shift.repository.ShiftRepository
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository
+import com.merge.backend.domain.substitute.dto.ClosedSubstituteRequestPageResponse
+import com.merge.backend.domain.substitute.dto.ClosedSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse
@@ -29,11 +31,13 @@ import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService
 import com.merge.backend.global.exception.BusinessException
+import com.merge.backend.global.exception.GlobalErrorCode
 import java.time.Clock
 import java.time.LocalDateTime
 import kotlin.jvm.optionals.getOrNull
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -59,11 +63,14 @@ class SubstituteRequestService(
         val shift = validateSubstituteRequest(shiftId, actorUserId)
 
         // 조건에 맞는 대타 후보들을 먼저 찾음
-        val candidates = substituteCandidateService.findCandidates(
+        val foundCandidates = substituteCandidateService.findCandidates(
             requireNotNull(shift.schedule.workplace.id), // 대상 근무지 ID
             requireNotNull(shift.member.id), // 대타를 요청한 멤버 ID
             shift, // 대타가 필요한 Shift
         )
+
+        // 후보를 고른 뒤 퇴사가 Commit될 수 있어, 소속을 잠그고 다시 확인한 후보만 넣음 (ML-5 §4-4 반례 A)
+        val candidates = guardMemberships(shift, foundCandidates)
 
         // 후보가 한 명도 없으면 Request 자체를 만들지 않음
         if (candidates.isEmpty()) {
@@ -104,11 +111,33 @@ class SubstituteRequestService(
         val now = LocalDateTime.now(clock)
 
         val requests =
-            substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(
+            substituteRequestRepository.findAllByRequesterMember_User_IdAndRequesterMember_LeftAtIsNullOrderByCreateDateDesc(
                 actorUserId,
             )
 
         return requests.map { request -> SentSubstituteRequestResponse.from(request, now) }
+    }
+
+    // 소속 Guard: 요청자·후보 소속을 ID 오름차순 FOR SHARE로 잠가 퇴사(소속 FOR UPDATE)와 직렬화한 뒤
+    // 현재 소속을 DB 값으로 다시 확인. 요청자가 나갔으면 거부, 나간 후보는 빼고 돌려줌 (ML-5 §5 대타 생성 행, TASK-V2-69 L70)
+    private fun guardMemberships(shift: Shift, candidates: List<WorkplaceMember>): List<WorkplaceMember> {
+        val workplaceId = requireNotNull(shift.schedule.workplace.id)
+        val requesterMemberId = requireNotNull(shift.member.id)
+        val candidateIds = candidates.map { requireNotNull(it.id) }
+
+        workplaceMemberRepository.findAllByIdInForShare((candidateIds + requesterMemberId).sorted())
+
+        if (!workplaceMemberRepository.existsCurrentMember(requesterMemberId, workplaceId)) {
+            throw BusinessException(SubstituteRequestErrorCode.NOT_OWN_SHIFT)
+        }
+
+        if (candidateIds.isEmpty()) {
+            return candidates
+        }
+
+        val currentIds = workplaceMemberRepository.findCurrentEmployeeIdsIn(candidateIds, workplaceId).toSet()
+
+        return candidates.filter { it.id in currentIds }
     }
 
     private fun validateSubstituteRequest(shiftId: Long, actorUserId: Long): Shift {
@@ -164,6 +193,72 @@ class SubstituteRequestService(
         return requests.map { request ->
             SubstituteRequestListResponse.from(request, acceptedCandidateMap)
         }
+    }
+
+    // API-SB-02 - MANAGER: 근무지의 끝난 대타 요청 (종료·계산된 만료). 조회만 하고 DB는 바꾸지 않음
+    @Transactional(readOnly = true)
+    fun findClosedRequests(
+        workplaceId: Long,
+        actorId: Long,
+        from: LocalDateTime?, // 효력 종료 시각 하한 (포함)
+        to: LocalDateTime?, // 효력 종료 시각 상한 (포함)
+        page: Int,
+        size: Int,
+    ): ClosedSubstituteRequestPageResponse {
+        workplaceMemberService.requireManager(actorId, workplaceId)
+
+        val now = LocalDateTime.now(clock)
+
+        // 기본은 최근 7일. 보존 기간·조회 상한이 아니라 기본 필터 (API-CATALOG API-SB-02)
+        val periodFrom = from ?: now.minusDays(7)
+        val periodTo = to ?: now
+        if (periodFrom > periodTo || page < 0 || size !in 1..MAX_CLOSED_PAGE_SIZE) {
+            throw BusinessException(GlobalErrorCode.INVALID_REQUEST_PARAMETER)
+        }
+
+        val slice = substituteRequestRepository.findClosedByWorkplaceId(
+            workplaceId,
+            now,
+            periodFrom,
+            periodTo,
+            PageRequest.of(page, size),
+        )
+        val requests = slice.content
+        if (requests.isEmpty()) {
+            return ClosedSubstituteRequestPageResponse(emptyList(), page, size, slice.hasNext())
+        }
+
+        // 수락자: 끝난 요청은 수락자가 없을 수 있어 getAcceptedCandidates(ACCEPTED 요청 전용)를 쓰지 않음
+        // 여러 명이면 한 명만 고르지 않고 SUB-06과 같이 오류 (ML-3 §3)
+        val accepterByRequestId = substituteCandidateRepository
+            .findByRequestIdInAndStatus(requests.map { requireNotNull(it.id) }, CandidateStatus.ACCEPTED)
+            .groupBy { requireNotNull(it.request.id) }
+            .mapValues { (requestId, accepters) ->
+                if (accepters.size > 1) {
+                    log.error(
+                        "끝난 요청(requestId={})에 수락자가 {}명 조회되었습니다. candidateIds={}",
+                        requestId,
+                        accepters.size,
+                        accepters.map { candidate -> candidate.id },
+                    )
+                    throw BusinessException(SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_DUPLICATED)
+                }
+                accepters.single()
+            }
+
+        // 같은 근무의 진행 중 요청 ID (더 최근 = 요청 ID가 더 큼)
+        val activeRequestIdsByShiftId = substituteRequestRepository
+            .findActiveByShiftIdIn(requests.map { requireNotNull(it.shift.id) }.distinct(), now)
+            .groupBy({ requireNotNull(it.shift.id) }, { requireNotNull(it.id) })
+
+        val items = requests.map { request ->
+            val requestId = requireNotNull(request.id)
+            val hasNewerActiveRequest = activeRequestIdsByShiftId[request.shift.id].orEmpty().any { it > requestId }
+
+            ClosedSubstituteRequestResponse.from(request, accepterByRequestId[requestId], hasNewerActiveRequest, now)
+        }
+
+        return ClosedSubstituteRequestPageResponse(items, page, size, slice.hasNext())
     }
 
     // 내부적으로 사용하는 수락자 조회 - private으로 캡슐화
@@ -272,6 +367,13 @@ class SubstituteRequestService(
         val candidateUserId = requireNotNull(acceptedMember.user.id)
 
         userService.getByIdForUpdate(candidateUserId)
+
+        // 소속 Guard: 수락자 소속을 FOR SHARE로 잠가 퇴사와 직렬화한 뒤 DB 값으로 다시 확인 (ML-5 §5 대타 승인 행, ML5-T8)
+        val guardedMemberId = requireNotNull(acceptedMember.id)
+        workplaceMemberRepository.findByIdForShare(guardedMemberId)
+        if (workplaceMemberRepository.findCurrentEmployeeIdsIn(listOf(guardedMemberId), workplaceId).isEmpty()) {
+            throw BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE)
+        }
 
         // 현재를 기준으로 대체 근무 시작 시간이 지나거나 같다면 (now >= startAt)
         val validationNow = LocalDateTime.now(clock)
@@ -482,5 +584,8 @@ class SubstituteRequestService(
 
     companion object {
         private val log = LoggerFactory.getLogger(SubstituteRequestService::class.java)
+
+        // API-SB-02 한 페이지 최대 개수 (구현 계약)
+        const val MAX_CLOSED_PAGE_SIZE = 100
     }
 }

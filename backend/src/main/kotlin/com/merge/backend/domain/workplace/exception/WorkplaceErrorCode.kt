@@ -47,6 +47,21 @@ enum class WorkplaceErrorCode(
         HttpStatus.CONFLICT,
         "WPL-008",
         "이미 종료된 소속입니다."
+    ),
+    ONGOING_SHIFT_PREVENTS_LEAVE(
+        HttpStatus.CONFLICT,
+        "WPL-009",
+        "진행 중인 근무가 있어 퇴사 처리할 수 없습니다."
+    ),
+    STALE_LEAVE_PLAN(
+        HttpStatus.CONFLICT,
+        "WPL-010",
+        "퇴사 계획이 변경되었습니다. 미리보기를 다시 조회해 주세요."
+    ),
+    LEAVE_UNAVAILABLE_CONFLICT_CONFIRMATION_REQUIRED(
+        HttpStatus.CONFLICT,
+        "WPL-011",
+        "퇴사 인계의 근무 불가능 일정 충돌 확인이 필요합니다."
     );
 
     override fun getHttpStatus(): HttpStatus = httpStatus

@@ -63,6 +63,8 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import org.springframework.context.ApplicationEventPublisher
+import org.junit.jupiter.api.BeforeEach
 
 @ExtendWith(MockitoExtension::class)
 class ShiftServiceTest {
@@ -92,6 +94,16 @@ class ShiftServiceTest {
 
     @Mock
     private lateinit var clock: Clock
+
+    // 공개 후 변경 알림 Event 발행용 (알림 저장은 별도 통합 Test에서 확인)
+    @Mock
+    private lateinit var applicationEventPublisher: ApplicationEventPublisher
+
+    // 소속 Guard(FOR SHARE 재확인)는 Mock에서 기본으로 "현재 소속"으로 둔다. 실제 Lock 동작은 DraftMembershipGuardConcurrencyTest
+    @BeforeEach
+    fun allowCurrentMembership() {
+        Mockito.lenient().`when`(workplaceMemberRepository.existsCurrentMember(any(), any())).thenReturn(true)
+    }
 
     @Test
     @DisplayName("SCH-01 - Pattern에서 전달된 정보로 SCHEDULED Shift를 저장한다")

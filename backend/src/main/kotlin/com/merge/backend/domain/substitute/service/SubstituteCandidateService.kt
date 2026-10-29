@@ -199,6 +199,18 @@ class SubstituteCandidateService(
         // 같은 User의 시간 상태를 변경하는 작업끼리 직렬화
         userService.getByIdForUpdate(candidateUserId)
 
+        // 소속 Guard: 수락자 소속을 FOR SHARE로 잠가 퇴사와 직렬화한 뒤 DB 값으로 다시 확인 (ML-5 §5 대타 수락 행, ML5-T5)
+        val memberId = requireNotNull(candidate.member.id)
+        workplaceMemberRepository.findByIdForShare(memberId)
+        if (
+            workplaceMemberRepository.findCurrentEmployeeIdsIn(
+                listOf(memberId),
+                requireNotNull(targetShift.schedule.workplace.id),
+            ).isEmpty()
+        ) {
+            throw BusinessException(SubstituteRequestErrorCode.INVALID_CANDIDATE_MEMBER)
+        }
+
         // Request/User Lock 대기 이후의 최신 시간
         val now = LocalDateTime.now(clock)
 
@@ -300,10 +312,27 @@ class SubstituteCandidateService(
     // 알림은 내지 않고 결과만 돌려줌. 받는 사람은 퇴사 확정 결과로 V5가 정함 (#80 근무 변경 종료와 같은 방식)
     @Transactional(propagation = Propagation.MANDATORY)
     fun closeCandidaciesByMemberLeave(memberId: Long, now: LocalDateTime): MemberLeaveCandidacyResult {
+        return closeMemberLeaveCandidacies(memberId, now,
+            substituteRequestRepository.findActiveByCandidateMemberIdForUpdate(memberId, now))
+    }
+
+    /** V2 전용: 전체 Request 선점 후 호출한다. 기존 상태 전이를 재사용하고 새 Request는 잠그지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun closeCandidaciesByMemberLeave(
+        memberId: Long, now: LocalDateTime, lockedRequestIds: Set<Long>
+    ): MemberLeaveCandidacyResult {
+        val requests = if (lockedRequestIds.isEmpty()) emptyList() else
+            substituteRequestRepository.findActiveByCandidateMemberIdWithinIds(memberId, now, lockedRequestIds)
+        return closeMemberLeaveCandidacies(memberId, now, requests)
+    }
+
+    private fun closeMemberLeaveCandidacies(
+        memberId: Long, now: LocalDateTime, requests: List<SubstituteRequest>
+    ): MemberLeaveCandidacyResult {
         val closedRequests = mutableListOf<CandidateIneligibleClosedRequest>()
         var ineligibleCandidacies = 0
 
-        substituteRequestRepository.findActiveByCandidateMemberIdForUpdate(memberId, now).forEach { request ->
+        requests.forEach { request ->
             val requestId = requireNotNull(request.id)
 
             // Lock 전에 읽힌 Entity면 상태가 옛 값일 수 있어 DB 값으로 판단

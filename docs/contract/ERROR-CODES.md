@@ -6,8 +6,8 @@
 |---|---|
 | ③ 문서 | `DRAFT` (S2-4A 초안, 2026-10-25) |
 | ② 정책 | 기존 code는 **AS-IS 기록**이다. 점검 결과의 정정 방향과 새 code 예약은 [G03-D-03](../decisions/proposals/G03-D-03-error-code.md)에 따른 **제안 (`PROPOSED`)**이다. 팀 승인 전 |
-| 구현 | 없음. Enum을 바꾸지 않았다. Kotlin Migration은 기존 code·HTTP·Message를 그대로 옮긴다 |
-| ④ / ⑤ | 관련 Test 전부 `SPECIFIED` / `NOT_RUN` |
+| 구현 | 최초 작성 (2026-10-25) 당시 이 문서에 따른 Enum 변경 없음. 현재 `WPL-006~008`은 PR #90으로 구현·병합됨 (§4). `WPL-009~011`은 API-LV-02 구현 예정 코드. 그 밖의 적용 기록은 각 행을 따르며 Kotlin Migration의 기존 code·HTTP·Message 보존 원칙은 유지 |
+| ④ / ⑤ | 최초 작성 당시 신규 제안의 관련 Test는 전부 `SPECIFIED` / `NOT_RUN`. 현재 PR #90 조회 Test는 `IMPLEMENTED` / `UNKNOWN` (TEST-INVENTORY §4-3). 개별 실행 근거 없이 `PASSED`로 올리지 않으며 과거 검증 기록은 해당 기준을 유지 |
 | 기준 코드 | 3차 `develop` `a148a62` (Production Java = `cdaaa13`). 정적 확인 |
 
 새 code를 쓰기 전에 **이 목록에 먼저 번호를 예약**한다. 여러 담당자가 같은 번호를 쓰지 않게 하기 위해서다 (G03-D-03 §6).
@@ -155,7 +155,7 @@
 | `SUB-013` | 409 | DUPLICATE | 이미 진행중인 대체근무 요청이 있습니다 | SubstituteRequestService.validateSubstituteRequest L154 | 정상 | 3 | — |
 | `SUB-014` | 400 | STATE_CONFLICT | 취소된 근무에는 대체근무를 요청할 수 없습니다 | SubstituteCandidateService.validateRespondableCandidate L159<br>SubstituteRequestService.validateSubstituteRequest L141 | **T1-03 (새로 발견)** 후보 응답(Candidate L159)에서 "취소된 근무에는 대체근무를 요청할 수 없습니다" 문구. 요청 생성(L141)에는 맞음. T1-02와 같은 패턴 | 2 | — |
 | `SUB-015` | 404 | INTERNAL | ACCEPTED 상태인 요청의 수락자 정보를 찾을 수 없습니다. | SubstituteRequestService.getAcceptedCandidates L224 | T2 내부 불변식 위반(수락자 없음)을 업무 오류로 응답 (관리자 진행 중 목록) | 1 | — |
-| `SUB-016` | 400 | INTERNAL | 하나의 요청에 대해 수락자가 여러 명 조회되었습니다. | SubstituteRequestService.getAcceptedCandidates L210 | T2 내부 불변식 위반(수락자 여러 명)을 업무 오류로 응답 | 1 | — |
+| `SUB-016` | 400 | INTERNAL | 하나의 요청에 대해 수락자가 여러 명 조회되었습니다. | SubstituteRequestService.getAcceptedCandidates L210, SubstituteRequestService.findClosedRequests (API-SB-02, PR #104 리뷰 반영) | T2 내부 불변식 위반(수락자 여러 명)을 업무 오류로 응답 | 2 | — |
 | `SUB-017` | 400 | STATE_CONFLICT | 이미 종료되었거나 승인된 요청은 종료할 수 없습니다. | SubstituteRequestService.close L382 | 정상 | 2 | — |
 | `SUB-018` | 400 | STATE_CONFLICT | 근무 시작 이후에는 요청을 종료할 수 없습니다. | SubstituteRequestService.close L397 | 정상 | 2 | — |
 | `SUB-019` | 404 | NOT_FOUND | 해당 대타 후보를 찾을 수 없습니다. | SubstituteCandidateService.validateRespondableCandidate L111<br>SubstituteCandidateService.validateRespondableCandidate L125 | 정상 | 1 | — |
@@ -170,9 +170,11 @@
 | `COM-003` | 400 | INPUT | 요청 파라미터가 올바르지 않습니다. | GlobalExceptionHandler.handleMethodArgumentTypeMismatchException L95<br>GlobalExceptionHandler.handleMissingServletRequestParameterException L109 | 정상 | 4 | — |
 | `COM-500` | 500 | INTERNAL | 서버 내부 오류가 발생했습니다. | GlobalExceptionHandler.handleException L120 | T3 HTTP 번호 형식. **R1 (Known Limitation, 2026-10-26):** 현재 Java MockMvc에서 **Controller가 없는 URL** 요청도 이 처리로 와 500 `COM-500`이 관찰됨 (`NoResourceFoundException` 처리 없음). 의도된 최종 오류 계약이 아니며, 올바른 HTTP Status·ErrorCode는 별도 결정 후 수정. 지원하지 않는 HTTP Method(405 예상)가 여기로 오는지는 미검증 (추정) | 1 | — |
 
-## 4. 새 code 예약 (`PROPOSED`, Enum 미적용)
+## 4. 새 code 예약과 구현 현황
 
-현재 최대 번호: AUTH 006, WPL 005, SFT 019, SCH 012, SUB 023, COM 003 (+500). 아래는 그다음 번호다. 문구는 후보다.
+최초 작성 당시 최대 번호: AUTH 006, WPL 005, SFT 019, SCH 012, SUB 023, COM 003 (+500). 아래는 그다음 번호로 예약한 목록이다. 최초의 `PROPOSED`·Enum 미적용·문구 후보 표기는 당시 기록이며, 현재 구현 여부는 아래 구분과 각 행의 적용 기록을 따른다. 구현 사실은 정책 승인 상태와 구분한다. §3의 Java Baseline 87개 목록과 과거 검증 기록은 그대로 유지한다.
+
+**PR #90 반영 (2026-10-29 정적 확인):** [PR #90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90)으로 `WorkplaceErrorCode.kt`의 `WPL-006` (`WORKPLACE_MEMBER_NOT_FOUND`), `WPL-007` (`MANAGER_CANNOT_LEAVE`), `WPL-008` (`MEMBERSHIP_ALREADY_ENDED`)이 구현·병합되어 API-LV-01에서 사용된다. 아래 사용 API의 API-LV-02는 후속 확정 API 범위다. **`WPL-009~011`은 아직 해당 Enum에 없으며 API-LV-02의 구현 예정 코드**로 구분한다. 미리보기는 진행 중 근무를 200 + `canLeave=false`로 안내한다.
 
 | 예약 | HTTP | 종류 | 상황 | 사용 API | 근거 |
 |---|---|---|---|---|---|
@@ -180,7 +182,7 @@
 | `WPL-006` | 404 | NOT_FOUND | 퇴사 대상·인계 대상 소속이 없거나 다른 근무지 (구별하지 않음) | API-LV-01·02 | API-CATALOG §1 |
 | `WPL-007` | 409 | STATE_CONFLICT | 퇴사 대상이 MANAGER | API-LV-01·02 | ML-H2 H2-9 |
 | `WPL-008` | 409 | STATE_CONFLICT | 퇴사 대상이 이미 종료된 소속 | API-LV-01·02 | ML-4 §5 |
-| `WPL-009` | 409 | STATE_CONFLICT | 진행 중 근무가 있어 퇴사 불가 (`data`에 종료 시각) | API-LV-01·02 | ML-4-7 |
+| `WPL-009` | 409 | STATE_CONFLICT | 진행 중 근무가 있어 퇴사 불가 (`data`에 종료 시각) | API-LV-02 | ML-4-7. PR #90 병합 구현의 API-LV-01은 200 + `canLeave=false`, `blockingReason="ONGOING_SHIFT"`, `ongoingShift`로 안내 (API-CATALOG §3-1). 확정 API의 409 계약은 유지 |
 | `WPL-010` | 409 | STALE | 퇴사 계획이 지금 상태와 맞지 않음 (P1~P5) | API-LV-02 | G03-D-05 §4-2 |
 | `WPL-011` | 409 | CONFIRM_REQUIRED | 퇴사 인계의 불가능 시간 충돌 확인 필요 (목록 형식) | API-LV-02 | G03-D-05 §5 — §6 질문 1 |
 | `SFT-020` | 409 | STATE_CONFLICT | 공개 후 변경 불가 상태 (근무표가 PUBLISHED 아님, 근무가 SCHEDULED 아님, 시작한 근무) | API-PS-01·02·03 | ML-2 D27 |

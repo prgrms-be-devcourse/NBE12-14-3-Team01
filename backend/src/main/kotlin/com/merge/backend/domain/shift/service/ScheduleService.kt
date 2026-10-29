@@ -31,6 +31,7 @@ import java.util.Optional
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository
 
 @Service
 class ScheduleService(
@@ -42,6 +43,7 @@ class ScheduleService(
     private val workplaceMemberService: WorkplaceMemberService,
     private val unavailableTimeRepository: UnavailableTimeRepository,
     private val workplaceRepository: WorkplaceRepository,
+    private val workplaceMemberRepository: WorkplaceMemberRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val clock: Clock
 ) {
@@ -88,7 +90,16 @@ class ScheduleService(
                     workplaceId
                 )
 
-        for (pattern in patterns) {
+        // 소속 Guard (ML-5 §5-1, ML-2-INV-02): Workplace Lock 뒤 대상 소속을 ID 오름차순 FOR SHARE로 잠가 퇴사와 직렬화하고
+        // DB 값으로 다시 거른다 (대타 Guard #105와 같은 방식). 그 사이 퇴사가 Commit된 사람의 Pattern은 복사하지 않는다 ("현재 구성원의 Pattern")
+        val patternMemberIds = patterns.map { requireNotNull(it.member.id) }.distinct().sorted()
+        workplaceMemberRepository.findAllByIdInForShare(patternMemberIds)
+        val currentMemberIds = patternMemberIds
+            .filter { memberId -> workplaceMemberRepository.existsCurrentMember(memberId, requireNotNull(workplaceId)) }
+            .toSet()
+        val currentPatterns = patterns.filter { it.member.id in currentMemberIds }
+
+        for (pattern in currentPatterns) {
             val shiftDate =
                 savedSchedule.resolveDate(
                     pattern.dayOfWeek
@@ -113,7 +124,7 @@ class ScheduleService(
 
         return ScheduleCreateResponse.from(
             savedSchedule,
-            patterns.size
+            currentPatterns.size
         )
     }
 
