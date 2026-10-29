@@ -1,6 +1,8 @@
 package com.merge.backend.domain.workplace.controller
 
+import com.merge.backend.domain.notification.entity.Notification
 import com.merge.backend.domain.notification.entity.NotificationType
+import com.merge.backend.domain.notification.repository.NotificationRepository
 import com.merge.backend.domain.shift.entity.Schedule
 import com.merge.backend.domain.shift.entity.Shift
 import com.merge.backend.domain.shift.entity.ShiftStatus
@@ -83,6 +85,9 @@ class LeaveConfirmHttpIntegrationTest {
 
     @Autowired
     private lateinit var substituteCandidateRepository: SubstituteCandidateRepository
+
+    @Autowired
+    private lateinit var notificationRepository: NotificationRepository
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
@@ -183,9 +188,76 @@ class LeaveConfirmHttpIntegrationTest {
         assertThat(typesOf(f.leaver, since)).isEmpty()
     }
 
+    @Test
+    @DisplayName("퇴사 확정 뒤 퇴사자에게는 그 근무지·내 근무·알림이 보이지 않는다 (V2-N-30)")
+    fun leaverNoLongerSeesWorkplaceShiftsOrNotifications() {
+        // given: 퇴사 전에는 근무지·이번 주 내 근무·알림이 보인다
+        val f = createFixture()
+        TransactionTemplate(transactionManager).executeWithoutResult {
+            notificationRepository.save(
+                Notification(workplaceMemberRepository.findById(f.leaver.memberId).orElseThrow(), NotificationType.SCHEDULE_PUBLISHED, "퇴사 전 알림"),
+            )
+        }
+        val leaverToken = token(f.leaver.user)
+        val weekStart = jdbcTemplate.queryForObject(
+            "SELECT sc.week_start_date FROM shift s JOIN schedule sc ON sc.id = s.schedule_id WHERE s.id = ?",
+            java.time.LocalDate::class.java, f.reassignShiftId,
+        ).toString()
+        mvc.perform(get(WORKPLACES).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[?(@.workplaceId == ${f.workplaceId})]").isNotEmpty)
+        mvc.perform(get(MY_SHIFTS).param("weekStartDate", weekStart).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.shifts.length()").value(2))
+        mvc.perform(get(NOTIFICATIONS).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(1))
+
+        // when
+        confirm(f)
+
+        // then: 같은 JWT로 다시 조회하면 근무지·근무·알림 모두 현재 소속 조건으로 빠진다
+        mvc.perform(get(WORKPLACES).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[?(@.workplaceId == ${f.workplaceId})]").isEmpty)
+        mvc.perform(get(MY_SHIFTS).param("weekStartDate", weekStart).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.shifts.length()").value(0))
+        mvc.perform(get(NOTIFICATIONS).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(0))
+        // 관리 API: 퇴사자는 미리보기·확정을 다시 받을 수 없다 (실행 관리자가 같은 확정을 반복해도 소속 종료 그대로)
+        mvc.perform(get(PREVIEW, f.workplaceId, f.leaver.memberId).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $leaverToken"))
+            .andExpect(status().isForbidden)
+    }
+
     // ===================== 헬퍼 =====================
 
     private fun token(user: User): String = userService.genAccessToken(user)
+
+    private fun confirm(f: Fixture) {
+        val managerToken = token(f.manager.user)
+        val preview = objectMapper.readTree(
+            mvc.perform(get(PREVIEW, f.workplaceId, f.leaver.memberId).contextPath(CONTEXT).header(HttpHeaders.AUTHORIZATION, "Bearer $managerToken"))
+                .andExpect(status().isOk)
+                .andReturn().response.contentAsString,
+        ).get("data")
+        val decisions = preview.get("publishedShifts").toList().map { shift ->
+            val shiftId = shift.get("shiftId").asLong()
+            buildMap {
+                put("shiftId", shiftId)
+                put("shiftStartAt", shift.get("startAt").asString())
+                put("shiftEndAt", shift.get("endAt").asString())
+                put("action", if (shiftId == f.reassignShiftId) "REASSIGN" else "CANCEL")
+                if (shiftId == f.reassignShiftId) put("targetMemberId", f.target.memberId)
+            }
+        }
+        val body = objectMapper.writeValueAsString(mapOf("previewContext" to preview.get("previewContext").asString(), "decisions" to decisions))
+        mvc.perform(
+            post(LEAVE, f.workplaceId, f.leaver.memberId).contextPath(CONTEXT).contentType(MediaType.APPLICATION_JSON).content(body)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $managerToken"),
+        ).andExpect(status().isOk)
+    }
 
     private fun leftAtOf(memberId: Long): LocalDateTime? =
         jdbcTemplate.queryForObject("SELECT left_at FROM workplace_member WHERE id = ?", LocalDateTime::class.java, memberId)
@@ -289,5 +361,8 @@ class LeaveConfirmHttpIntegrationTest {
         const val CONTEXT = "/api/v1"
         const val PREVIEW = "/api/v1/workplaces/{workplaceId}/members/{memberId}/leave-preview"
         const val LEAVE = "/api/v1/workplaces/{workplaceId}/members/{memberId}/leave"
+        const val WORKPLACES = "/api/v1/workplaces"
+        const val MY_SHIFTS = "/api/v1/schedules/me"
+        const val NOTIFICATIONS = "/api/v1/notifications"
     }
 }
