@@ -455,7 +455,11 @@ export default function SubstituteAdminPage() {
 
           <button
               type="button"
-              onClick={() => handleTabChange("CLOSED")}
+              onClick={() => {
+                handleTabChange("CLOSED");
+                // 탭에 들어올 때마다 다시 불러옴 (화면을 열어 둔 사이 끝나거나 만료된 요청 반영)
+                setClosedReloadCount((prev) => prev + 1);
+              }}
               disabled={isSubmitting}
               className={`rounded-full px-4 py-2 text-sm font-bold transition disabled:opacity-50 ${
                   tab === "CLOSED"
