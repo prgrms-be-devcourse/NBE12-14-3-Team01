@@ -58,7 +58,7 @@
 - 정기 근무 패턴 등록 및 관리
 - 주간 근무표 생성·수정·공개
 - 공개된 근무표에 시작 전 근무 추가·취소·담당자 재배정
-- 직원 퇴사 전 공식 근무·DRAFT·대타 요청의 예상 영향 미리보기
+- 직원 퇴사 전 공식 근무·DRAFT·대타 요청의 예상 영향 미리보기 및 직원 목록 화면 연동
 - 근무지 초대 코드 재발급
 - 대체근무 요청 최종 승인
 - 승인 완료 후 공식 근무표 반영
@@ -93,7 +93,8 @@
 
 - 미리보기 조회 API는 소속·근무·대타 상태를 변경하지 않고 예상 영향과 서명된 `previewContext`를 반환합니다 ([#90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90)).
 - 퇴사 확정 POST는 핵심 로직이 구현된 [#102](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/102) 당시에는 **비활성**이었습니다. 이후 [#112](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/112)가 병합되어 최신 `develop`에는 활성화 구성과 퇴사 확정 알림 연결이 반영되어 있습니다.
-- 퇴사 미리보기·확정의 Frontend 화면 연결은 아직 반영되지 않았습니다. 운영 환경의 POST 활성화 여부는 별도로 확인해야 합니다.
+- 퇴사 미리보기는 [#107](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/107)에서 직원 목록의 '소속 종료' 메뉴와 모달에 Frontend 연동을 완료했습니다.
+- 퇴사 확정은 [#113](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/113)에서 Frontend 컴포넌트(`LeaveConfirmPanel`) 구현을 완료했으나, 실제 미리보기 모달과의 연결은 아직 미완료입니다. 운영 환경의 POST 활성화 여부는 별도로 확인해야 합니다.
 
 </details>
 
@@ -308,7 +309,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 
 | 이름 | 역할 | 담당 기능 |
 | --- | --- | --- |
-| **황희리** | 팀장 | 근무지·소속·정기근무 Kotlin 전환 · 재가입·소속 이력 · 퇴사 미리보기·확정 핵심 로직 ([#52](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/52), [#82](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/82), [#90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90), [#102](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/102)) |
+| **황희리** | 팀장 | 근무지·소속·정기근무 Kotlin 전환 · 재가입·소속 이력 · 퇴사 미리보기·확정 핵심 로직 · 퇴사 미리보기 프론트엔드 연동 ([#52](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/52), [#82](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/82), [#90](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/90), [#102](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/102), [#107](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/107)) |
 | **백혜승** | 서기 | 알림 Kotlin 전환·신규 알림 · 공통 API 계약 테스트·테스트 Kotlin 전환 · 퇴사 확정 POST 활성화·알림 연결 ([#15](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/15), [#53](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/53), [#79](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/79), [#100](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/100), [#112](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/112)) |
 | **김덕우** | 팀원 | 회원·인증 Kotlin 전환 · 서버·화면 로그아웃 · 대타 정합성 보완·종료 조회 API 및 직원 화면 ([#19](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/19), [#74](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/74), [#76](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/76), [#101](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/101), [#104](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/104), [#110](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/110)) |
 | **박세민** | 팀원 | 근무표·근무·근무 불가 시간 Kotlin 전환 · 공개 근무 추가·취소·재배정 및 화면 연동 ([#24](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/24), [#50](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/50), [#87](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/87), [#91](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/91), [#93](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/93), [#108](https://github.com/prgrms-be-devcourse/NBE12-14-3-Team01/pull/108)) |
