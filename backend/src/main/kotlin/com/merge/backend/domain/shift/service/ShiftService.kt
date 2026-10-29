@@ -373,8 +373,13 @@ class ShiftService(
                 }
             ) throw BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME)
         }
+        val unacknowledged = plan.reassignments.any { (shift, target) ->
+            findUnacknowledgedUnavailableConflict(shift, target, acknowledgements) != null
+        }
+        if (!unacknowledged) return emptyList()
+        // G03-D-05 §5-3 ③: 하나라도 통과하지 못하면 확인한 쌍까지 포함한 최신 목록 전체를 돌려준다 (D05-T3)
         return plan.reassignments.mapNotNull { (shift, target) ->
-            findUnacknowledgedUnavailableConflict(shift, target, acknowledgements)
+            findUnacknowledgedUnavailableConflict(shift, target, emptyList())
         }
     }
 

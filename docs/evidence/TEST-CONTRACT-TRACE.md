@@ -8,7 +8,7 @@
 | 한계 | ③은 Test 이름과 계약 문장의 대조다. 각 Test 본문의 기대값이 계약 문장과 완전히 같은지는 ID별로 검토하지 않았다. 실행 결과는 각 PR의 EV 기록과 아래 "이 PR로 추가"를 따른다 |
 | 관계 | TEST-INVENTORY를 대체하지 않는다. 당시 열린 PR과 같은 자리에 줄을 추가하지 않도록 별도 파일로 둔다. 다음 TEST-INVENTORY 정리 때 이 표의 연결을 옮긴다 |
 
-판정: **연결** = 기존 Test가 계약 장면을 다룸 (ID 연결 기록만 없었음) / **이 PR** = 이 PR에서 Test 추가 / **없음(후)** = Test 없음, 제출 후 / **범위 밖** = 기능 없음·대체된 계약
+판정: **연결** = 기존 Test가 계약 장면을 다룸 (ID 연결 기록만 없었음) / **이 PR** = PR #109에서 Test 추가 / **보강 2** = 백엔드 마감 보강 PR(develop `a24a61f` 이후)에서 Test 추가 / **없음(후)** = Test 없음, 제출 후 / **범위 밖** = 기능 없음·대체된 계약
 
 ## 1. V2 소속·퇴사·재가입
 
@@ -37,7 +37,7 @@
 | V2-N-27 | 진행 중 근무 → 409 + 종료 시각 | 연결 | `LeaveConfirmServiceIntegrationTest.ongoingWorkAndExpiredContextRefuseWithoutWrites` |
 | V2-N-28 | 미리보기 후 근무 추가 → 확정 409 | 연결 | `LeaveConfirmServiceIntegrationTest.publishedTimeChangesProduceStaleAndNoWrites`, `DraftMembershipGuardConcurrencyTest.leaveWaitsForDraftAddAndBecomesStale` (#106) |
 | V2-N-29 | 응답 요약 수 = 실제 변경 수 | 연결 | `LeaveConfirmServiceIntegrationTest.commitsReassignmentCancellationDraftDeletionPatternPreservationAndInviteRotationTogether`, `actualV4ClosesSolePendingCandidateAndCountsBothReasons` |
-| V2-N-30 | 퇴사 후 근무지·관리·내 근무·알림 거부 또는 미표시 | 없음(후) | 각 조회의 현재 소속 조건으로 성립하나 "퇴사 확정 → 각 API" 장면 Test 없음 (POST 비활성) |
+| V2-N-30 | 퇴사 후 근무지·관리·내 근무·알림 거부 또는 미표시 | **보강 2** | `LeaveConfirmHttpIntegrationTest.leaverNoLongerSeesWorkplaceShiftsOrNotifications` (HTTP 퇴사 확정 → 같은 JWT로 근무지 목록·내 근무·알림 0, 미리보기 403) |
 | V2-N-31 | 퇴사 후 이전 근무 상세 거부 | 연결 | `MembershipRejoinCompatibilityIntegrationTest.endedMembershipShiftIsExcludedFromBothListAndDetailAfterRejoin` |
 | V2-N-32·33 | 퇴사·재가입 후 보낸 대타 목록 | 연결 | `SubstituteCurrentMembershipListTest.sentListShowsOnlyCurrentMembershipRequests` (#101) |
 | V2-N-34 | 과거 소속 이력 = 본인 종료 소속만 | 연결 | `MembershipRejoinIntegrationTest.endedMembershipHttpHistoryContainsOnlyActorHistoryAndExcludesCurrentMembership` |
@@ -64,7 +64,7 @@
 | V3-N-14 | 이력 저장 실패 → 담당자 변경 Rollback | 없음(후) | 대타 종료 실패 Rollback(`ShiftServiceTest` L781)은 있으나 이력 저장 실패 주입은 없음. V3 담당 |
 | V3-N-15 | 알림 실패 → 취소 성공 | 연결 | `ShiftChangeNotificationFailureIntegrationTest.allNotificationFailuresDoNotChangeBusinessResult` (#100) |
 | V3-N-16 | 진행 중 대타 있는 근무 취소·변경 → ML-3 | 연결 | `SubstituteShiftChangeIntegrationTest` (#96, V4-N-61·62) |
-| V3-N-17 | 관리자 두 명 동시 변경 (= H6-C4) | 없음(후) | V3 담당. #96에서 범위 밖으로 기록 |
+| V3-N-17 | 관리자 두 명 동시 변경 (= H6-C4) | **보강 2** | `PublishedReassignConcurrencyTest` 2건 (다른 대상: 이력 2건 순서대로 이어짐 / 같은 대상: 뒤 요청 `SAME_SHIFT_MEMBER_REASSIGNMENT`, 이력 1건) |
 | V3-N-18 | 퇴사 × 대타 승인 동시 | 부분 | `SubstituteMembershipGuardTest.approveWaitsForLeaveOfAccepter` (#105, 소속만 잠근 퇴사). 실제 퇴사 Service와의 경합은 없음(후) |
 | V3-N-19 | 퇴사 × Publish 동시 (= ML5-T9) | 없음(후) | |
 
@@ -73,7 +73,7 @@
 | ID | 계약 요약 | 판정 | 근거 Test |
 |---|---|---|---|
 | V4-N-18 | 재인계 뒤에도 `SHIFT_CHANGED` 유지 | 없음(후) | V4 담당 (작은 Test) |
-| H6-C4 | 관리자 두 명 인계 동시 | 없음(후) | V3-N-17과 같음 |
+| H6-C4 | 관리자 두 명 인계 동시 | **보강 2** | V3-N-17과 같음 |
 | ML5-T7 (H6-C6) | 퇴사 × 다른 후보 마지막 거절 | 연결 | `SubstituteMemberLeaveTest.lastRejectWaitsForLeaveInProgress`·`lastRejectAfterLeaveClosesAsCandidateIneligible` (#92) |
 | ML5-T9 | 퇴사 × Publish | 없음(후) | V3-N-19와 같음 |
 | ML5-T12 | Deadlock 유도 → 503 매핑 | 범위 밖 | 503 매핑 미구현 (G03-D-03 §5-3, 실험 후 적용) |
@@ -113,7 +113,12 @@ PR #100의 새 알림 Test는 NOTIFICATION-TYPES §8에만 기록돼 있어 여�
 | D05-T7 | 연결 | `publishedTimeChangesProduceStaleAndNoWrites`, `duplicateAndIncompleteDecisionsAreStaleWithoutWrites` |
 | D05-T8 | 연결 | `permitsDraftReductionAndRejectsRepeatedCompletion` (감소 성공), `DraftMembershipGuardConcurrencyTest.leaveWaitsForDraftAddAndBecomesStale` (증가 STALE) |
 | D05-T9 | 연결 | `lateFailureRollsBackClosedRequestsHistoryCancelledShiftAndDeletedDraft`, `failureAfterRealV4CleanupRollsBackCandidateAndAllV2V3Changes` |
-| D05-T3·T4·T5·T5b·T5c·T10·T11, D21-T8 | 없음(후) | 미리보기 뒤 확인 목록이 바뀌는 경우·기존 API 형식 회귀·응답 Field — **퇴사 확정 POST 활성화 체크리스트에 포함** |
+| D05-T3, D21-T8 | **보강 2 + 수정** | `LeaveConfirmServiceIntegrationTest.newConflictOnAnotherPairReturnsFullLatestListWithoutWrites` — 구현이 확인 안 된 쌍만(1건) 돌려주던 것을 §5-3 ③ "최신 정규화 목록"(2건)으로 수정 |
+| D05-T4 | **보강 2** | `.deletedUnavailableTimeStillPassesWithPreviousAcknowledgement` |
+| D05-T5 | **보강 2** | `.movedUnavailableTimeBeyondAcknowledgedRangeRequiresConfirmationAgain` (근무 시간으로 잘린 새 겹침) |
+| D05-T5b | **보강 2** | `.splitUnavailableTimeWithSameMergedOverlapPasses` |
+| D05-T5c | **보강 2** | `.substituteApprovedAfterPreviewMakesPlanStale` (실제 수락·승인 Command) |
+| D05-T10·T11 | 없음(후) | 기존 API 형식 회귀·응답 Field |
 | D21-T1~T5 | 연결 | G03-D-21 표의 BASELINE·MIGRATION 표기 (`ShiftServiceTest`·`SubstituteRequestServiceTest`·`SubstituteCandidateServiceTest`), D21-T3·T6은 V4-N-39 (#96) |
 
 ## 6. 요약
