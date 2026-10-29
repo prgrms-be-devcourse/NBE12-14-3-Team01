@@ -176,6 +176,8 @@ export default function ReceivedRequestsPage() {
   const [closedRequests, setClosedRequests] = useState<AcceptedClosedSubstituteRequestResponse[]>([]);
   const [isClosedLoading, setIsClosedLoading] = useState(true);
   const [closedLoadError, setClosedLoadError] = useState<string | null>(null);
+  // 지난 요청 탭에 들어올 때·다시 시도할 때 다시 불러옴 (화면을 열어 둔 사이 끝난 요청 반영)
+  const [closedReloadCount, setClosedReloadCount] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -289,7 +291,7 @@ export default function ReceivedRequestsPage() {
     return () => {
       ignore = true;
     };
-  }, [workplaceId]);
+  }, [workplaceId, closedReloadCount]);
 
   const handleAccept = async (candidateId: number) => {
     try {
@@ -400,7 +402,10 @@ export default function ReceivedRequestsPage() {
 
           <button
               type="button"
-              onClick={() => setTab("PAST")}
+              onClick={() => {
+                setTab("PAST");
+                setClosedReloadCount((prev) => prev + 1);
+              }}
               className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                   tab === "PAST"
                       ? "bg-[#005642] text-white"
@@ -515,8 +520,15 @@ export default function ReceivedRequestsPage() {
           )}
 
           {tab === "PAST" && !isClosedLoading && closedLoadError && (
-              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#f1cccc] bg-white text-sm text-[#d95555]">
-                {closedLoadError}
+              <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#f1cccc] bg-white text-sm text-[#d95555]">
+                <p>{closedLoadError}</p>
+                <button
+                    type="button"
+                    onClick={() => setClosedReloadCount((prev) => prev + 1)}
+                    className="rounded-lg border border-[#f1cccc] bg-white px-4 py-2 text-xs font-bold text-[#d95555] hover:bg-[#fff5f5]"
+                >
+                  다시 시도
+                </button>
               </div>
           )}
 
