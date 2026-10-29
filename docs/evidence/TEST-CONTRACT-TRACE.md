@@ -43,7 +43,7 @@
 | V2-N-34 | 과거 소속 이력 = 본인 종료 소속만 | 연결 | `MembershipRejoinIntegrationTest.endedMembershipHttpHistoryContainsOnlyActorHistoryAndExcludesCurrentMembership` |
 | V2-N-35 | 취소 근무: 상세 거부, 빠진 근무에 표시 | 연결 | `ShiftServiceTest` "근무 상세 조회 실패 - 취소된 근무인 경우", `RemovedShiftQueryServiceTest.cancelledShiftIsListed` (#95) |
 | V2-N-36·37·38·40 | 빠진 근무 (인계 표시, 재가입 격리, A→B→A 제외, 8일 전 제외) | 연결 | `RemovedShiftQueryServiceTest.reassignedShiftIsListedForPreviousMemberOnly`·`previousMembershipIsExcludedAfterRejoin`·`shiftReturnedToMeIsExcluded`·`sevenDayBoundaryIsInclusive` (#95) |
-| V2-N-53 | UP-06 퇴사 전체 흐름 | 없음(후) | 퇴사 확정 POST 활성화 후 사용자 경로 Test |
+| V2-N-53 | UP-06 퇴사 전체 흐름 | 부분 | `LeaveConfirmHttpIntegrationTest` (HTTP 미리보기 → 확정 → DB·알림). 화면 경로는 Frontend 연결 후 |
 
 ## 2. V3 근무·공개 후 변경 (ML-2)
 
@@ -102,7 +102,7 @@ PR #100의 새 알림 Test는 NOTIFICATION-TYPES §8에만 기록돼 있어 여�
 | NT-T14 | 실행 관리자 0건, 다른 관리자 1건 | 연결 | 같은 Test + `ShiftChangeNotificationPlannerTest.actorExcludedOnlyFromManagerRole` |
 | NT-T15 | 응답의 종료 요청 수 = 실제 종료 수 | 연결 | `SubstituteShiftChangeIntegrationTest` (#96, `closedSubstituteRequests`) |
 | NT-T16 ② | 활성 요청 없음 → 0, 종료 알림 0 | 연결 | `ShiftChangeNotificationIntegrationTest.cancelWithoutRequestNotifiesOwnerOnly` |
-| V5-N-20 | 퇴사 확정의 자격 상실 알림 (실행 관리자 제외) | 없음(후) | 퇴사 확정 알림 연결 전 (#102 후속 4번) |
+| V5-N-20 | 퇴사 확정의 자격 상실 알림 (실행 관리자 제외) | 연결 | `LeaveConfirmHttpIntegrationTest.previewThenConfirmCommitsEverythingAndNotifies` (실행 관리자는 자기 요청의 요청자 알림 1건만) |
 
 ## 5. 퇴사 확정 확인 형식 (G03-D-05, G03-D-21)
 
@@ -130,3 +130,4 @@ PR #100의 새 알림 Test는 NOTIFICATION-TYPES §8에만 기록돼 있어 여�
 | 일자 | 내용 |
 |---|---|
 | 2026-10-29 | 초안. 연결되지 않은 90개 ID 정적 대조, #100 알림 Test 연결, V2-N-21·22·NT-T8 Test 추가 (EV는 PR 본문) |
+| 2026-10-29 | 퇴사 확정 POST 활성화: V5-N-20 연결, V2-N-53 부분 |

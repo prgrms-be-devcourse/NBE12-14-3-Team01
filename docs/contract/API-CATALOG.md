@@ -92,7 +92,8 @@
 | 409 응답 | **CONFIRM_REQUIRED** (`data` = G03-D-05 §5-1 충돌 목록, 겹침 구간만) / **STALE** (계획이 지금과 다름 → 미리보기 다시 조회. 예: 같은 근무지의 인계 대상이 그 사이 퇴사, 근무가 그 사이 인계·취소됨, 미리보기 이후 DRAFT/대타 자동 대상 추가·교체·처리 효과 확대. 자동 대상이 감소하기만 하면 다른 조건 재검증 후 진행 가능) / **STATE_CONFLICT** (진행 중 근무 — `data`에 종료 시각, 이미 종료된 소속, 대상이 MANAGER) / **FORBIDDEN_CONFLICT** (인계 대상의 공식 근무 중복. 기존 SFT·SCH code 재사용 여부는 S2-4) |
 | 상태 변경 (한 Transaction) | 대상 소속 `leftAt = now` / 인계 근무: `Shift.member = 대상` + 배정 이력 (`MEMBER_LEFT`) / 취소 근무: `CANCELLED` + 취소 사유 `MEMBER_LEFT`·시각·행위자 / DRAFT 삭제 / 퇴사자 근무의 활성 Request → `CLOSED / SHIFT_CHANGED` / 퇴사자가 후보인 Request: PENDING → `INELIGIBLE`, 수락자면 Request `CLOSED / CANDIDATE_INELIGIBLE` / (선택) 초대 코드 재발급. Pattern은 보존하고 자동 적용 제외 |
 | Lock (ML-5 후보, 실험 전) | (재발급 시 Workplace) → 관련 Schedule → 퇴사자 근무 Shift → 관련 Request → 인계 대상 User (ID 오름차순) → 인계 대상 소속 `FOR SHARE` + 퇴사 대상 소속 `FOR UPDATE` → 다시 조회 → 미리보기와 대상+처리 효과 비교(추가/교체/확대는409 STALE). 검사 후 삽입 경합도 공통 Guard로 검증 |
-| 알림 (Commit 후, 최선 노력) | 인계받은 직원 (근무 배정), 대타 종료 관련자 (요청자·후보, 현재 소속만, ML-3), 퇴사자는 받지 않음. 대체 조회 화면: 예정 근무, 보낸·수락 대타 목록 (G03-D-22) |
+| 알림 (Commit 후, 최선 노력) | 인계받은 직원 (근무 배정), 대타 종료 관련자 (요청자·ACCEPTED 후보, **실행 관리자를 뺀 다른 현재 관리자**, 현재 소속만, ML-3·NOTIFICATION-TYPES §6-3-2), 퇴사자는 받지 않음. 대체 조회 화면: 예정 근무, 보낸·수락 대타 목록, 관리자 끝난 대타 (API-SB-02) (G03-D-22) |
+| 구현 (2026-10-29) | PR #102 핵심 로직 + **POST 활성화** (소속 Guard #105·#106 뒤 Readiness Bean, `feat/v2-leave-confirm-activate`). 오류 code: 공식 근무 충돌은 기존 `SFT-009`/`SFT-010`, 원본 검증 실패는 `WPL-010` (DL-016, 팀 기록 필요). 알림은 소속 종료 뒤 발행 (V5-N-20). Test `LeaveConfirmHttpIntegrationTest` (Security Filter·JWT) |
 | 데이터 출처 | API-LV-01과 같고, 인계 대상의 불가능 시간(본인 User 기준), 인계 대상의 공식 근무 (User 기준 충돌 검사) |
 | Test | ML-4 V2-N-24~40, ML-2 V3-N-01~08, ML-3 V4-N-08~22 일부, G03-D-05 D05-T1~T9·T11, G03-D-21 D21-T7~T9 |
 
@@ -437,3 +438,4 @@ ID를 직접 받는 API 전체에 M3 선검사 원칙을 적용한다. 구현은
 | 2026-10-29 | CHG-02 SUB-05 현재 소속 구현, CHG-03은 PR #82 구현에 Test 연결 (V4-N-36·37, EV-042) |
 | 2026-10-29 | API-SB-02 구현 행 추가 (경로 확정, 기간·페이지 파라미터, 응답 필드, 사실 Field 정의, 없는 근무지 403). 팀 승인은 PR 리뷰로 요청 중 (EV-044) |
 | 2026-10-29 | API-SB-02 PR #104 리뷰 반영: 수락자 여러 명 → `SUB-016`, 없는 근무지 403은 AS-IS로 확인 (EV-044) |
+| 2026-10-29 | API-LV-02 POST 활성화·구현 행, 알림 행에 다른 현재 관리자 반영 |
